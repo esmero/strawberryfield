@@ -6,7 +6,7 @@
  * Time: 9:26 PM
  */
 
-namespace Drupal\strawberryfield\Plugin\FieldWidget;
+namespace Drupal\strawberryfield\Plugin\Field\FieldWidget;
 
 use Drupal\Core\Field\Plugin\Field\FieldWidget\StringTextareaWidget;
 /**
