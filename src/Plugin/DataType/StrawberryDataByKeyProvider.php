@@ -43,7 +43,9 @@ class StrawberryDataByKeyProvider extends TypedData
     $flattened = [];
     // BY reference it fills @var $flattened with a shallow json
     StrawberryfieldJsonHelper::jsonFlattener($json, $flattened);
-
+    if (isset($flattened[$needle])){
+      $values[] = $flattened[$needle];
+    }
     foreach ($flattened as $graphitems) {
       if (isset($graphitems[$needle])) {
         if (is_array($graphitems[$needle])) {

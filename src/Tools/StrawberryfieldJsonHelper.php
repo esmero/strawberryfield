@@ -48,20 +48,14 @@ class StrawberryfieldJsonHelper {
 
   /**
    * Flattens JSON string into array
-   * https://stackoverflow.com/questions/28393612/flattening-a-json-multi-depty-array-in-php
    *
    * @param string $json
    * @param array $flat
    */
   public static function jsonFlattener(array $json = [], array &$flat = [])
   {
-    foreach ($json as $item) {
-      $c = isset($item->children) ? $item->children : null;
-      unset($item->children);
-      $flat [] = $item;
-      if ($c)
-        StrawberryfieldJsonHelper::jsonFlattener($c, $flat);
-    }
+    //@TODO refactor to https://github.com/tonirilix/nested-json-flattener/blob/20396e7dfd040b6061a5b85e72fe4e187f3d499f/src/Flattener/Flattener.php#L47
+    $flat = $json;
 
   }
 
