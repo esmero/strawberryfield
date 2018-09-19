@@ -15,7 +15,7 @@ use Drupal\Core\TypedData\DataDefinition;
  *   label = @Translation("Strawberry Field"),
  *   module = "strawberryfield",
  *   default_formatter = "strawberry_default_formatter",
- *   default_widget = "string_textarea",
+ *   default_widget = "strawberry_textarea",
  *   constraints = {"valid_strawberry_json" = {}}
  *   category = "GLAM Metadata",
  * )
