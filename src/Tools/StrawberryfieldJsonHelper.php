@@ -8,10 +8,14 @@
 
 namespace Drupal\strawberryfield\Tools;
 
-/**
- * Defines a minimal JSON-LD context.
- */
-CONST DEFAULT_JSONLDCONTEXT = '{
+
+
+class StrawberryfieldJsonHelper {
+
+  /**
+* Defines a minimal JSON-LD context.
+*/
+  CONST DEFAULT_JSONLDCONTEXT = '{
     "@context":  {
        "type": "@type",
         "id": "@id",
@@ -41,8 +45,6 @@ CONST DEFAULT_JSONLDCONTEXT = '{
          "name": { "@id": "schema:name" }
        }
     }';
-
-class StrawberryfieldJsonHelper {
 
   /**
    * Flattens JSON string into array

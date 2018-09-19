@@ -8,6 +8,8 @@
 
 namespace Drupal\strawberryfield\Tools;
 
+use \Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
+
 
 class StrawberryKeyNameProvider {
 
