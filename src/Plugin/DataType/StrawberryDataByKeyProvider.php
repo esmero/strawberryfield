@@ -38,6 +38,7 @@ class StrawberryDataByKeyProvider extends TypedData
     $definition = $this->getDataDefinition();
     // This key is passed by the property definition in the field class
     $needle = $definition['jsonkey'];
+    dpm($needle);
     $flattened = [];
     // BY reference it fills @var $flattened with a shallow json
     StrawberryfieldJsonHelper::jsonFlattener($json, $flattened);
