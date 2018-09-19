@@ -1,8 +1,10 @@
-name: Strawberry Field Module
+name: Strawberry Field
 description: Creates a field type that stores JSON and makes it available to other Drupal modules.
-package: Custom
-
+package: Field types
 type: module
-core: 8.x
-
-php: 5.6
+core: 8.5.x
+php: 7.1
+dependencies:
+  - 'drupal:field'
+  - 'drupal:system (>= 8.5)'
+  - 'drupal:user'
