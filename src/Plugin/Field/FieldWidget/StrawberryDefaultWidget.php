@@ -20,4 +20,4 @@ use Drupal\Core\Field\Plugin\Field\FieldWidget\StringTextareaWidget;
  *   }
  * )
  */
-class StrawberryFieldDefaultWidget extends StringTextareaWidget {}
+class StrawberryDefaultWidget extends StringTextareaWidget {}
