@@ -8,7 +8,7 @@
 
 namespace Drupal\strawberryfield\Tools;
 
-use \Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
+use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
 
 
 class StrawberryKeyNameProvider {
@@ -37,7 +37,7 @@ class StrawberryKeyNameProvider {
     ];
     $validkeys = array_keys(
       array_merge(
-        $jsonld_reservedkeys['@context'],
+        $jsonldcontextarray['@context'],
         array_fill_keys($jsonld_reservedkeys, 'stub')
       )
     );
