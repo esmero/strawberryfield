@@ -15,7 +15,6 @@ class StrawberryKeyNameProvider {
 
   public static function fetchKeyNames() {
     $jsonldcontext = StrawberryfieldJsonHelper::SIMPLE_JSONLDCONTEXT;
-    dump($jsonldcontext);
     // @TODO refactor the keyname generation to multiple methods
     $validkeys = [];
     $jsonldcontextarray = json_decode($jsonldcontext, TRUE);

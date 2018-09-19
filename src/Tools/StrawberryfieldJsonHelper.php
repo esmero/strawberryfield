@@ -30,7 +30,7 @@ class StrawberryfieldJsonHelper {
         "dateIssued": { "@id": "schema:dateIssued", "@type": "DateTime"},
         "dateModified": { "@id": "schema:dateModified", "@type": "Date"},
         "datePosted": { "@id": "schema:datePosted", "@type": "Date"},
-        "datePublished": { "@id": "schema:datePublished", "@type": "Date"}
+        "datePublished": { "@id": "schema:datePublished", "@type": "Date"},
         "Application": "as:Application",
         "Dataset": "dctypes:Dataset",
         "Image": "dctypes:StillImage",
