@@ -16,7 +16,7 @@ use Drupal\Core\TypedData\DataDefinition;
  *   module = "strawberryfield",
  *   default_formatter = "strawberry_default_formatter",
  *   default_widget = "strawberry_textarea",
- *   constraints = {"valid_strawberry_json" = {}}
+ *   constraints = {"valid_strawberry_json" = {}},
  *   category = "GLAM Metadata",
  * )
  */
@@ -101,4 +101,3 @@ use Drupal\Core\TypedData\DataDefinition;
 
 
  }
- 
