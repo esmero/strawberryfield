@@ -49,14 +49,74 @@ class StrawberryfieldJsonHelper {
   /**
    * Flattens JSON string into array
    *
-   * @param string $json
-   * @param array $flat
-   */
-  public static function jsonFlattener(array $json = [], array &$flat = [])
-  {
-    //@TODO refactor to https://github.com/tonirilix/nested-json-flattener/blob/20396e7dfd040b6061a5b85e72fe4e187f3d499f/src/Flattener/Flattener.php#L47
-    $flat = $json;
+   * @param array $sourcearray
+   *    An Associative array coming, maybe, from a JSON string.
+   * @param string $propertypath;
+   *   Use to accumulate the propertypath between recursive calls.
 
+   */
+  public static function arrayToFlatPropertypaths(array $sourcearray = [], $propertypath = '')
+  {
+    $flat = array();
+    foreach ($sourcearray as $key => $values) {
+      if (is_array($values)) {
+        $flat = $flat + static::arrayToFlatPropertypaths($values,  $propertypath.$key.'.');
+      }
+      else {
+        $flat[$propertypath.$key] = $values;
+      }
+    }
+
+    return $flat;
   }
+
+
+  /**
+   * @param array $array
+   *     An Associative array coming, maybe, from a JSON string.
+   * @param array $flat
+   *     An by reference accumulator.
+   * @param bool $jsonld
+   *    If special JSONLD handling is desired.
+   *
+   * @return array
+   *   Same as the accumulator but left there in case someone needs a return.
+   */
+  public static function arrayToFlatCommonkeys(array $array, &$flat = array(), $jsonld = TRUE)
+  {
+    if (($jsonld) && array_key_exists('@graph', $array)) {
+      $array = $array['@graph'];
+    } else {
+      // @TODO We need to deal with posiblity of multiple @Contexts
+      // Which could make a same $key mean different things.
+      // In this case @context could or not exist.
+      unset($array['@context']);
+    }
+    foreach ($array as $key=>$value) {
+      if (is_array($value)) {
+        static::arrayToFlatCommonkeys($value, $flat, $jsonld);
+      }
+      else {
+        $flat[$key][] = $value;
+      }
+    }
+    return $flat;
+  }
+
+
+
+
+  /**
+   * Array helper that checks if an array is associative or not
+   *
+   * @param array $sourcearray
+   *
+   * @return bool
+   */
+  public static function jsonIsList(array $sourcearray =  []) {
+      return empty(array_filter(array_keys($sourcearray), 'is_string'));
+  }
+
+
 
 }
