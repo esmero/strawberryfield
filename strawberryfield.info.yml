@@ -5,6 +5,8 @@ type: module
 core: 8.x
 php: 7.1
 dependencies:
-  - 'drupal:field'
   - 'drupal:system (>= 8.6)'
   - 'drupal:user'
+  - 'drupal:field'
+  - 'drupal:serialization'
+  - 'drupal:hal'
