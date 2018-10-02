@@ -85,9 +85,24 @@ use Drupal\Core\TypedData\DataDefinition;
     * {@inheritdoc}
     */
    public function isEmpty() {
-     $value = parent::isEmpty();
-     //@TODO: assume a json with only keys and no values is empty
-     return $value === NULL || $value === '';
+     
+     if (empty($this->properties['value'])) {
+       return true;
+     }
+     
+     $json_array = json_decode($this->properties['value'], true);
+
+     foreach ($json_array as $key => $value) {
+       if(!empty($value)) {
+         return false;
+       }
+
+       if (is_array($value)) {
+         return false;
+       }
+     }
+
+     return true;          
    }
 
    /**
