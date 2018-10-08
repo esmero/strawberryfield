@@ -1,0 +1,6 @@
+entity.strawberry_keynameprovider.add_form:
+  route_name: entity.strawberry_keynameprovider.add_form
+  title: 'Add Strawberry Key Name Provider'
+  appears_on:
+    - entity.strawberry_keynameprovider.collection
+

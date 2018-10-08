@@ -46,7 +46,7 @@ class StrawberryDefaultFormatter extends FormatterBase {
     foreach ($items as $delta => $item) {
       // Render each element as markup.
       $element[$delta] = [
-        '#markup' => $item->value,
+        '#markup' => json_encode(json_decode($item->value, true), JSON_PRETTY_PRINT),
         '#prefix' => '<pre>',
         '#suffix' => '</pre>',
       ];

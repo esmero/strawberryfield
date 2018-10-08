@@ -1,0 +1,9 @@
+
+# Strawberry Key Name Providers menu items definition
+entity.strawberry_keynameprovider.collection:
+  title: 'Strawberry Key Name Providers'
+  route_name: entity.strawberry_keynameprovider.collection
+  description: 'List Strawberry Key Name Providers (bundles)'
+  parent: system.admin_structure
+  weight: 99
+

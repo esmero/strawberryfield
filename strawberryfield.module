@@ -25,6 +25,7 @@ function strawberryfield_node_insert(NodeInterface $node) {
  */
 function strawberryfield_invalidate_fieldefinition_caches(NodeInterface $node) {
 
+  //@TODO do the same for StrawberryfieldKeyNameProvider Plugins
   if ($node->isPublished() && $node->isDefaultRevision()) {
     $needscleaning = FALSE;
     $strawberry_field_class = $class = \Drupal::service('plugin.manager.field.field_type')->getPluginClass('strawberryfield_field');
