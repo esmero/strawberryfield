@@ -10,13 +10,13 @@ namespace Drupal\strawberryfield\Tools;
 
 use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
 
-
+/* @deprecated in favour of Plugins of type \Drupal\strawberryfield\Plugin\StrawberryfieldKeyNameProviderInterface */
 class StrawberryKeyNameProvider {
 
   public static function fetchKeyNames() {
     $jsonldcontext = StrawberryfieldJsonHelper::SIMPLE_JSONLDCONTEXT;
     // @TODO refactor the keyname generation to multiple methods
-    // @TODO Or even better to be a service defintion.
+    // @TODO Or even better to be a service definition.
     $validkeys = [];
     $jsonldcontextarray = json_decode($jsonldcontext, TRUE);
 
@@ -44,6 +44,5 @@ class StrawberryKeyNameProvider {
 
     return $validkeys;
   }
-
 
 }
