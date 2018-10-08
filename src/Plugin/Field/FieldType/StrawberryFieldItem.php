@@ -8,6 +8,7 @@ use Drupal\strawberryfield\Tools\StrawberryKeyNameProvider;
 use Drupal\Core\TypedData\DataDefinition;
 use Drupal\strawberryfield\Plugin\StrawberryfieldKeyNameProviderManager;
 use Drupal\strawberryfield\Entity\keyNameProviderEntity;
+use Drupal\Component\Utility\Random;
 
 /**
  * Provides a field type of strawberryfield.
@@ -123,24 +124,9 @@ use Drupal\strawberryfield\Entity\keyNameProviderEntity;
     * {@inheritdoc}
     */
    public function isEmpty() {
-     
-     if (empty($this->properties['value'])) {
-       return true;
-     }
-     
-     $json_array = json_decode($this->properties['value'], true);
-
-     foreach ($json_array as $key => $value) {
-       if(!empty($value)) {
-         return false;
-       }
-
-       if (is_array($value)) {
-         return false;
-       }
-     }
-
-     return true;          
+     $value = parent::isEmpty();
+     //@TODO: assume a json with only keys and no values is empty
+     return $value === NULL || $value === '';
    }
 
    /**
