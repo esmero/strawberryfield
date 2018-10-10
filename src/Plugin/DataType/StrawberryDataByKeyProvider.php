@@ -42,8 +42,13 @@ class StrawberryDataByKeyProvider extends TypedData
 
     $flattened = [];
     StrawberryfieldJsonHelper::arrayToFlatCommonkeys($jsonArray,$flattened, TRUE );
+    // @ TODO research moving this to \Drupal\Core\TypedData\Plugin\DataType\Map
+    // Solr is having issues dealing with that type
+    // but would allow us to avoid imploding and then deimploding
+
+    // Also, see if we need to quote everything
     if (isset($flattened[$needle])){
-      $values[] = $flattened[$needle];
+      $values[] = implode(",", $flattened[$needle]);
     }
     foreach ($flattened as $graphitems) {
       if (isset($graphitems[$needle])) {
