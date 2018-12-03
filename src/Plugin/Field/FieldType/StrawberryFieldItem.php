@@ -6,6 +6,9 @@ use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\strawberryfield\Tools\StrawberryKeyNameProvider;
 use Drupal\Core\TypedData\DataDefinition;
+use Drupal\strawberryfield\Plugin\StrawberryfieldKeyNameProviderManager;
+use Drupal\strawberryfield\Entity\keyNameProviderEntity;
+use Drupal\Component\Utility\Random;
 
 /**
  * Provides a field type of strawberryfield.
@@ -66,7 +69,44 @@ use Drupal\Core\TypedData\DataDefinition;
        ->setRequired(TRUE);
 
      // @See also https://api.drupal.org/api/drupal/core%21lib%21Drupal%21Core%21TypedData%21OptionsProviderInterface.php/interface/OptionsProviderInterface/8.5.x
-     $keynamelist = StrawberryKeyNameProvider::fetchKeyNames();
+
+     $keynamelist = [];
+
+     $plugin_config_entities = \Drupal::EntityTypeManager()->getListBuilder('strawberry_keynameprovider')->load();
+     if (count($plugin_config_entities))  {
+       /* @var keyNameProviderEntity[] $plugin_config_entities */
+       foreach($plugin_config_entities as $plugin_config_entity) {
+         if ($plugin_config_entity->isActive()) {
+           $entity_id = $plugin_config_entity->id();
+           $configuration_options = $plugin_config_entity->getPluginconfig();
+           // This argument is used when buildin the cid for the plugin internal cache.
+           $configuration_options['configEntity'] = $entity_id ;
+           //@TODO HOW MANY KEYS? we should be able to set this per instance.
+           $keynamelist = array_merge(\Drupal::service('strawberryfield.keyname_manager')->createInstance($plugin_config_entity->getPluginid(),$plugin_config_entity->getPluginconfig())->provideKeyNames(), $keynamelist);
+         }
+       }
+     } else {
+       // @TODO not sure if i need this. This is the default in case we have no plugins yet.
+       //
+       $keyprovider_plugin = \Drupal::service('strawberryfield.keyname_manager')
+         ->getDefinitions();
+       // Collect the key Providers Plugins
+
+       foreach ($keyprovider_plugin as $plugin_definition) {
+         /* @var \Drupal\strawberryfield\Plugin\StrawberryfieldKeyNameProviderInterface $plugin_definition */
+         $keynamelist = array_merge(
+           \Drupal::service('strawberryfield.keyname_manager')->createInstance(
+             $plugin_definition['id'],
+             []
+           )->provideKeyNames(),
+           $keynamelist
+         );
+       }
+     }
+    // @TODO add also the flat representation as a property. Simply reuse our internal property helper
+    // Handy when dealing with Field formatters
+
+
      foreach ($keynamelist as $keyname) {
        $properties[$keyname] = DataDefinition::create('string')
          ->setLabel($keyname)

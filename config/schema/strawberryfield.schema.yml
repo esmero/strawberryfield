@@ -1,0 +1,34 @@
+strawberryfield.strawberry_keynameprovider.*:
+  type: config_entity
+  label: 'Strawberry Key Name Providers config'
+  mapping:
+    id:
+      type: string
+      label: 'ID'
+    label:
+      type: label
+      label: 'Label'
+    uuid:
+      type: string
+    pluginid:
+      type: string
+      label: 'Plugin ID'
+    pluginconfig:
+      type: strawberryfield.strawberry_keynameprovider.[%parent.pluginid]
+    active:
+      type: boolean
+      label: 'Whether this plugin is active or not'
+
+strawberryfield.strawberry_keynameprovider.jsonld:
+  type: config_object
+  label: 'Strawberry Key Name Provider JSONLD specific config'
+  mapping:
+    url:
+      type: string
+      label: 'JSON LD Content URI'
+    filterurl:
+      type: string
+      label: 'Narrow down JSONLD document'
+    keys:
+      type: string
+      label: 'Additional Keys to include'

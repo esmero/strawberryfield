@@ -33,7 +33,7 @@ class StrawberryDataByKeyProvider extends TypedData
     $values = [];
     $item = $this->getParent();
     // Should 10 be enough? this is json-ld not github.. so maybe...
-    $json = json_decode($item->value,true,10);
+    $jsonArray = json_decode($item->value,true,10);
 
     $definition = $this->getDataDefinition();
 
@@ -41,10 +41,14 @@ class StrawberryDataByKeyProvider extends TypedData
     $needle = $definition['settings']['jsonkey'];
 
     $flattened = [];
-    // BY reference it fills @var $flattened with a shallow json
-    StrawberryfieldJsonHelper::jsonFlattener($json, $flattened);
+    StrawberryfieldJsonHelper::arrayToFlatCommonkeys($jsonArray,$flattened, TRUE );
+    // @ TODO research moving this to \Drupal\Core\TypedData\Plugin\DataType\Map
+    // Solr is having issues dealing with that type
+    // but would allow us to avoid imploding and then deimploding
+
+    // Also, see if we need to quote everything
     if (isset($flattened[$needle])){
-      $values[] = $flattened[$needle];
+      $values[] = implode(",", $flattened[$needle]);
     }
     foreach ($flattened as $graphitems) {
       if (isset($graphitems[$needle])) {

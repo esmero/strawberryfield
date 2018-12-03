@@ -1,0 +1,50 @@
+<?php
+/**
+ * @file
+ * Contains strawberryfield.module.
+ */
+
+use Drupal\Core\Cache\Cache;
+use Drupal\node\NodeInterface;
+
+
+/**
+ * Implements hook_node_insert().
+ *
+ * @param \Drupal\node\NodeInterface $node
+ */
+function strawberryfield_node_insert(NodeInterface $node) {
+  strawberryfield_invalidate_fieldefinition_caches($node);
+}
+
+
+/**
+ * Invalidate the cache for strawberryfields field type defintions.
+ *
+ * @param \Drupal\node\NodeInterface $node
+ */
+function strawberryfield_invalidate_fieldefinition_caches(NodeInterface $node) {
+
+  //@TODO do the same for StrawberryfieldKeyNameProvider Plugins
+  if ($node->isPublished() && $node->isDefaultRevision()) {
+    $needscleaning = FALSE;
+    $strawberry_field_class = $class = \Drupal::service('plugin.manager.field.field_type')->getPluginClass('strawberryfield_field');
+    foreach ($node->getFieldDefinitions() as $field) {
+      $field_name = $field->getName();
+      $class = $field->getItemDefinition()->getClass();
+      $is_ripe = ($class === $strawberry_field_class) || is_subclass_of(
+          $class,
+          $strawberry_field_class
+        );
+      if ($is_ripe) {
+        //@TODO lets accumulate the keys and put then in a new entity type @context
+        $needscleaning = TRUE;
+      }
+    }
+
+    if ($needscleaning) {
+      \Drupal::service('plugin.manager.field.field_type')->clearCachedDefinitions();
+    }
+
+  }
+}

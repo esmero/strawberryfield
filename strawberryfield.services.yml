@@ -1,0 +1,4 @@
+services:
+    strawberryfield.keyname_manager:
+        class: Drupal\strawberryfield\Plugin\StrawberryfieldKeyNameProviderManager
+        parent: default_plugin_manager

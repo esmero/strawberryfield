@@ -1,0 +1,19 @@
+{
+    "name": "strawberryfield/strawberryfield",
+    "description": "A strawberry field for Drupal 8",
+    "type": "drupal-module",
+    "license": "GPL-2.0+",
+    "homepage": "https://github.com/esmero/strawberryfield",
+    "authors": [
+        {
+            "name": "Diego Pino Navarro",
+            "email": "dpino@metro.org",
+            "homepage": "https://github.com/DiegoPino",
+            "role": "Owner"
+        }
+    ],
+    "require": {
+        "ml/json-ld": "^1.0",
+        "mtdowling/jmespath.php":"^2.4"
+    }
+}
