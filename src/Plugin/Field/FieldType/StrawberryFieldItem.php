@@ -103,7 +103,8 @@ use Drupal\Component\Utility\Random;
          );
        }
      }
-
+    // @TODO add also the flat representation as a property. Simply reuse our internal property helper
+    // Handy when dealing with Field formatters
 
 
      foreach ($keynamelist as $keyname) {
