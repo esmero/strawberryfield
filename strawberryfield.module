@@ -118,6 +118,3 @@ function strawberryfield_node_presave(ContentEntityInterface $entity) {
     }
   }
 }
-
-
-

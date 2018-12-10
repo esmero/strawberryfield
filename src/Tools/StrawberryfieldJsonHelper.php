@@ -156,6 +156,4 @@ class StrawberryfieldJsonHelper {
       return empty(array_filter(array_keys($sourcearray), 'is_string'));
   }
 
-
-
 }
