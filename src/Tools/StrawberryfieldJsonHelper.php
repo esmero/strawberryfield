@@ -59,8 +59,46 @@ class StrawberryfieldJsonHelper {
   {
     $flat = array();
     foreach ($sourcearray as $key => $values) {
+
       if (is_array($values)) {
         $flat = $flat + static::arrayToFlatPropertypaths($values,  $propertypath.$key.'.');
+      }
+      else {
+        $flat[$propertypath.$key] = $values;
+      }
+    }
+
+    return $flat;
+  }
+
+
+  /**
+   * Flattens JSON string into array
+   *
+   * Converts URI and numeric keys to wildcards
+   *
+   * @param array $sourcearray
+   *    An Associative array coming, maybe, from a JSON string.
+   * @param string $propertypath;
+   *   Use to accumulate the propertypath between recursive calls.
+
+   */
+  public static function arrayToFlatJsonPropertypaths(array $sourcearray = [], $propertypath = '')
+  {
+    $flat = array();
+    foreach ($sourcearray as $key => $values) {
+      // If a Key is an URL chances are we are dealing with many different ones
+      // Also we want to build JSON Paths here, so replace with *
+      if(filter_var($key , FILTER_VALIDATE_URL)) {
+        $key = "*";
+      } elseif (is_integer($key)) {
+        $key = '[*]';
+        //@TODO research implications of $.field[*] versus $.field.[*]
+      }
+      // I could break here instead of iterating further, but that could exclude sub properties not present
+      // In the first element
+      if (is_array($values)) {
+        $flat = $flat + static::arrayToFlatJsonPropertypaths($values,  $propertypath.$key.'.');
       }
       else {
         $flat[$propertypath.$key] = $values;
@@ -92,9 +130,10 @@ class StrawberryfieldJsonHelper {
       // In this case @context could or not exist.
       unset($array['@context']);
     }
-    foreach ($array as $key=>$value) {
+    foreach ($array as $key => $value) {
       if (is_array($value)) {
         static::arrayToFlatCommonkeys($value, $flat, $jsonld);
+        $flat[$key][] = $value;
       }
       else {
         $flat[$key][] = $value;

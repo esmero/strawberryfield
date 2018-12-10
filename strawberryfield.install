@@ -1,0 +1,37 @@
+<?php
+/**
+ * @file
+ * Contains install and update functions for strawberryfield.
+ */
+
+use Drupal\Core\Language\LanguageInterface;
+use Drupal\taxonomy\Entity\Vocabulary;
+use Drupal\taxonomy\Entity\Term;
+
+/**
+ * Implements hook_install().
+ */
+
+function strawberry_install() {
+  $vid = "strawberryfield_voc_id";
+  $name = "Strawberryfield Metadata Keys";
+  $vocabularies = Vocabulary::loadMultiple();
+  if (!isset($vocabularies[$vid])) {
+
+    // Create a vocabulary to hold strawberryfield json keys.
+    $vocabulary = Vocabulary::create([
+      'name' => $name,
+      'description' => 'Holds Strawberry Field provided JSON Keys. Populated automatically on node save.',
+      'vid' => $vid,
+      'langcode' => LanguageInterface::LANGCODE_NOT_SPECIFIED,
+      'weight' => 0,
+    ]);
+    $vocabulary->save();
+  }
+  else {
+    // @TODO Vocabulary Already exist. Reuse as key provider.
+    $query = \Drupal::entityQuery('taxonomy_term');
+    $query->condition('vid', $vid);
+    $tids = $query->execute();
+  }
+}

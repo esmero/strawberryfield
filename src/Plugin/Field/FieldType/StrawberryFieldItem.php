@@ -4,11 +4,10 @@ namespace Drupal\strawberryfield\Plugin\Field\FieldType;
 use Drupal\Core\Field\FieldItemBase;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Field\FieldDefinitionInterface;
-use Drupal\strawberryfield\Tools\StrawberryKeyNameProvider;
-use Drupal\Core\TypedData\DataDefinition;
-use Drupal\strawberryfield\Plugin\StrawberryfieldKeyNameProviderManager;
+use Drupal\Core\TypedData\DataDefinition;;
 use Drupal\strawberryfield\Entity\keyNameProviderEntity;
 use Drupal\Component\Utility\Random;
+use Drupal\Core\TypedData\ListDataDefinition;
 
 /**
  * Provides a field type of strawberryfield.
@@ -63,12 +62,30 @@ use Drupal\Component\Utility\Random;
     */
    public static function propertyDefinitions(FieldStorageDefinitionInterface $field_definition) {
 
+
+     $reserverd_keys = [
+       'value',
+       'str_flatten_keys',
+     ];
+
      // @TODO mapDataDefinition() is the next step.
      $properties['value'] = DataDefinition::create('string')
        ->setLabel(t('JSON String'))
        ->setRequired(TRUE);
 
      // @See also https://api.drupal.org/api/drupal/core%21lib%21Drupal%21Core%21TypedData%21OptionsProviderInterface.php/interface/OptionsProviderInterface/8.5.x
+
+     // All properties as Property keys.
+     // Handy when dealing with Field formatters
+     $properties['str_flatten_keys'] = ListDataDefinition::create('string')
+       ->setLabel('JSON keys defined in this field')
+       ->setComputed(TRUE)
+       ->setClass(
+         '\Drupal\strawberryfield\Plugin\DataType\StrawberryKeysFromJson'
+       )
+       ->setInternal(FALSE)
+       ->setReadOnly(TRUE);
+
 
      $keynamelist = [];
 
@@ -103,11 +120,12 @@ use Drupal\Component\Utility\Random;
          );
        }
      }
-    // @TODO add also the flat representation as a property. Simply reuse our internal property helper
-    // Handy when dealing with Field formatters
-
 
      foreach ($keynamelist as $keyname) {
+       if (isset($reserverd_keys[$keyname])) {
+         // Avoid internal reserved keys
+         continue;
+       }
        $properties[$keyname] = DataDefinition::create('string')
          ->setLabel($keyname)
          ->setComputed(TRUE)
@@ -118,6 +136,8 @@ use Drupal\Component\Utility\Random;
          ->setSetting('jsonkey',$keyname)
          ->setReadOnly(TRUE);
      }
+
+
      return $properties;
    }
 
