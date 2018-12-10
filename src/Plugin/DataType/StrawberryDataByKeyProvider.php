@@ -11,7 +11,7 @@ namespace Drupal\strawberryfield\Plugin\DataType;
 use Drupal\Core\TypedData\TypedData;
 use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
 
-
+//@TODO refactor to same as \Drupal\strawberryfield\Plugin\DataType\StrawberryKeysFromJson
 class StrawberryDataByKeyProvider extends TypedData
 {
 
@@ -42,11 +42,8 @@ class StrawberryDataByKeyProvider extends TypedData
 
     $flattened = [];
     StrawberryfieldJsonHelper::arrayToFlatCommonkeys($jsonArray,$flattened, TRUE );
-    // @ TODO research moving this to \Drupal\Core\TypedData\Plugin\DataType\Map
-    // Solr is having issues dealing with that type
-    // but would allow us to avoid imploding and then deimploding
 
-    // Also, see if we need to quote everything
+    // @TODO, see if we need to quote everything
     if (isset($flattened[$needle])){
       $values[] = implode(",", $flattened[$needle]);
     }
@@ -63,8 +60,6 @@ class StrawberryDataByKeyProvider extends TypedData
     }
     // Right now we are just joining all values in a large string
     $this->processed = implode(",", $values);
-    // @TODO refactor this whole class to be a ItemList.
-    // @TODO refactor solr to be able to process MapData Type
 
     return $this->processed;
   }
