@@ -85,8 +85,7 @@ class JsonldKeyNameProvider extends StrawberryfieldKeyNameProviderBase {
       '#rows' => 5,
       '#title' => $this->t('Additional keys separated by commas'),
       '#default_value' => $this->getConfiguration()['keys'],
-      '#description' => t('Text that will be shown inside the field until a value is entered.'),
-      //'#parents' => $parents
+      '#description' => t('Additional properties that we would like to allow Strawberryfields to expose.'),
     ];
     return $element;
   }
@@ -103,7 +102,9 @@ class JsonldKeyNameProvider extends StrawberryfieldKeyNameProviderBase {
       $processedvalues = json_decode($jsonldcontext, TRUE);
       $processedvalues = $processedvalues['@context'];
     }
-
+    //user extra provided keys, if any.
+    $extrakeys = explode(",",$this->getConfiguration()['keys']);
+    $extrakeys = !empty($extrakeys) ? array_fill_keys($extrakeys,'stub'): [];
     $jsonld_reservedkeys = [
       '@context',
       '@id',
@@ -120,10 +121,12 @@ class JsonldKeyNameProvider extends StrawberryfieldKeyNameProviderBase {
       '@graph',
       'label',
     ];
+    // Mix all keys together.
     $validkeys = array_keys(
       array_merge(
         $processedvalues,
-        array_fill_keys($jsonld_reservedkeys, 'stub')
+        array_fill_keys($jsonld_reservedkeys, 'stub'),
+        $extrakeys
       )
     );
     // return them sorted for children's joy.
