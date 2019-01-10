@@ -82,6 +82,7 @@ function strawberryfield_node_presave(ContentEntityInterface $entity) {
             $term_path[] = $json_node;
           }
           $parent_id = 0;
+          $term_path = array_filter($term_path);
           foreach ($term_path as $path) {
             $query = \Drupal::entityQuery('taxonomy_term');
             $query->condition('vid', "strawberryfield_voc_id");
