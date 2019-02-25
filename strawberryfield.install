@@ -7,6 +7,8 @@
 use Drupal\Core\Language\LanguageInterface;
 use Drupal\taxonomy\Entity\Vocabulary;
 use Drupal\taxonomy\Entity\Term;
+use Drupal\field\Entity\FieldStorageConfig;
+use Drupal\field\Entity\FieldConfig;
 
 /**
  * Implements hook_install().
@@ -27,6 +29,17 @@ function strawberry_install() {
       'weight' => 0,
     ]);
     $vocabulary->save();
+    // Add a translatable field to the vocabulary.
+    $fieldstorage = FieldStorageConfig::create(array(
+      'field_name' => 'field_jsonpath',
+      'entity_type' => 'taxonomy_term',
+      'type' => 'text',
+    ));
+    $fieldstorage->save();
+
+    $field = FieldConfig::create(['field_storage' => $fieldstorage, 'bundle' => $vid]);
+    $field->save();
+
   }
   else {
     // @TODO Vocabulary Already exist. Reuse as key provider.

@@ -83,7 +83,9 @@ function strawberryfield_node_presave(ContentEntityInterface $entity) {
           }
           $parent_id = 0;
           $term_path = array_filter($term_path);
+          $breadcrumb = '';
           foreach ($term_path as $path) {
+            $breadcrumb = empty($breadcrumb)? $path: $breadcrumb.'.'.$path;
             $query = \Drupal::entityQuery('taxonomy_term');
             $query->condition('vid', "strawberryfield_voc_id");
             $query->condition('name', $path);
@@ -95,6 +97,7 @@ function strawberryfield_node_presave(ContentEntityInterface $entity) {
                   'vid' => 'strawberryfield_voc_id',
                   'name' => $path,
                   'parent' => $parent_id,
+                  'field_jsonpath' => $breadcrumb,
                 ]
               );
               $newlycreatedcount++;
@@ -119,3 +122,47 @@ function strawberryfield_node_presave(ContentEntityInterface $entity) {
     }
   }
 }
+
+/**
+ * Implements hook_entity_base_field_info().
+
+function strawberryfield_field_entity_base_field_info(EntityTypeInterface $entity_type) {
+  $fields = [];
+  if ($entity_types = _strawberryfieldable_get_entity_types()) {
+    // Adding field to entity types.
+    if (in_array($entity_type->id(), $entity_types)) {
+      $fields['strawberryfield_entityreferences'] = BaseFieldDefinition::create('entity_reference')
+        ->setName('strawberryfield_entityreferences')
+        ->setTargetEntityTypeId($entity_type->id())
+        ->setSetting('target_type', 'group_content')
+        ->setLabel(t('Related to'))
+        ->setTranslatable(FALSE)
+        ->setComputed(TRUE)
+        ->setCustomStorage(TRUE)
+        ->setCardinality(FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED)
+        ->setClass('\Drupal\gcontent_field\Field\GcontentFieldItemList')
+        ->setDisplayConfigurable('form', TRUE)
+        ->setDisplayConfigurable('view', TRUE)
+        ->setDisplayOptions('view', [
+          'label' => 'hidden',
+          'type' => 'hidden',
+          'weight' => 50,
+        ]);
+    }
+  }
+  return $fields;
+}
+
+/**
+ * Get entities where the field should be added.
+
+function _strawberryfieldable_get_entity_types() {
+  $entity_types = [];
+  $field_map = \Drupal::entityManager()->getFieldMap();
+  foreach ($field_map['node'] as $field => $usage) {
+    if ($usage['type'] == "strawberryfield_field")
+      $entity_types = $entity_types + $usage['bundles'];
+  }
+}
+return $entity_types;
+} */
