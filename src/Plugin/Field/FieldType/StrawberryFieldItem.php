@@ -126,11 +126,11 @@ use Drupal\Core\TypedData\ListDataDefinition;
          // Avoid internal reserved keys
          continue;
        }
-       $properties[$keyname] = DataDefinition::create('string')
+       $properties[$keyname] = ListDataDefinition::create('string')
          ->setLabel($keyname)
          ->setComputed(TRUE)
          ->setClass(
-           '\Drupal\strawberryfield\Plugin\DataType\StrawberryDataByKeyProvider'
+           '\Drupal\strawberryfield\Plugin\DataType\StrawberryValuesFromJson'
          )
          ->setInternal(FALSE)
          ->setSetting('jsonkey',$keyname)
