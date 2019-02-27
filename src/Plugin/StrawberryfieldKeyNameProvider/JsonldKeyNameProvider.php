@@ -97,6 +97,7 @@ class JsonldKeyNameProvider extends StrawberryfieldKeyNameProviderBase {
 
     $processedvalues = $this->getCacheTheKeys();
     $validkeys = [];
+    $extrakeys = [];
     if (empty($processedvalues)) {
       $jsonldcontext = StrawberryfieldJsonHelper::SIMPLE_JSONLDCONTEXT;
       $processedvalues = json_decode($jsonldcontext, TRUE);
@@ -104,6 +105,7 @@ class JsonldKeyNameProvider extends StrawberryfieldKeyNameProviderBase {
     }
     //user extra provided keys, if any.
     $extrakeys = explode(",",$this->getConfiguration()['keys']);
+    $extrakeys = array_map('trim', $extrakeys);
     $extrakeys = !empty($extrakeys) ? array_fill_keys($extrakeys,'stub'): [];
     $jsonld_reservedkeys = [
       '@context',
