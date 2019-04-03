@@ -78,14 +78,15 @@ class StrawberryValuesFromJson extends ItemList {
 
     $flattened = [];
     StrawberryfieldJsonHelper::arrayToFlatCommonkeys($jsonArray,$flattened, TRUE );
+
     // @TODO, see if we need to quote everything
     if (isset($flattened[$needle]) && is_array($flattened[$needle])){
-      $values[] = array_map('trim', $flattened[$needle]);
+      // This is an array, don't double nest to make the normalizer happy.
+      $values = array_map('trim', $flattened[$needle]);
     }
     elseif (isset($flattened[$needle])) {
       $values[] = trim($flattened[$needle]);
     }
-
 
     /*foreach ($flattened as $graphitems) {
       if (isset($graphitems[$needle])) {

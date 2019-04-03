@@ -11,6 +11,7 @@ namespace Drupal\strawberryfield\Plugin\Field\FieldWidget;
 use Drupal\Core\Field\Plugin\Field\FieldWidget\StringTextareaWidget;
 use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Messenger\MessengerTrait;
 /**
  * Plugin implementation of the 'strawberry_textarea' widget.
  *
@@ -24,6 +25,7 @@ use Drupal\Core\Form\FormStateInterface;
  */
 class StrawberryDefaultWidget extends StringTextareaWidget {
 
+  use MessengerTrait;
   /**
    * {@inheritdoc}
    */
@@ -38,7 +40,7 @@ class StrawberryDefaultWidget extends StringTextareaWidget {
     }
     else {
       // This should never happen since the basefield has a JSON symfony validator.
-      $this->messenger->addError(
+      $this->messenger()->addError(
         $this->t(
           'Looks like your stored field data is not in JSON format.<br> JSON says: @jsonerror <br>. Please correct it!',
           [
