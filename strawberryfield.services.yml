@@ -1,9 +1,9 @@
 services:
-    strawberryfield.keyname_manager:
-        class: Drupal\strawberryfield\Plugin\StrawberryfieldKeyNameProviderManager
-        parent: default_plugin_manager
-    strawberryfield_normalizer.typed_data:
-        class: \Drupal\strawberryfield\Normalizer\StrawberryfieldFieldItemNormalizer
-        tags:
-          - { name: normalizer, priority: 2 }
-        arguments: ['@entity.repository']
+  strawberryfield.keyname_manager:
+    class: Drupal\strawberryfield\Plugin\StrawberryfieldKeyNameProviderManager
+    parent: default_plugin_manager
+  serializer.normalizer.strawberryfield.typed_data:
+    class: Drupal\strawberryfield\Normalizer\StrawberryfieldFieldItemNormalizer
+    tags:
+      - { name: normalizer, priority: 100 }
+    arguments: ['@entity.repository']

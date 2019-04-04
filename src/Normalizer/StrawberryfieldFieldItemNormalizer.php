@@ -6,6 +6,7 @@ use Drupal\Core\Entity\EntityRepositoryInterface;
 use Drupal\serialization\Normalizer\FieldItemNormalizer;
 use Drupal\strawberryfield\Plugin\Field\FieldType\StrawberryFieldItem;
 use Drupal\serialization\Normalizer\EntityReferenceFieldItemNormalizerTrait;
+use Drupal\Core\TypedData\TypedDataInternalPropertiesHelper;
 
 /**
  * Adds the file URI to embedded file entities.
@@ -42,11 +43,17 @@ class StrawberryfieldFieldItemNormalizer extends FieldItemNormalizer {
    * {@inheritdoc}
    */
   public function normalize($field_item, $format = NULL, array $context = []) {
-    //@TODO json decode and encode into array our strawberryfield
     //@TODO check what options we can get from $context
-    $values = parent::normalize($field_item, $format, $context);
 
-
+    //@TODO allow per Field instance to limit which prop is internal or external
+    //@TODO do the inverse, a denormalizer for 'value' to allow API ingests
+    // Only do this because parent implementation can change.
+    $values = parent::normalize($field_item, $format , $context);
+    $mainproperty = $field_item->mainPropertyName();
+    // Now get the mainPropertyName and decode
+    if ((isset($values[$mainproperty])) && (!empty($values[$mainproperty])) || $values[$mainproperty]!='') {
+      $values[$mainproperty] = $this->serializer->decode($values[$mainproperty], 'json');
+    }
     return $values;
   }
 
