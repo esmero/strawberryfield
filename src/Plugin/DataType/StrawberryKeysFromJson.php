@@ -54,6 +54,10 @@ class StrawberryKeysFromJson extends ItemList {
     return $values;
   }
 
+  /**
+   * @param null $langcode
+   *
+   */
   public function process($langcode = NULL)
   {
     if ($this->computed == TRUE) {
