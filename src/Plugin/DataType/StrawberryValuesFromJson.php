@@ -57,54 +57,61 @@ class StrawberryValuesFromJson extends ItemList {
   /**
    * @param null $langcode
    *
-   * @return array|null
    */
   public function process($langcode = NULL)
   {
-    if ($this->processed !== NULL) {
-      return $this->processed;
+    if ($this->computed == TRUE) {
+      return;
     }
     $values = [];
     $item = $this->getParent();
+    if (!empty($item->value)) {
+      // Should 10 be enough? this is json-ld not github.. so maybe...
+      $jsonArray = json_decode($item->value, TRUE, 10);
+      //@TODO deal with JSON exceptions as we have done before
 
-    // Should 10 be enough? this is json-ld not github.. so maybe...
-    $jsonArray = json_decode($item->value,true,10);
-    //@TODO deal with JSON exceptions as we have done before
+      $definition = $this->getDataDefinition();
 
-    $definition = $this->getDataDefinition();
+      // This key is passed by the property definition in the field class
+      $needle = $definition['settings']['jsonkey'];
 
-    // This key is passed by the property definition in the field class
-    $needle = $definition['settings']['jsonkey'];
+      $flattened = [];
+      StrawberryfieldJsonHelper::arrayToFlatCommonkeys(
+        $jsonArray,
+        $flattened,
+        TRUE
+      );
 
-    $flattened = [];
-    StrawberryfieldJsonHelper::arrayToFlatCommonkeys($jsonArray,$flattened, TRUE );
-
-    // @TODO, see if we need to quote everything
-    if (isset($flattened[$needle]) && is_array($flattened[$needle])){
-      // This is an array, don't double nest to make the normalizer happy.
-      $values = array_map('trim', $flattened[$needle]);
-    }
-    elseif (isset($flattened[$needle])) {
-      $values[] = trim($flattened[$needle]);
-    }
-
-    /*foreach ($flattened as $graphitems) {
-      if (isset($graphitems[$needle])) {
-        if (is_array($graphitems[$needle])) {
-          $values[] = implode(",", $graphitems[$needle]);
-        }
-        else {
-          $values[] = $graphitems[$needle];
-        }
+      // @TODO, see if we need to quote everything
+      if (isset($flattened[$needle]) && is_array($flattened[$needle])) {
+        // This is an array, don't double nest to make the normalizer happy.
+        $values = array_map('trim', $flattened[$needle]);
+      }
+      elseif (isset($flattened[$needle])) {
+        $values[] = trim($flattened[$needle]);
       }
 
-    }*/
+      /*foreach ($flattened as $graphitems) {
+        if (isset($graphitems[$needle])) {
+          if (is_array($graphitems[$needle])) {
+            $values[] = implode(",", $graphitems[$needle]);
+          }
+          else {
+            $values[] = $graphitems[$needle];
+          }
+        }
 
-    $this->processed = array_values($values);
-    $this->computed = TRUE;
-    foreach ($this->processed as $delta => $item) {
-      $this->list[$delta] = $this->createItem($delta, $item);
+      }*/
+
+      $this->processed = array_values($values);
+      foreach ($this->processed as $delta => $item) {
+        $this->list[$delta] = $this->createItem($delta, $item);
+      }
     }
+    else {
+      $this->processed = NULL;
+    }
+    $this->computed = TRUE;
   }
 
   /**

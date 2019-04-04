@@ -19,6 +19,7 @@ use Drupal\Core\TypedData\ListDataDefinition;
  *   default_formatter = "strawberry_default_formatter",
  *   default_widget = "strawberry_textarea",
  *   constraints = {"valid_strawberry_json" = {}},
+ *   list_class = "\Drupal\strawberryfield\Field\StrawberryFieldItemList",
  *   category = "GLAM Metadata",
  * )
  */
@@ -145,9 +146,21 @@ use Drupal\Core\TypedData\ListDataDefinition;
     * {@inheritdoc}
     */
    public function isEmpty() {
-     $value = parent::isEmpty();
-     //@TODO: assume a json with only keys and no values is empty
-     return $value === NULL || $value === '';
+     // Lets optimize.
+     // All our properties are computed
+     // So if main value is empty rest will be too
+     $mainproperty = $this->mainPropertyName();
+
+     if (isset($this->{$mainproperty})) {
+       $mainvalue = $this->{$mainproperty};
+       if (empty($mainvalue) || $mainvalue == '') {
+         return TRUE;
+       }
+     }
+     else {
+       return TRUE;
+     }
+     return FALSE;
    }
 
    /**
@@ -158,6 +171,5 @@ use Drupal\Core\TypedData\ListDataDefinition;
      $values['value'] = '{"label": "' . $random->word(mt_rand(1, 2000)) . '""}';
      return $values;
    }
-
 
  }

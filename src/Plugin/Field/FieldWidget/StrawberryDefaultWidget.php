@@ -30,26 +30,28 @@ class StrawberryDefaultWidget extends StringTextareaWidget {
    * {@inheritdoc}
    */
   public function formElement(FieldItemListInterface $items, $delta, array $element, array &$form, FormStateInterface $form_state) {
-
-    $rawjson = $items[$delta]->value;
-    $prettyjson = $rawjson;
-    $objectjson = json_decode($rawjson,FALSE);
-    $json_error = json_last_error();
-    if ($json_error == JSON_ERROR_NONE) {
-      $prettyjson = json_encode($objectjson, JSON_PRETTY_PRINT);
+    // Be smart, don't overprocess and empty field.
+    $prettyjson = "";
+    if (!$items[$delta]->isEmpty()) {
+      $rawjson = $items[$delta]->value;
+      $prettyjson = $rawjson;
+      $objectjson = json_decode($rawjson, FALSE);
+      $json_error = json_last_error();
+      if ($json_error == JSON_ERROR_NONE) {
+        $prettyjson = json_encode($objectjson, JSON_PRETTY_PRINT);
+      }
+      else {
+        // This should never happen since the basefield has a JSON symfony validator.
+        $this->messenger()->addError(
+          $this->t(
+            'Looks like your stored field data is not in JSON format.<br> JSON says: @jsonerror <br>. Please correct it!',
+            [
+              '@jsonerror' => json_last_error_msg()
+            ]
+          )
+        );
+      }
     }
-    else {
-      // This should never happen since the basefield has a JSON symfony validator.
-      $this->messenger()->addError(
-        $this->t(
-          'Looks like your stored field data is not in JSON format.<br> JSON says: @jsonerror <br>. Please correct it!',
-          [
-            '@jsonerror' => $json_error
-          ]
-        )
-      );
-    }
-
 
     $element['value'] = $element + [
         '#type' => 'textarea',

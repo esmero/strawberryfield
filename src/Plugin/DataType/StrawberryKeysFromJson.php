@@ -44,7 +44,7 @@ class StrawberryKeysFromJson extends ItemList {
   protected $list = [];
 
   public function getValue() {
-    if ($this->processed == NULL) {
+    if ($this->computed == FALSE) {
       $this->process();
     }
     $values = [];
@@ -56,23 +56,29 @@ class StrawberryKeysFromJson extends ItemList {
 
   public function process($langcode = NULL)
   {
-    if ($this->processed !== NULL) {
-      return $this->processed;
+    if ($this->computed == TRUE) {
+      return;
     }
     $values = [];
     $item = $this->getParent();
+    if (!empty($item->value)) {
+      // Should 10 be enough? this is json-ld not github.. so maybe...
+      $jsonArray = json_decode($item->value, TRUE, 10);
+      //@TODO deal with JSON exceptions as we have done before
 
-    // Should 10 be enough? this is json-ld not github.. so maybe...
-    $jsonArray = json_decode($item->value,true,10);
-    //@TODO deal with JSON exceptions as we have done before
-
-    $flattened = [];
-    $flattened = StrawberryfieldJsonHelper::arrayToFlatJsonPropertypaths($jsonArray);
-    $this->processed = array_keys($flattened);
-    $this->computed = TRUE;
-    foreach ($this->processed as $delta => $item) {
-      $this->list[$delta] = $this->createItem($delta, $item);
+      $flattened = [];
+      $flattened = StrawberryfieldJsonHelper::arrayToFlatJsonPropertypaths(
+        $jsonArray
+      );
+      $this->processed = array_keys($flattened);
+      $this->computed = TRUE;
+      foreach ($this->processed as $delta => $item) {
+        $this->list[$delta] = $this->createItem($delta, $item);
+      }
+    } else {
+      $this->processed = NULL;
     }
+    $this->computed = TRUE;
   }
 
   /**
