@@ -4,7 +4,7 @@ namespace Drupal\strawberryfield\Plugin\Field\FieldType;
 use Drupal\Core\Field\FieldItemBase;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Field\FieldDefinitionInterface;
-use Drupal\Core\TypedData\DataDefinition;;
+use Drupal\Core\TypedData\DataDefinition;
 use Drupal\strawberryfield\Entity\keyNameProviderEntity;
 use Drupal\Component\Utility\Random;
 use Drupal\Core\TypedData\ListDataDefinition;
