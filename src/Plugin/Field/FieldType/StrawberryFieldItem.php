@@ -8,6 +8,7 @@ use Drupal\Core\TypedData\DataDefinition;
 use Drupal\strawberryfield\Entity\keyNameProviderEntity;
 use Drupal\Component\Utility\Random;
 use Drupal\Core\TypedData\ListDataDefinition;
+use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
 
 /**
  * Provides a field type of strawberryfield.
@@ -38,6 +39,16 @@ use Drupal\Core\TypedData\ListDataDefinition;
     * @var \Drupal\Core\TypedData\TypedDataInterface[]
     */
    protected $properties = [];
+
+
+   /**
+    * A flattened JSON array.
+    *
+    * This is computed once so other properties can use it.
+    *
+    * @var array|null
+    */
+   protected $flattenjson = NULL;
 
    /**
     * @param FieldStorageDefinitionInterface $field_definition
@@ -161,6 +172,36 @@ use Drupal\Core\TypedData\ListDataDefinition;
        return TRUE;
      }
      return FALSE;
+   }
+
+
+   /**
+    * Calculates / keeps around a flatten common keys array for the main value.
+    *
+    * @param bool $force
+    * Forces regeneration even if already computed.
+    *
+    * @return array
+    */
+   public function provideFlatten($force = TRUE) {
+
+     if ($this->isEmpty()) {
+       $this->flattenjson = [];
+     }
+     else {
+       if ($this->flattenjson == NULL || $force) {
+         $mainproperty = $this->mainPropertyName();
+         $jsonArray = json_decode($this->{$mainproperty}, TRUE, 10);
+         $flattened = [];
+         StrawberryfieldJsonHelper::arrayToFlatCommonkeys(
+           $jsonArray,
+           $flattened,
+           TRUE
+         );
+         $this->flattenjson = $flattened;
+       }
+     }
+     return $this->flattenjson;
    }
 
    /**

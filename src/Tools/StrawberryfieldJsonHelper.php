@@ -120,11 +120,15 @@ class StrawberryfieldJsonHelper {
    * @return array
    *   Same as the accumulator but left there in case someone needs a return.
    */
-  public static function arrayToFlatCommonkeys(array $array, &$flat = array(), $jsonld = TRUE)
-  {
+  public static function arrayToFlatCommonkeys(
+    array $array,
+    &$flat = [],
+    $jsonld = TRUE
+  ) {
     if (($jsonld) && array_key_exists('@graph', $array)) {
       $array = $array['@graph'];
-    } else {
+    }
+    else {
       // @TODO We need to deal with posiblity of multiple @Contexts
       // Which could make a same $key mean different things.
       // In this case @context could or not exist.
@@ -133,16 +137,29 @@ class StrawberryfieldJsonHelper {
     foreach ($array as $key => $value) {
       if (is_array($value)) {
         static::arrayToFlatCommonkeys($value, $flat, $jsonld);
-        $flat[$key][] = $value;
+        // Don't accumulate int keys. Makes no sense.
+        if (is_string($key)) {
+          if (!isset($flat[$key])) {
+            $flat[$key] = [];
+          }
+          // Means we can't keep flattening
+          if (is_array($value)) {
+            $flat[$key] = $flat[$key] + $value;
+          }
+          else {
+            $flat[$key][] = $value;
+          }
+        }
       }
       else {
-        $flat[$key][] = $value;
+        // Don't accumulate int keys. Makes no sense.
+        if (is_string($key)) {
+          $flat[$key][] = $value;
+        }
       }
     }
     return $flat;
   }
-
-
 
 
   /**
