@@ -17,6 +17,7 @@ use Drupal\Core\TypedData\ListInterface;
 use Drupal\Core\TypedData\TypedDataInterface;
 use Drupal\Core\TypedData\Plugin\DataType\ItemList;
 use Drupal\Core\TypedData\ComputedItemListTrait;
+use Drupal\strawberryfield\Plugin\Field\FieldType\StrawberryFieldItem;
 
 
 class StrawberryValuesFromJson extends ItemList {
@@ -64,26 +65,29 @@ class StrawberryValuesFromJson extends ItemList {
       return;
     }
     $values = [];
+
     $item = $this->getParent();
     if (!empty($item->value)) {
-      // Should 10 be enough? this is json-ld not github.. so maybe...
-      $jsonArray = json_decode($item->value, TRUE, 10);
-      //@TODO deal with JSON exceptions as we have done before
+
+
+      /* @var $item StrawberryFieldItem */
+      $flattened = $item->provideFlatten(FALSE);
 
       $definition = $this->getDataDefinition();
 
       // This key is passed by the property definition in the field class
       $needle = $definition['settings']['jsonkey'];
 
-      $flattened = [];
-      StrawberryfieldJsonHelper::arrayToFlatCommonkeys(
-        $jsonArray,
-        $flattened,
-        TRUE
-      );
-
       // @TODO, see if we need to quote everything
       if (isset($flattened[$needle]) && is_array($flattened[$needle])) {
+        foreach ($flattened[$needle] as &$item) {
+          // If this is true we have a complex structure nested
+          // But Solr won't be able to deal with it. Lets jsonencode it.
+          if (is_array($item)) {
+            // @TODO should we allow unicode directly?
+            $item = json_encode($item,JSON_UNESCAPED_UNICODE);
+          }
+        }
         // This is an array, don't double nest to make the normalizer happy.
         $values = array_map('trim', $flattened[$needle]);
       }
