@@ -68,20 +68,15 @@ class StrawberryValuesFromJson extends ItemList {
 
     $item = $this->getParent();
     if (!empty($item->value)) {
+
+
       /* @var $item StrawberryFieldItem */
-      $jsonArray = $item->provideFlatten(FALSE);
+      $flattened = $item->provideFlatten(FALSE);
 
       $definition = $this->getDataDefinition();
 
       // This key is passed by the property definition in the field class
       $needle = $definition['settings']['jsonkey'];
-
-      $flattened = [];
-      StrawberryfieldJsonHelper::arrayToFlatCommonkeys(
-        $jsonArray,
-        $flattened,
-        TRUE
-      );
 
       // @TODO, see if we need to quote everything
       if (isset($flattened[$needle]) && is_array($flattened[$needle])) {
