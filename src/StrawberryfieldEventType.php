@@ -15,13 +15,15 @@ final class StrawberryfieldEventType {
    *
    * This event allows modules to perform an action whenever a node
    * with a SBF(Strawberry Field) is saved. The event listener method receives a
-   * \Drupal\strawberryfield\StrawberryfieldCrudEvent instance.
+   * \Drupal\strawberryfield\Event\StrawberryfieldCrudEvent instance.
    *
    * See \strawberryfield_node_presave
    *
    * @Event
    *
    * @see strawberryfield_node_presave
+   * @see \Drupal\strawberryfield\Event\StrawberryfieldCrudEvent
+   *
    *
    * @var string
    */
@@ -33,13 +35,14 @@ final class StrawberryfieldEventType {
    * This event allows modules to perform an action whenever a node
    * with a SBF(Strawberry Field) is inserted for the first time.
    * The event listener method receives a
-   * \Drupal\strawberryfield\StrawberryfieldCrudEvent instance.
+   * \Drupal\strawberryfield\Event\StrawberryfieldCrudEvent instance.
    *
    * See \strawberryfield_node_insert
    *
    * @Event
    *
    * @see strawberryfield_node_insert
+   * @see \Drupal\strawberryfield\Event\StrawberryfieldCrudEvent
    *
    * @var string
    */
@@ -51,13 +54,14 @@ final class StrawberryfieldEventType {
    * This event allows modules to perform an action whenever a node
    * with a SBF(Strawberry Field) is updated.
    * The event listener method receives a
-   * \Drupal\strawberryfield\StrawberryfieldCrudEvent instance.
+   * \Drupal\strawberryfield\Event\StrawberryfieldCrudEvent instance.
    *
    * See \strawberryfield_node_update
    *
    * @Event
    *
-   * @see strawberryfield_node_update
+   * @see
+   * @see \Drupal\strawberryfield\Event\StrawberryfieldCrudEvent
    *
    * @var string
    */
@@ -69,13 +73,14 @@ final class StrawberryfieldEventType {
    * This event allows modules to perform an action whenever a node
    * with a SBF(Strawberry Field) gets a new revision inserted.
    * The event listener method receives a
-   * \Drupal\strawberryfield\StrawberryfieldCrudEvent instance.
+   * \Drupal\strawberryfield\Event\StrawberryfieldCrudEvent instance.
    *
-   * See \strawberryfield_node_update
+   * See \strawberryfield_node_revision_create
    *
    * @Event
    *
    * @see strawberryfield_node_update
+   * @see \Drupal\strawberryfield\Event\StrawberryfieldCrudEvent
    *
    * @var string
    */
@@ -87,13 +92,14 @@ final class StrawberryfieldEventType {
    * This event allows modules to perform an action whenever a node
    * with a SBF(Strawberry Field) gets a new revision inserted.
    * The event listener method receives a
-   * \Drupal\strawberryfield\StrawberryfieldCrudEvent instance.
+   * \Drupal\strawberryfield\Event\StrawberryfieldCrudEvent instance.
    *
    * See \strawberryfield_node_revision_delete
    *
    * @Event
    *
    * @see strawberryfield_node_revision_delete
+   * @see \Drupal\strawberryfield\Event\StrawberryfieldCrudEvent
    *
    * @var string
    */
@@ -105,13 +111,14 @@ final class StrawberryfieldEventType {
    * This event allows modules to perform an action whenever a node
    * with a SBF(Strawberry Field) gets deleted
    * The event listener method receives a
-   * \Drupal\strawberryfield\StrawberryfieldCrudEvent instance.
+   * \Drupal\strawberryfield\Event\StrawberryfieldCrudEvent instance.
    *
    * See \strawberryfield_node_delete
    *
    * @Event
    *
    * @see strawberryfield_node_delete
+   * @see \Drupal\strawberryfield\Event\StrawberryfieldCrudEvent
    *
    * @var string
    */
@@ -124,9 +131,11 @@ final class StrawberryfieldEventType {
    * JSON needs to be enriched, cleaned and or normalized.
    * This is the state of the JSON just before being saved.
    * The event listener method receives a
-   * \Drupal\strawberryfield\StrawberryfieldServiceEvent instance.
+   * \Drupal\strawberryfield\Event\StrawberryfieldJsonProcessEvent instance.
    *
    * @Event
+   *
+   * @see \Drupal\strawberryfield\Event\StrawberryfieldJsonProcessEvent
    *
    * @var string
    */
@@ -152,9 +161,11 @@ final class StrawberryfieldEventType {
    * This event allows modules to perform an action whenever a new JSON Flavour
    * is generated.
    * The event listener method receives a
-   * \Drupal\strawberryfield\StrawberryfieldFlavourCrudEvent instance.
+   * \Drupal\strawberryfield\Event\StrawberryfieldFlavourCrudEvent instance.
    *
    * @Event
+   *
+   * @see \Drupal\strawberryfield\Event\StrawberryfieldFlavourCrudEvent
    *
    * @var string
    */
@@ -166,9 +177,11 @@ final class StrawberryfieldEventType {
    * This event allows modules to perform an action whenever a JSON Flavour
    * is deleted.
    * The event listener method receives a
-   * \Drupal\strawberryfield\StrawberryfieldFlavourCrudEvent instance.
+   * \Drupal\strawberryfield\Event\StrawberryfieldFlavourCrudEvent instance.
    *
    * @Event
+   *
+   * @see \Drupal\strawberryfield\Event\StrawberryfieldFlavourCrudEvent
    *
    * @var string
    */
