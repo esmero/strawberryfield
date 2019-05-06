@@ -54,7 +54,7 @@ class StrawberryfieldEventPresaveSubscriberVocabCreator extends StrawberryfieldE
    * @throws \Drupal\Core\Entity\EntityStorageException
    */
   public function onEntityPresave(StrawberryfieldCrudEvent $event) {
-    dpm($event);
+
     /* @var $entity \Drupal\Core\Entity\ContentEntityInterface */
     $entity = $event->getEntity();
     $sbf_fields = $event->getFields();
