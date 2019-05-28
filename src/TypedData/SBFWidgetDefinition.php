@@ -18,8 +18,8 @@ class SBFWidgetDefinition extends ComplexDataDefinitionBase {
       $info = &$this->propertyDefinitions;
 
       $info['page_id'] = DataDefinition::create('string')->setLabel('Page ID');
-//      $info['parent_id'] = DataDefinition::create('string')->setLabel('Parent ID');
-//      $info['fulltext'] = DataDefinition::create('string')->setLabel('FullText test');
+      $info['parent_id'] = DataDefinition::create('string')->setLabel('Parent ID');
+      $info['fulltext'] = DataDefinition::create('string')->setLabel('FullText test');
     }
 
 /**
