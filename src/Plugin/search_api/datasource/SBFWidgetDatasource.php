@@ -34,7 +34,7 @@ class SBFWidgetDatasource extends DatasourcePluginBase {
     return $values ?: NULL;
   }
   public function getItemIds($page = NULL) {
-    $ids = ["1"];
+    $ids = ["1","2","3","4"];
     return $ids;
   }
 
@@ -44,23 +44,29 @@ class SBFWidgetDatasource extends DatasourcePluginBase {
 
   public function loadMultiple(array $ids) {
     $documents = [];
+    $sbfwidget_definition = SBFWidgetDefinition::create('strawberryfield_test_widget');
 
-    $id = "1";
-    $data = [
-      'page_id' => '1',
+    foreach($ids as $id){
+      $data = [
+        'page_id' => $id,
+        'parent_id' => '1',
+        'fulltext' => 'Start' . $id . 'End',
+     ];
+     $documents[$id] = \Drupal::typedDataManager()->create($sbfwidget_definition);
+     $documents[$id]->setValue($data);
+
+    }
+
+
+//    $id = "1";
+//    $data = [
+//      'page_id' => '1',
 //      'parent_id' => '1',
 //      'fulltext' => 'Start 1 End',
-   ];
-    $sbfwidget_definition = SBFWidgetDefinition::create('strawberryfield_test_widget');
-//    $sbfwidget = \Drupal::typedDataManager()->create($sbfwidget_definition);
-//    $sbfwidget->setValue($data);
+//   ];
 
-//    $documents[$id] = $sbfwidget;
-
-      $documents[$id] = \Drupal::typedDataManager()->create($sbfwidget_definition);
-      $documents[$id]->setValue($data);
-
-
+//    $documents[$id] = \Drupal::typedDataManager()->create($sbfwidget_definition);
+//    $documents[$id]->setValue($data);
 
     return $documents;
   }
