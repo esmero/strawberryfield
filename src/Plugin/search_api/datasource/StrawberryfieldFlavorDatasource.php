@@ -6,24 +6,24 @@ use Drupal\Core\TypedData\DataDefinition;
 use Drupal\Core\TypedData\ComplexDataInterface;
 use Drupal\search_api\Datasource\DatasourcePluginBase;
 
-use Drupal\strawberryfield\Plugin\DataType\SBFWidget;
-use Drupal\strawberryfield\TypedData\SBFWidgetDefinition;
+use Drupal\strawberryfield\Plugin\DataType\StrawberryfieldFlavorData;
+use Drupal\strawberryfield\TypedData\StrawberryfieldFlavorDataDefinition;
 
 /**
- * Represents a datasource which exposes widgets.
+ * Represents a datasource which exposes flavors.
  *
  * @SearchApiDatasource(
- *   id = "strawberryfield_test_widget",
- *   label = @Translation("SBFWidgets"),
+ *   id = "strawberryfield_flavor_datasource",
+ *   label = @Translation("Strawberryfield Flavor Datasource"),
  * )
  */
-class SBFWidgetDatasource extends DatasourcePluginBase {
+class StrawberryfieldFlavorDatasource extends DatasourcePluginBase {
 
   /**
    * {@inheritdoc}
    */
   public function getPropertyDefinitions() {
-    return \Drupal::typedDataManager()->createDataDefinition('strawberryfield_test_widget')->getPropertyDefinitions();
+    return \Drupal::typedDataManager()->createDataDefinition('strawberryfield_flavor_data')->getPropertyDefinitions();
   }
 
   /**
@@ -44,7 +44,7 @@ class SBFWidgetDatasource extends DatasourcePluginBase {
 
   public function loadMultiple(array $ids) {
     $documents = [];
-    $sbfwidget_definition = SBFWidgetDefinition::create('strawberryfield_test_widget');
+    $sbfflavordata_definition = StrawberryfieldFlavorDataDefinition::create('strawberryfield_flavor_data');
 
     foreach($ids as $id){
       $data = [
@@ -52,21 +52,10 @@ class SBFWidgetDatasource extends DatasourcePluginBase {
         'parent_id' => '1',
         'fulltext' => 'Start' . $id . 'End',
      ];
-     $documents[$id] = \Drupal::typedDataManager()->create($sbfwidget_definition);
+     $documents[$id] = \Drupal::typedDataManager()->create($sbfflavordata_definition);
      $documents[$id]->setValue($data);
 
     }
-
-
-//    $id = "1";
-//    $data = [
-//      'page_id' => '1',
-//      'parent_id' => '1',
-//      'fulltext' => 'Start 1 End',
-//   ];
-
-//    $documents[$id] = \Drupal::typedDataManager()->create($sbfwidget_definition);
-//    $documents[$id]->setValue($data);
 
     return $documents;
   }
