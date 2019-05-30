@@ -20,6 +20,7 @@ use Drupal\search_api\Datasource\DatasourceInterface;
 use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\search_api\Utility\Utility;
+use Drupal\Core\Config\ConfigFactoryInterface;
 
 
 /**
@@ -46,6 +47,13 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase {
      * @var \Drupal\Core\Language\LanguageManagerInterface
      */
     protected $languageManager;
+
+      /**
+       * The config factory.
+       *
+       * @var \Drupal\Core\Config\ConfigFactoryInterface|null
+       */
+      protected $configFactory;
 
   /**
    * {@inheritdoc}
@@ -146,20 +154,42 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase {
   protected function getLanguages() {
     $all_languages = $this->getLanguageManager()->getLanguages();
 
-//§/ bypass
 //§/    if ($this->isTranslatable()) {
-    if (1 == 0) {
-      $selected_languages = array_flip($this->configuration['languages']['selected']);
-      if ($this->configuration['languages']['default']) {
-        return array_diff_key($all_languages, $selected_languages);
-      }
-      else {
-        return array_intersect_key($all_languages, $selected_languages);
-      }
-    }
+//§/      $selected_languages = array_flip($this->configuration['languages']['selected']);
+//§/      if ($this->configuration['languages']['default']) {
+//§/        return array_diff_key($all_languages, $selected_languages);
+//§/      }
+//§/      else {
+//§/        return array_intersect_key($all_languages, $selected_languages);
+//§/      }
+//§/    }
 
     return $all_languages;
   }
+
+
+    /**
+     * Retrieves the config factory.
+     *
+     * @return \Drupal\Core\Config\ConfigFactoryInterface
+     *   The config factory.
+     */
+    public function getConfigFactory() {
+      return $this->configFactory ?: \Drupal::configFactory();
+    }
+
+    /**
+     * Retrieves the config value for a certain key in the Search API settings.
+     *
+     * @param string $key
+     *   The key whose value should be retrieved.
+     *
+     * @return mixed
+     *   The config value for the given key.
+     */
+    protected function getConfigValue($key) {
+      return $this->getConfigFactory()->get('search_api.settings')->get($key);
+    }
 
   /**
    * {@inheritdoc}
@@ -211,9 +241,6 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase {
       }
     }
 
-//§/ bypass
-$page = NULL;
-//§/
     if (isset($page)) {
       $page_size = $this->getConfigValue('tracking_page_size');
       assert($page_size, 'Tracking page size is not set.');
@@ -224,6 +251,9 @@ $page = NULL;
     }
 
     $entity_ids = $select->execute();
+
+    dpm("In getPartialItemIds");
+    dpm($entity_ids);
 
     if (!$entity_ids) {
       return NULL;
@@ -256,7 +286,14 @@ $page = NULL;
         $translations = array_intersect($translations, $languages);
       }
       foreach ($translations as $langcode) {
-        $item_ids[] = "$entity_id:$langcode";
+        $page_id = 1;
+        $item_ids[] = "$entity_id:$page_id:$langcode";
+        $page_id = 2;
+        $item_ids[] = "$entity_id:$page_id:$langcode";
+        $page_id = 3;
+        $item_ids[] = "$entity_id:$page_id:$langcode";
+        $page_id = 4;
+        $item_ids[] = "$entity_id:$page_id:$langcode";
       }
     }
 
@@ -266,6 +303,9 @@ $page = NULL;
       // static cache after each batch.
       $this->getEntityStorage()->resetCache($entity_ids);
     }
+
+dpm("In getPartialItemIds");
+dpm($item_ids);
 
     return $item_ids;
   }
@@ -279,11 +319,16 @@ $page = NULL;
     $documents = [];
     $sbfflavordata_definition = StrawberryfieldFlavorDataDefinition::create('strawberryfield_flavor_data');
 
+dpm("In loadmultiple 2");
+dpm($ids);
+
     foreach($ids as $id){
+      //§/ $id = $entity_id : $page_id : $langcode
+      $splitted_id = explode(':',$id);
       $data = [
-        'page_id' => $id,
-        'parent_id' => '1',
-        'fulltext' => 'Start' . $id . 'End',
+        'page_id' => $splitted_id[1],
+        'parent_id' => $splitted_id[0],
+        'fulltext' => 'Start ' . $splitted_id[1] . ' End',
      ];
      $documents[$id] = \Drupal::typedDataManager()->create($sbfflavordata_definition);
      $documents[$id]->setValue($data);
