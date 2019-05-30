@@ -94,18 +94,29 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase {
     return "node";
   }
 
+    /**
+     * Determines whether the entity type supports bundles.
+     *
+     * @return bool
+     *   TRUE if the entity type supports bundles, FALSE otherwise.
+     */
+    protected function hasBundles() {
+      return $this->getEntityType()->hasKey('bundle');
+    }
+
   /**
    * {@inheritdoc}
    */
   public function defaultConfiguration() {
     $default_configuration = [];
 
-//§/    if ($this->hasBundles()) {
-//§/      $default_configuration['bundles'] = [
-//§/        'default' => TRUE,
-//§/        'selected' => [],
-//§/      ];
-//§/    }
+    if ($this->hasBundles()) {
+      $default_configuration['bundles'] = [
+        'default' => TRUE,
+        'selected' => [],
+      ];
+    }
+
 
     if ($this->isTranslatable()) {
       $default_configuration['languages'] = [
@@ -244,11 +255,7 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase {
     // might want to include and later sort out those for which we want only the
     // translations in $languages and those (matching $bundles) where we want
     // all (enabled) translations.
-    //§/
-    //§/ ToDO manage bundles
-    //§/ at the moment bybass
-    //§/ if ($this->hasBundles()) {
-    if ( 1 == 0) {
+    if ($this->hasBundles()) {
       $bundle_property = $this->getEntityType()->getKey('bundle');
       if ($bundles && !$languages) {
         $select->condition($bundle_property, $bundles, 'IN');
@@ -277,8 +284,8 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase {
 
     $entity_ids = $select->execute();
 
-    dpm("In getPartialItemIds");
-    dpm($entity_ids);
+//§/    dpm("In getPartialItemIds");
+//§/    dpm($entity_ids);
 
     if (!$entity_ids) {
       return NULL;
@@ -329,8 +336,8 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase {
       $this->getEntityStorage()->resetCache($entity_ids);
     }
 
-dpm("In getPartialItemIds");
-dpm($item_ids);
+//§/dpm("In getPartialItemIds");
+//§/dpm($item_ids);
 
     return $item_ids;
   }
@@ -344,7 +351,7 @@ dpm($item_ids);
     $documents = [];
     $sbfflavordata_definition = StrawberryfieldFlavorDataDefinition::create('strawberryfield_flavor_data');
 
-dpm("In loadmultiple 2");
+dpm("In loadmultiple");
 dpm($ids);
 
     foreach($ids as $id){
