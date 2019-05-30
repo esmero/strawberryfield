@@ -21,6 +21,7 @@ use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\search_api\Utility\Utility;
 use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\Language\Language;
 
 
 /**
@@ -94,6 +95,30 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase {
   }
 
   /**
+   * {@inheritdoc}
+   */
+  public function defaultConfiguration() {
+    $default_configuration = [];
+
+//§/    if ($this->hasBundles()) {
+//§/      $default_configuration['bundles'] = [
+//§/        'default' => TRUE,
+//§/        'selected' => [],
+//§/      ];
+//§/    }
+
+    if ($this->isTranslatable()) {
+      $default_configuration['languages'] = [
+        'default' => TRUE,
+        'selected' => [Language::LANGCODE_NOT_SPECIFIED],
+      ];
+    }
+
+    return $default_configuration;
+  }
+
+
+  /**
    * Retrieves the entity type manager.
    *
    * @return \Drupal\Core\Entity\EntityTypeManagerInterface
@@ -154,15 +179,15 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase {
   protected function getLanguages() {
     $all_languages = $this->getLanguageManager()->getLanguages();
 
-//§/    if ($this->isTranslatable()) {
-//§/      $selected_languages = array_flip($this->configuration['languages']['selected']);
-//§/      if ($this->configuration['languages']['default']) {
-//§/        return array_diff_key($all_languages, $selected_languages);
-//§/      }
-//§/      else {
-//§/        return array_intersect_key($all_languages, $selected_languages);
-//§/      }
-//§/    }
+    if ($this->isTranslatable()) {
+      $selected_languages = array_flip($this->configuration['languages']['selected']);
+      if ($this->configuration['languages']['default']) {
+        return array_diff_key($all_languages, $selected_languages);
+      }
+      else {
+        return array_intersect_key($all_languages, $selected_languages);
+      }
+    }
 
     return $all_languages;
   }
