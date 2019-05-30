@@ -23,7 +23,7 @@ final class StrawberryfieldEventType {
    *
    * @see strawberryfield_node_presave
    * @see \Drupal\strawberryfield\Event\StrawberryfieldCrudEvent
-   *
+   * @see \Drupal\strawberryfield\EventSubscriber\StrawberryfieldEventPresaveSubscriberVocabCreator
    *
    * @var string
    */
@@ -186,7 +186,4 @@ final class StrawberryfieldEventType {
    * @var string
    */
   const DELETE_FLAVOUR = 'sbf.flavour.delete';
-
-
-
 }
