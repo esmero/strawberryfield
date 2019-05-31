@@ -10,6 +10,7 @@ use Drupal\search_api\Utility\Utility;
 use Drupal\search_api\Plugin\PluginFormTrait;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Plugin\PluginFormInterface;
+use Drupal\Core\Entity\Plugin\DataType\EntityAdapter;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 
@@ -18,8 +19,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  *
  * @SearchApiDatasource(
  *   id = "strawberryfield_flavor_datasource",
- *   label = @Translation("Strawberryfield Flavor Datasource"),
- *   entity_type = "node",
+ *   label = @Translation("Strawberryfield Flavor Datasource")
  * )
  */
 class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements PluginFormInterface {
@@ -97,6 +97,7 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
    * Returns an associative array with bundles that have a SBF.
    *
    * @return array
+   * An associative array of SBF field names keyed by the bundle name.
    */
   public function getApplicableBundlesWithSbfField() {
     $listFields = [];
@@ -112,7 +113,7 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
           if (!empty($field_definition->getTargetBundle())
             && $field_definition->getType() == 'strawberryfield_field'
           ) {
-            $listFields[$bundle][$field_name]['type'] = $field_definition->getType();
+            $listFields[$bundle][]= $field_name;
           }
         }
       }
@@ -129,6 +130,32 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
     return $values ?: NULL;
   }
 
+  /**
+   * {@inheritdoc}
+   */
+  public function getItemUrl(ComplexDataInterface $item) {
+    if ($entity = $this->getEntity($item)) {
+      if ($entity->hasLinkTemplate('canonical')) {
+        return $entity->toUrl('canonical');
+      }
+    }
+    return NULL;
+  }
+
+  /**
+   * Retrieves the entity from a search item.
+   *
+   * @param \Drupal\Core\TypedData\ComplexDataInterface $item
+   *   An item of this datasource's type.
+   *
+   * @return \Drupal\Core\Entity\EntityInterface|null
+   *   The parent entity object for that item, or NULL if none could be
+   *   found.
+   */
+  protected function getEntity(ComplexDataInterface $item) {
+    $value = $item->get('target_id')->getValue();
+    return $value instanceof EntityInterface ? $value : NULL;
+  }
   /**
    * {@inheritdoc}
    */
@@ -157,9 +184,6 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
     // all (enabled) translations.
     if ($this->hasBundles()) {
 
-      dpm($bundles);
-      dpm($languages);
-
       $bundle_property = $this->getEntityType()->getKey('bundle');
       if ($bundles && !$languages) {
         $select->condition($bundle_property, $bundles, 'IN');
@@ -187,9 +211,6 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
     }
 
     $entity_ids = $select->execute();
-
-    dpm("In getPartialItemIds");
-    dpm($entity_ids);
 
     if (!$entity_ids) {
       return NULL;
@@ -240,9 +261,6 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
       $this->getEntityStorage()->resetCache($entity_ids);
     }
 
-    //§/dpm("In getPartialItemIds");
-    //§/dpm($item_ids);
-
     return $item_ids;
   }
 
@@ -260,10 +278,7 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
    * {@inheritdoc}
    */
   public function getEntityTypeId() {
-    $plugin_definition = $this->getPluginDefinition();
-
-    //    return $plugin_definition['entity_type'];
-    return "node";
+    return 'node';
   }
 
   /**
@@ -533,6 +548,7 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
       $splitted_id = explode(':',$id);
       $data = [
         'page_id' => $splitted_id[1],
+        'target_id' => EntityAdapter::createFromEntity($this->entityTypeManager->getStorage('node')->load($splitted_id[0])),
         'parent_id' => $splitted_id[0],
         'fulltext' => 'Start ' . $splitted_id[1] . ' End',
       ];
