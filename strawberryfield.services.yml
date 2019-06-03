@@ -7,3 +7,8 @@ services:
     tags:
       - { name: normalizer, priority: 100 }
     arguments: ['@entity.repository']
+  strawberryfield.presavevocab_subscriber:
+    class: Drupal\strawberryfield\EventSubscriber\StrawberryfieldEventPresaveSubscriberVocabCreator
+    tags:
+      - {name: event_subscriber}
+    arguments: ['@string_translation', '@messenger']
