@@ -126,7 +126,7 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
    * {@inheritdoc}
    */
   public function getItemId(ComplexDataInterface $item) {
-    $values = $item->get('page_id')->getValue();
+    $values = $item->get('item_id')->getValue();
     return $values ?: NULL;
   }
 
@@ -547,7 +547,7 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
       // $id = $entity_id : $page_id : $langcode
       $splitted_id = explode(':',$id);
       $data = [
-        'page_id' => $splitted_id[1],
+        'item_id' => $id,
         'target_id' => EntityAdapter::createFromEntity($this->entityTypeManager->getStorage('node')->load($splitted_id[0])),
         'parent_id' => $splitted_id[0],
         'fulltext' => 'Start ' . $splitted_id[1] . ' End',
