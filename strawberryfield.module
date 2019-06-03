@@ -4,18 +4,111 @@
  * Contains strawberryfield.module.
  */
 
-use Drupal\Core\Cache\Cache;
 use Drupal\node\NodeInterface;
 use Drupal\Core\Entity\ContentEntityInterface;
-
+use Drupal\strawberryfield\Event\StrawberryfieldCrudEvent;
+use Drupal\strawberryfield\StrawberryfieldEventType;
 
 /**
- * Implements hook_node_insert().
+ * Implements hook_ENTITY_TYPE_presave().
  *
- * @param \Drupal\node\NodeInterface $node
+ * {@inheritdoc}
  */
-function strawberryfield_node_insert(NodeInterface $node) {
-  strawberryfield_invalidate_fieldefinition_caches($node);
+function strawberryfield_node_presave(ContentEntityInterface $entity) {
+
+  if ($sbf_fields = strawberryfield_bears_strawberryfield($entity)) {
+    $event_type = StrawberryfieldEventType::PRESAVE;
+    $event = new StrawberryfieldCrudEvent($event_type, $entity, $sbf_fields);
+    /** @var \Symfony\Component\EventDispatcher\EventDispatcher $dispatcher */
+    $dispatcher = \Drupal::service('event_dispatcher');
+    $dispatcher->dispatch($event_type, $event);
+  }
+
+}
+
+/**
+ * Implements hook_ENTITY_TYPE_update().
+ *
+ * {@inheritdoc}
+ */
+function strawberryfield_node_update(ContentEntityInterface $entity) {
+
+  if ($sbf_fields = strawberryfield_bears_strawberryfield($entity)) {
+    $event_type = StrawberryfieldEventType::SAVE;
+    $event = new StrawberryfieldCrudEvent($event_type, $entity, $sbf_fields);
+    /** @var \Symfony\Component\EventDispatcher\EventDispatcher $dispatcher */
+    $dispatcher = \Drupal::service('event_dispatcher');
+    $dispatcher->dispatch($event_type, $event);
+  }
+}
+
+/**
+ * Implements hook_ENTITY_TYPE_insert().
+ *
+ * {@inheritdoc}
+ */
+function strawberryfield_node_insert(ContentEntityInterface $entity) {
+
+  //@TODO move this to an event subscriber.
+  strawberryfield_invalidate_fieldefinition_caches($entity);
+
+  if ($sbf_fields = strawberryfield_bears_strawberryfield($entity)) {
+    $event_type = StrawberryfieldEventType::INSERT;
+    $event = new StrawberryfieldCrudEvent($event_type, $entity, $sbf_fields);
+    /** @var \Symfony\Component\EventDispatcher\EventDispatcher $dispatcher */
+    $dispatcher = \Drupal::service('event_dispatcher');
+    $dispatcher->dispatch($event_type, $event);
+  }
+}
+/**
+ * Implements hook_ENTITY_TYPE_revision_create().
+ *
+ * {@inheritdoc}
+ */
+function strawberryfield_node_revision_create(ContentEntityInterface $new_revision, ContentEntityInterface $entity, $keep_untranslatable_fields) {
+
+  if ($sbf_fields = strawberryfield_bears_strawberryfield($entity)) {
+    $event_type = StrawberryfieldEventType::NEW_REVISION;
+    $event = new StrawberryfieldCrudEvent($event_type, $entity, $sbf_fields);
+    /** @var \Symfony\Component\EventDispatcher\EventDispatcher $dispatcher */
+    $dispatcher = \Drupal::service('event_dispatcher');
+    $dispatcher->dispatch($event_type, $event);
+  }
+}
+
+/**
+ * Implements hook_ENTITY_TYPE_delete().
+ *
+ * {@inheritdoc}
+ */
+function strawberryfield_node_delete(ContentEntityInterface $entity) {
+
+  if ($sbf_fields = strawberryfield_bears_strawberryfield($entity)) {
+    $event_type = StrawberryfieldEventType::DELETE;
+    $event = new StrawberryfieldCrudEvent($event_type, $entity, $sbf_fields);
+    /** @var \Symfony\Component\EventDispatcher\EventDispatcher $dispatcher */
+    $dispatcher = \Drupal::service('event_dispatcher');
+    $dispatcher->dispatch($event_type, $event);
+  }
+
+}
+
+/**
+ * Implements hook_ENTITY_TYPE_revision_delete().
+ *
+ * {@inheritdoc}
+ */
+function strawberryfield_node_revision_delete(ContentEntityInterface $entity) {
+
+  if ($sbf_fields = strawberryfield_bears_strawberryfield($entity)) {
+    $event_type = StrawberryfieldEventType::DELETE;
+    $event = new StrawberryfieldCrudEvent($event_type, $entity, $sbf_fields);
+    /** @var \Symfony\Component\EventDispatcher\EventDispatcher $dispatcher */
+    $dispatcher = \Drupal::service('event_dispatcher');
+    $dispatcher->dispatch($event_type, $event);
+  }
+  //@TODO move this to an event subscriber.
+  strawberryfield_invalidate_fieldefinition_caches($entity);
 }
 
 
@@ -24,14 +117,13 @@ function strawberryfield_node_insert(NodeInterface $node) {
  *
  * @param \Drupal\node\NodeInterface $node
  */
-function strawberryfield_invalidate_fieldefinition_caches(NodeInterface $node) {
+function strawberryfield_invalidate_fieldefinition_caches(ContentEntityInterface $entity) {
 
   //@TODO do the same for StrawberryfieldKeyNameProvider Plugins
-  if ($node->isPublished() && $node->isDefaultRevision()) {
+  if ($entity->isPublished() && $entity->isDefaultRevision()) {
     $needscleaning = FALSE;
     $strawberry_field_class = $class = \Drupal::service('plugin.manager.field.field_type')->getPluginClass('strawberryfield_field');
-    foreach ($node->getFieldDefinitions() as $field) {
-      $field_name = $field->getName();
+    foreach ($entity->getFieldDefinitions() as $field) {
       $class = $field->getItemDefinition()->getClass();
       $is_ripe = ($class === $strawberry_field_class) || is_subclass_of(
           $class,
@@ -49,120 +141,30 @@ function strawberryfield_invalidate_fieldefinition_caches(NodeInterface $node) {
   }
 }
 
-function strawberryfield_node_presave(ContentEntityInterface $entity) {
 
-  $field_item_lists = $entity->getFields();
-  $newlycreatedcount = 0;
-  //@TODO refactor this as part of the AS/event driven architecture
-  // And make all this efforts JSON based plugins.
-  foreach ($field_item_lists as $field)
-    $type = $field->getFieldDefinition()->getType();
-  if ($type == 'strawberryfield_field') {
-    if (!$field->isEmpty) {
-      $jsonkeys = [];
-      $jsonkeys = $field->{'str_flatten_keys'};
-      foreach ($jsonkeys as $path) {
-        // Since our keys will be jsonpaths, we can explode them first by dot
-        $path_parts_raw = [];
-        $path_parts_raw = explode(".", $path);
-        $terms = [];
-        $terms = new CachingIterator(
-          new ArrayIterator($path_parts_raw)
-        );
-        $term_path = [];
-        foreach ($terms as $json_node) {
-          if ($terms->hasNext()) {
-            $next = $terms->getInnerIterator()->current();
-            if ($next == '[*]' || $next == '*') {
-              $term_path[] = $json_node . "." . $next;
-              continue;
-            }
-          }
-          if ($json_node != '[*]' && $json_node != '*') {
-            $term_path[] = $json_node;
-          }
-          $parent_id = 0;
-          $term_path = array_filter($term_path);
-          $breadcrumb = '';
-          foreach ($term_path as $path) {
-            $breadcrumb = empty($breadcrumb)? $path: $breadcrumb.'.'.$path;
-            $query = \Drupal::entityQuery('taxonomy_term');
-            $query->condition('vid', "strawberryfield_voc_id");
-            $query->condition('name', $path);
-            $query->condition('parent', $parent_id, 'IN');
-            $tids = $query->execute();
-            if (count($tids) == 0) {
-              $new_term = \Drupal\taxonomy\Entity\Term::create(
-                [
-                  'vid' => 'strawberryfield_voc_id',
-                  'name' => $path,
-                  'parent' => $parent_id,
-                  'field_jsonpath' => $breadcrumb,
-                ]
-              );
-              $newlycreatedcount++;
-              $new_term->enforceIsNew();
-              $new_term->save();
-              $parent_id = $new_term->id();
-            }
-            else {
-              //Assuming parent is there
-              foreach ($tids as $terms_id) {
-                $parent_id = $terms_id;
-              }
-            }
-
-          }
-        }
+/**
+ * Checks if Content entity bears SBF and if so returns machine names
+ *
+ * This function statically caches per Bundle and entity type the results.
+ *
+ * @param \Drupal\Core\Entity\ContentEntityInterface $entity
+ *
+ * @return array
+ *  Returns a numberic keyed array with machine names for the SBF fields
+ */
+function strawberryfield_bears_strawberryfield(ContentEntityInterface $entity) {
+  $hassbf = &drupal_static(__FUNCTION__);
+  $entitytype = $entity->getEntityTypeId();
+  $bundle = $entity->bundle();
+  $key = $entitytype . ":" . $bundle;
+  if (!isset($hassbf[$key])) {
+    $hassbf[$key] = [];
+    $field_item_lists = $entity->getFields();
+    foreach ($field_item_lists as $field) {
+      if ($field->getFieldDefinition()->getType() == 'strawberryfield_field') {
+        $hassbf[$key][] = $field->getFieldDefinition()->getName();
       }
-    if ($newlycreatedcount > 0) {
-      \Drupal::messenger()->addStatus(t('New Terms added to the vocabulary'));
-    }
-
     }
   }
+  return $hassbf[$key];
 }
-
-/**
- * Implements hook_entity_base_field_info().
-
-function strawberryfield_field_entity_base_field_info(EntityTypeInterface $entity_type) {
-  $fields = [];
-  if ($entity_types = _strawberryfieldable_get_entity_types()) {
-    // Adding field to entity types.
-    if (in_array($entity_type->id(), $entity_types)) {
-      $fields['strawberryfield_entityreferences'] = BaseFieldDefinition::create('entity_reference')
-        ->setName('strawberryfield_entityreferences')
-        ->setTargetEntityTypeId($entity_type->id())
-        ->setSetting('target_type', 'group_content')
-        ->setLabel(t('Related to'))
-        ->setTranslatable(FALSE)
-        ->setComputed(TRUE)
-        ->setCustomStorage(TRUE)
-        ->setCardinality(FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED)
-        ->setClass('\Drupal\gcontent_field\Field\GcontentFieldItemList')
-        ->setDisplayConfigurable('form', TRUE)
-        ->setDisplayConfigurable('view', TRUE)
-        ->setDisplayOptions('view', [
-          'label' => 'hidden',
-          'type' => 'hidden',
-          'weight' => 50,
-        ]);
-    }
-  }
-  return $fields;
-}
-
-/**
- * Get entities where the field should be added.
-
-function _strawberryfieldable_get_entity_types() {
-  $entity_types = [];
-  $field_map = \Drupal::entityManager()->getFieldMap();
-  foreach ($field_map['node'] as $field => $usage) {
-    if ($usage['type'] == "strawberryfield_field")
-      $entity_types = $entity_types + $usage['bundles'];
-  }
-}
-return $entity_types;
-} */
