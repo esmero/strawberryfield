@@ -20,6 +20,7 @@ class StrawberryfieldFlavorDataDefinition extends ComplexDataDefinitionBase {
 
       $info = &$this->propertyDefinitions;
       $info['item_id'] = DataDefinition::create('string')->setLabel('Item ID');
+      $info['page_id'] = DataDefinition::create('string')->setLabel('Page ID');
       $info['parent_id'] = DataReferenceTargetDefinition::create('integer');
       $info['target_id'] = EntityDataDefinition::create('node')->setLabel('Parent Node ID');
       $info['fulltext'] = DataDefinition::create('string')->setLabel('FullText test');
