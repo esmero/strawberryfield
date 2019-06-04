@@ -5,9 +5,7 @@
  * Date: 9/18/18
  * Time: 8:21 PM
  */
-
 namespace Drupal\strawberryfield\Plugin\DataType;
-
 use Drupal\Core\TypedData\DataDefinitionInterface;
 use Drupal\Core\TypedData\TraversableTypedDataInterface;
 use Drupal\Core\TypedData\TypedData;
@@ -18,32 +16,25 @@ use Drupal\Core\TypedData\TypedDataInterface;
 use Drupal\Core\TypedData\Plugin\DataType\ItemList;
 use Drupal\Core\TypedData\ComputedItemListTrait;
 use Drupal\strawberryfield\Plugin\Field\FieldType\StrawberryFieldItem;
-
-
 class StrawberryValuesFromJson extends ItemList {
-
   /**
    * Cached processed value.
    *
    * @var array|null
    */
   protected $processed = NULL;
-
   /**
    * Whether the values have already been computed or not.
    *
    * @var bool
    */
-
   protected $computed = FALSE;
-
   /**
    * Keyed array of items.
    *
    * @var \Drupal\Core\TypedData\TypedDataInterface[]
    */
   protected $list = [];
-
   public function getValue() {
     if ($this->processed == NULL) {
       $this->process();
@@ -54,7 +45,6 @@ class StrawberryValuesFromJson extends ItemList {
     }
     return $values;
   }
-
   /**
    * @param null $langcode
    *
@@ -65,19 +55,13 @@ class StrawberryValuesFromJson extends ItemList {
       return;
     }
     $values = [];
-
     $item = $this->getParent();
     if (!empty($item->value)) {
-
-
       /* @var $item StrawberryFieldItem */
       $flattened = $item->provideFlatten(FALSE);
-
       $definition = $this->getDataDefinition();
-
       // This key is passed by the property definition in the field class
       $needle = $definition['settings']['jsonkey'];
-
       // @TODO, see if we need to quote everything
       if (isset($flattened[$needle]) && is_array($flattened[$needle])) {
         foreach ($flattened[$needle] as &$item) {
@@ -94,7 +78,6 @@ class StrawberryValuesFromJson extends ItemList {
       elseif (isset($flattened[$needle])) {
         $values[] = trim($flattened[$needle]);
       }
-
       /*foreach ($flattened as $graphitems) {
         if (isset($graphitems[$needle])) {
           if (is_array($graphitems[$needle])) {
@@ -104,9 +87,7 @@ class StrawberryValuesFromJson extends ItemList {
             $values[] = $graphitems[$needle];
           }
         }
-
       }*/
-
       $this->processed = array_values($values);
       foreach ($this->processed as $delta => $item) {
         $this->list[$delta] = $this->createItem($delta, $item);
@@ -117,7 +98,6 @@ class StrawberryValuesFromJson extends ItemList {
     }
     $this->computed = TRUE;
   }
-
   /**
    * Ensures that values are only computed once.
    */
@@ -126,14 +106,12 @@ class StrawberryValuesFromJson extends ItemList {
       $this->process();
     }
   }
-
   /**
    * {@inheritdoc}
    */
   public function setValue($values, $notify = TRUE) {
     // Nothing to set
   }
-
   /**
    * {@inheritdoc}
    */
@@ -141,7 +119,6 @@ class StrawberryValuesFromJson extends ItemList {
     $this->ensureComputedValue();
     return parent::getString();
   }
-
   /**
    * {@inheritdoc}
    */
@@ -150,10 +127,8 @@ class StrawberryValuesFromJson extends ItemList {
       throw new \InvalidArgumentException('Unable to get a value with a non-numeric delta in a list.');
     }
     $this->ensureComputedValue();
-
     return isset($this->list[$index]) ? $this->list[$index] : NULL;
   }
-
   /**
    * {@inheritdoc}
    */
@@ -161,7 +136,6 @@ class StrawberryValuesFromJson extends ItemList {
     $this->ensureComputedValue();
     return parent::set($index, $value);
   }
-
   /**
    * {@inheritdoc}
    */
@@ -169,7 +143,6 @@ class StrawberryValuesFromJson extends ItemList {
     $this->ensureComputedValue();
     return parent::appendItem($value);
   }
-
   /**
    * {@inheritdoc}
    */
@@ -177,7 +150,6 @@ class StrawberryValuesFromJson extends ItemList {
     $this->ensureComputedValue();
     return parent::removeItem($index);
   }
-
   /**
    * {@inheritdoc}
    */
@@ -185,7 +157,6 @@ class StrawberryValuesFromJson extends ItemList {
     $this->ensureComputedValue();
     return parent::isEmpty();
   }
-
   /**
    * {@inheritdoc}
    */
@@ -193,7 +164,6 @@ class StrawberryValuesFromJson extends ItemList {
     $this->ensureComputedValue();
     return parent::offsetExists($offset);
   }
-
   /**
    * {@inheritdoc}
    */
@@ -201,7 +171,6 @@ class StrawberryValuesFromJson extends ItemList {
     $this->ensureComputedValue();
     return parent::getIterator();
   }
-
   /**
    * {@inheritdoc}
    */
@@ -209,13 +178,11 @@ class StrawberryValuesFromJson extends ItemList {
     $this->ensureComputedValue();
     return parent::count();
   }
-
   /**
    * {@inheritdoc}
    */
   public function applyDefaultValue($notify = TRUE) {
     return $this;
   }
-
-
 }
+

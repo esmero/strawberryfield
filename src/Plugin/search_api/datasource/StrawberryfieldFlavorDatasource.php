@@ -243,14 +243,14 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
         $translations = array_intersect($translations, $languages);
       }
       foreach ($translations as $langcode) {
-        $page_id = 1;
-        $item_ids[] = "$entity_id:$page_id:$langcode";
-        $page_id = 2;
-        $item_ids[] = "$entity_id:$page_id:$langcode";
-        $page_id = 3;
-        $item_ids[] = "$entity_id:$page_id:$langcode";
-        $page_id = 4;
-        $item_ids[] = "$entity_id:$page_id:$langcode";
+        $sequence_id = 1;
+        $item_ids[] = "$entity_id:$sequence_id:$langcode";
+        $sequence_id = 2;
+        $item_ids[] = "$entity_id:$sequence_id:$langcode";
+        $sequence_id = 3;
+        $item_ids[] = "$entity_id:$sequence_id:$langcode";
+        $sequence_id = 4;
+        $item_ids[] = "$entity_id:$sequence_id:$langcode";
       }
     }
 
@@ -544,11 +544,10 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
     dpm($ids);
 
     foreach($ids as $id){
-      // $id = $entity_id : $page_id : $langcode
       $splitted_id = explode(':',$id);
       $data = [
         'item_id' => $id,
-        'page_id' => $splitted_id[1],
+        'sequence_id' => $splitted_id[1],
         'target_id' => $splitted_id[0],
         'parent_id' => $splitted_id[0],
         'fulltext' => 'Start ' . $splitted_id[1] . ' End',
