@@ -13,7 +13,7 @@ use Drupal\Core\Annotation\Translation;
 /**
  * Defines a StrawberryfieldKeyNameProvider item annotation object.
  *
- * Class StrawberryfieldKeyNameProviderAnnotation
+ * Class StrawberryfieldKeyNameProvider
  *
  * @package Drupal\strawberryfield\Annotation
  *
