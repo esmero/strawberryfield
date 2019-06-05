@@ -126,8 +126,25 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
    * {@inheritdoc}
    */
   public function getItemId(ComplexDataInterface $item) {
-    $values = $item->get('item_id')->getValue();
-    return $values ?: NULL;
+    // @TODO This id is not the one for a particular flavor
+    // but the one from the source, which in this case is a node
+    // This is tricky since we really have a lot of id's for each node
+    // we could return either NULL, or with the first page (node:page:lang)
+    // or as here, with the node->id
+    // But in any case we will have to track our items manually
+    // @see search_api.module \search_api_node_access_records_alter
+    dpm('calling \Drupal\strawberryfield\Plugin\search_api\datasource\StrawberryfieldFlavorDatasource::getItemId');
+    dpm($item);
+
+    if ($value = $item->getValue()) {
+      if ($value instanceof EntityInterface) {
+        $enabled_bundles = $this->getBundles();
+        if (isset($enabled_bundles[$value->bundle()])) {
+          return $value->id() . ':' . $value->language()->getId() . ':' . 0;
+        }
+      }
+    }
+    return NULL;
   }
 
   /**
