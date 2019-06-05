@@ -110,47 +110,42 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
            $configuration_options = $plugin_config_entity->getPluginconfig();
            // This argument is used when buildin the cid for the plugin internal cache.
            $configuration_options['configEntity'] = $entity_id ;
+           /* @var \Drupal\strawberryfield\Plugin\StrawberryfieldKeyNameProviderInterface $plugin_instance */
+           $plugin_instance = \Drupal::service('strawberryfield.keyname_manager')->createInstance($plugin_config_entity->getPluginid(),$plugin_config_entity->getPluginconfig());
+           $plugin_definition = $plugin_instance->getPluginDefinition();
+           // Allows plugins to define its own processing class for the JSON values.
+           $processing_class = isset($plugin_definition['processor_class'])? $plugin_definition['processor_class'] : '\Drupal\strawberryfield\Plugin\DataType\StrawberryValuesFromJson';
+           if (!isset($keynamelist[$processing_class])) {
+             // make sure we have a processing class key even if we still have no keys
+             $keynamelist[$processing_class] = [];
+           }
            //@TODO HOW MANY KEYS? we should be able to set this per instance.
-           $keynamelist = array_merge(\Drupal::service('strawberryfield.keyname_manager')->createInstance($plugin_config_entity->getPluginid(),$plugin_config_entity->getPluginconfig())->provideKeyNames(), $keynamelist);
+           $keynamelist[$processing_class] = array_merge($plugin_instance->provideKeyNames(), $keynamelist[$processing_class]);
          }
        }
-     } else {
-       // @TODO not sure if i need this. This is the default in case we have no plugins yet.
-       //
-       $keyprovider_plugin = \Drupal::service('strawberryfield.keyname_manager')
-         ->getDefinitions();
-       // Collect the key Providers Plugins
-
-       foreach ($keyprovider_plugin as $plugin_definition) {
-         /* @var \Drupal\strawberryfield\Plugin\StrawberryfieldKeyNameProviderInterface $plugin_definition */
-         $keynamelist = array_merge(
-           \Drupal::service('strawberryfield.keyname_manager')->createInstance(
-             $plugin_definition['id'],
-             []
-           )->provideKeyNames(),
-           $keynamelist
-         );
-       }
      }
 
-     foreach ($keynamelist as $keyname) {
-       if (isset($reserverd_keys[$keyname])) {
-         // Avoid internal reserved keys
-         continue;
+     foreach ($keynamelist as $processor_class => $keynames) {
+       if (is_array($keynames)) {
+         foreach ($keynames as $keyname) {
+           if (isset($reserverd_keys[$keyname])) {
+             // Avoid internal reserved keys
+             continue;
+           }
+           $properties[$keyname] = ListDataDefinition::create('string')
+             ->setLabel($keyname)
+             ->setComputed(TRUE)
+             ->setClass(
+               $processor_class
+             )
+             ->setInternal(FALSE)
+             ->setSetting('jsonkey', $keyname)
+             ->setReadOnly(TRUE);
+         }
        }
-       $properties[$keyname] = ListDataDefinition::create('string')
-         ->setLabel($keyname)
-         ->setComputed(TRUE)
-         ->setClass(
-           '\Drupal\strawberryfield\Plugin\DataType\StrawberryValuesFromJson'
-         )
-         ->setInternal(FALSE)
-         ->setSetting('jsonkey',$keyname)
-         ->setReadOnly(TRUE);
      }
-
-
      return $properties;
+
    }
 
    /**

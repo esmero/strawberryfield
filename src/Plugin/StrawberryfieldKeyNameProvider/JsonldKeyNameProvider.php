@@ -23,7 +23,8 @@ use Drupal\Core\Cache\CacheBackendInterface;
  *
  * @StrawberryfieldKeyNameProvider(
  *    id = "jsonld",
- *    label = @Translation("JSONLD Strawberry Field Key Name Provider")
+ *    label = @Translation("JSONLD Strawberry Field Key Name Provider"),
+ *    processor_class = "\Drupal\strawberryfield\Plugin\DataType\StrawberryValuesFromJson"
  * )
  */
 class JsonldKeyNameProvider extends StrawberryfieldKeyNameProviderBase {
@@ -45,7 +46,7 @@ class JsonldKeyNameProvider extends StrawberryfieldKeyNameProviderBase {
        // e.g https://schema.org/docs/jsonldcontext.json"
       'url' => '',
         // Since JSON lists like schema.org can be huge
-        // We allow people to provide a subset that will be used to filter agains
+        // We allow a subset that will be used to filter against
         // e.g https://schema.org/Book.jsonld
       'filterurl' => '',
       'keys' => '',
