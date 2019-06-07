@@ -133,14 +133,12 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
     // or as here, with the node->id
     // But in any case we will have to track our items manually
     // @see search_api.module \search_api_node_access_records_alter
-    dpm('calling \Drupal\strawberryfield\Plugin\search_api\datasource\StrawberryfieldFlavorDatasource::getItemId');
-    dpm($item);
 
     if ($value = $item->getValue()) {
       if ($value instanceof EntityInterface) {
         $enabled_bundles = $this->getBundles();
         if (isset($enabled_bundles[$value->bundle()])) {
-          return $value->id() . ':' . $value->language()->getId() . ':' . 0;
+          return $value->id() . ':' . 0 . ':' . $value->language()->getId();
         }
       }
     }
