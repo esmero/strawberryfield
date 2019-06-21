@@ -46,9 +46,14 @@ class StrawberryfieldKeyNameProvider extends Plugin {
    * @var processor_class;
    * Use to define which class will process the data from the JSON.
    * Example: \Drupal\strawberryfield\Plugin\DataType\StrawberryValuesFromJson
-   *
-   * @ingroup plugin_translatable;
    */
   public $processor_class;
+
+  /**
+   * @var item_type;
+   * Use to define of which data type each value will be.
+   * Example: \Drupal\strawberryfield\Plugin\DataType\StrawberryValuesFromJson
+   */
+  public $item_type;
 
 }

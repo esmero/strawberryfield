@@ -8,8 +8,14 @@
 
 namespace Drupal\strawberryfield\Tools;
 
+use JmesPath\Env as JmesPath;
 
 
+/**
+ * Class StrawberryfieldJsonHelper
+ *
+ * @package Drupal\strawberryfield\Tools
+ */
 class StrawberryfieldJsonHelper {
 
   /**
@@ -171,6 +177,19 @@ class StrawberryfieldJsonHelper {
    */
   public static function jsonIsList(array $sourcearray =  []) {
       return empty(array_filter(array_keys($sourcearray), 'is_string'));
+  }
+
+  /**
+   *
+   *
+   * @param $expression
+   *  JMES Valid path expression
+   * @param array $sourcearray
+   *
+   * @return mixed|null Returns the matching data or null
+   */
+  public static function searchJson($expression, array $sourcearray =  []) {
+    return JmesPath::search($expression, $sourcearray);
   }
 
 }

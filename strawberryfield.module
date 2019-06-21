@@ -8,6 +8,15 @@ use Drupal\node\NodeInterface;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\strawberryfield\Event\StrawberryfieldCrudEvent;
 use Drupal\strawberryfield\StrawberryfieldEventType;
+use Drupal\Core\Field\BaseFieldDefinition;
+use Drupal\Core\Entity\EntityTypeInterface;
+use Drupal\Core\StreamWrapper\StreamWrapperInterface;
+use Drupal\Core\Field\FieldStorageDefinitionInterface;
+use Drupal\strawberryfield\Field\StrawberryFieldFileComputedItemList;
+use Drupal\Core\Access\AccessResult;
+use Drupal\Core\Field\FieldDefinitionInterface;
+use Drupal\Core\Session\AccountInterface;
+use Drupal\Core\Field\FieldItemListInterface;
 
 /**
  * Implements hook_ENTITY_TYPE_presave().
@@ -167,4 +176,104 @@ function strawberryfield_bears_strawberryfield(ContentEntityInterface $entity) {
     }
   }
   return $hassbf[$key];
+}
+
+
+/**
+ * @param \Drupal\Core\Entity\ContentEntityInterface $entity
+ */
+function strawberryfield_bundle_bears_strawberryfield(ContentEntityInterface $entity) {
+
+}
+
+/**
+ * Implements hook_entity_base_field_info();
+ *
+ * @param \Drupal\Core\Entity\EntityTypeInterface $entity_type
+ *
+ * @return array
+ */
+function strawberryfield_entity_base_field_info(EntityTypeInterface $entity_type
+) {
+
+  if ($entity_type->id() == 'node') {
+    $scheme_options = \Drupal::service('stream_wrapper_manager')->getNames(
+      StreamWrapperInterface::WRITE_VISIBLE
+    );
+    if (isset($scheme_options['private'])) {
+      $schema = 'private';
+    }
+    elseif (isset($scheme_options['public'])) {
+      $schema = 'public';
+    }
+    else {
+      $schema = 'public';
+    }
+
+    $fields = [];
+    // Add a field that serves as a drop box for any entities that bear a SBF
+    // @see https://www.drupal.org/project/drupal/issues/2346347 to
+    // know why we can't use \Drupal\Core\Field\BaseFieldDefinition
+    // If we try to make this Bundle specific.
+    $fields['field_file_drop'] = BaseFieldDefinition::create('entity_reference')
+      ->setName('field_file_drop')
+      ->setLabel(t('Drop Files'))
+      ->setComputed(TRUE)
+      ->setRevisionable(FALSE)
+      ->setTranslatable(FALSE)
+      ->setCardinality(FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED)
+      ->setReadOnly(FALSE)
+      ->setTargetEntityTypeId($entity_type->id())
+      ->setSettings(
+        [
+          'target_type' => 'file',
+          // @TODO Change this: stub only for now
+          'sbf_field' => 'field_descriptive_metadata',
+          'file_directory' => 'sbf_tmp',
+          'uri_scheme' => $schema,
+        ]
+      )
+      ->setClass(StrawberryFieldFileComputedItemList::class)
+      ->setDisplayConfigurable('view', FALSE)
+      ->setDisplayConfigurable('form', FALSE);
+    return $fields;
+  }
+}
+
+/**
+ * Implements hook_entity_field_access();
+ *
+ * @param $operation
+ * @param \Drupal\Core\Field\FieldDefinitionInterface $field_definition
+ * @param \Drupal\Core\Session\AccountInterface $account
+ * @param \Drupal\Core\Field\FieldItemListInterface|NULL $items
+ *
+ * @return \Drupal\Core\Access\AccessResult|\Drupal\Core\Access\AccessResultNeutral
+ */
+function strawberryfield_entity_field_access($operation, FieldDefinitionInterface $field_definition, AccountInterface $account, FieldItemListInterface $items = NULL) {
+  if ($field_definition
+      ->getName() == 'field_file_drop') {
+    return AccessResult::allowedIfHasPermission($account, 'upload to Digital Object file dropbox field');
+  }
+  return AccessResult::neutral();
+}
+
+
+function strawberryfield_file_mimetype_mapping_alter(&$mapping) {
+
+  // Add relevant Repository Mimetypes missing from D8
+  $mapping['mimetypes']['json_mimetype'] = 'application/json';
+  $mapping['extensions']['json'] = 'json_mimetype';
+  $mapping['mimetypes']['jsonld_mimetype'] = 'application/ld+json';
+  $mapping['extensions']['jsonld'] = 'jsonld_mimetype';
+  $mapping['mimetypes']['jpeg2000_mimetype'] = 'image/jp2';
+  $mapping['extensions']['jp2'] = 'jpeg2000_mimetype';
+  $mapping['mimetypes']['jpeg2000_mimetype'] = 'image/jp2';
+  $mapping['extensions']['jp2'] = 'jpeg2000_mimetype';
+  $mapping['mimetypes']['fits_image_mimetype'] = 'image/fits';
+  // @See https://en.wikipedia.org/wiki/FITS
+  $mapping['extensions']['fits'] = 'fits_image_mimetype';
+  $mapping['extensions']['fit'] = 'fits_image_mimetype';
+  $mapping['extensions']['fts'] = 'fits_image_mimetype';
+
 }

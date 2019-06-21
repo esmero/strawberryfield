@@ -51,6 +51,15 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
    protected $flattenjson = NULL;
 
    /**
+    * A JMESPATH processed results array.
+    *
+    * This is computed once per expression so other properties can use it.
+    *
+    * @var array|null
+    */
+   protected $jsonjmesresults = NULL;
+
+   /**
     * @param FieldStorageDefinitionInterface $field_definition
     * @return array
     */
@@ -73,7 +82,6 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
     * @return \Drupal\Core\TypedData\DataDefinitionInterface[]|mixed
     */
    public static function propertyDefinitions(FieldStorageDefinitionInterface $field_definition) {
-
 
      $reserverd_keys = [
        'value',
@@ -98,8 +106,8 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
        ->setInternal(FALSE)
        ->setReadOnly(TRUE);
 
-
      $keynamelist = [];
+     $item_types = [];
 
      $plugin_config_entities = \Drupal::EntityTypeManager()->getListBuilder('strawberry_keynameprovider')->load();
      if (count($plugin_config_entities))  {
@@ -111,29 +119,33 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
            // This argument is used when buildin the cid for the plugin internal cache.
            $configuration_options['configEntity'] = $entity_id ;
            /* @var \Drupal\strawberryfield\Plugin\StrawberryfieldKeyNameProviderInterface $plugin_instance */
-           $plugin_instance = \Drupal::service('strawberryfield.keyname_manager')->createInstance($plugin_config_entity->getPluginid(),$plugin_config_entity->getPluginconfig());
+           $plugin_instance = \Drupal::service('strawberryfield.keyname_manager')->createInstance($plugin_config_entity->getPluginid(),$configuration_options);
            $plugin_definition = $plugin_instance->getPluginDefinition();
            // Allows plugins to define its own processing class for the JSON values.
-           $processing_class = isset($plugin_definition['processor_class'])? $plugin_definition['processor_class'] : '\Drupal\strawberryfield\Plugin\DataType\StrawberryValuesFromJson';
-           if (!isset($keynamelist[$processing_class])) {
+           $processor_class = isset($plugin_definition['processor_class'])? $plugin_definition['processor_class'] : '\Drupal\strawberryfield\Plugin\DataType\StrawberryValuesFromJson';
+           // Allows plugins to define its own item type for each item in the ListDataDefinition for the JSON values.
+           $item_type = isset($plugin_definition['item_type'])? $plugin_definition['item_type'] : 'string';
+           if (!isset($keynamelist[$processor_class])) {
              // make sure we have a processing class key even if we still have no keys
-             $keynamelist[$processing_class] = [];
+             $keynamelist[$processor_class] = [];
+             // All processing classes share the same $item_type
+             $item_types[$processor_class] = $item_type;
            }
            //@TODO HOW MANY KEYS? we should be able to set this per instance.
-           $keynamelist[$processing_class] = array_merge($plugin_instance->provideKeyNames(), $keynamelist[$processing_class]);
+           $keynamelist[$processor_class] = array_merge($plugin_instance->provideKeyNames($entity_id), $keynamelist[$processor_class]);
          }
        }
      }
 
-     foreach ($keynamelist as $processor_class => $keynames) {
-       if (is_array($keynames)) {
-         foreach ($keynames as $keyname) {
-           if (isset($reserverd_keys[$keyname])) {
+     foreach ($keynamelist as $processor_class => $plugin_info) {
+       if (is_array($plugin_info)) {
+         foreach ($plugin_info as $property => $keyname) {
+           if (isset($reserverd_keys[$property])) {
              // Avoid internal reserved keys
              continue;
            }
-           $properties[$keyname] = ListDataDefinition::create('string')
-             ->setLabel($keyname)
+           $properties[$property] = ListDataDefinition::create($item_types[$processor_class])
+             ->setLabel($property)
              ->setComputed(TRUE)
              ->setClass(
                $processor_class
@@ -145,7 +157,6 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
        }
      }
      return $properties;
-
    }
 
    /**
@@ -197,6 +208,35 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
        }
      }
      return $this->flattenjson;
+   }
+
+
+   /**
+    * Calculates / keeps around JMES Path search results for the main value.
+    *
+    * @param bool $force
+    * Forces regeneration even if already computed.
+    *
+    * @param $expression
+    * @param bool $force
+    *
+    * @return array|mixed
+    */
+   public function searchPath($expression, $force = TRUE) {
+
+     if ($this->isEmpty()) {
+       $this->jsonjmesresults = [];
+     }
+     else {
+       if ($this->jsonjmesresults == NULL || !isset($this->jsonjmesresults[$expression]) || $force) {
+         $mainproperty = $this->mainPropertyName();
+         $jsonArray = json_decode($this->{$mainproperty}, TRUE, 10);
+         $searchresult = StrawberryfieldJsonHelper::searchJson($expression, $jsonArray);
+         $this->jsonjmesresults[$expression] = $searchresult;
+         return $searchresult;
+       }
+     }
+     return $this->jsonjmesresults[$expression];
    }
 
    /**
