@@ -1,18 +1,3 @@
-# Strawberryfield group admin
-strawberryfield.group.admin:
-  title: 'Archipelago'
-  route_name: system.admin_config_strawberryfield
-  parent: system.admin_config
-  description: 'Archipelago Configuration'
-  weight: -999
-
-#Strawberryfield IIIF admin settings
-strawberryfield.iiif_admin_settings_form:
-  title: 'IIIF Configuration Form'
-  route_name: strawberryfield.iiif_admin_settings_form
-  description: 'Configure IIIF'
-  parent: strawberryfield.group.admin
-  weight: 99
 
 # Strawberry Key Name Providers menu items definition
 entity.strawberry_keynameprovider.collection:
