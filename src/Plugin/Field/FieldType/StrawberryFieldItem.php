@@ -109,7 +109,11 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
      $keynamelist = [];
      $item_types = [];
 
-     $plugin_config_entities = \Drupal::EntityTypeManager()->getListBuilder('strawberry_keynameprovider')->load();
+     // Fixes Search paging. Properties get lost because something in D8 fails
+     // to invoke correctly (null results)
+     // \Drupal::EntityTypeManager()->getListBuilder('strawberry_keynameprovider')
+     $plugin_config_entities = \Drupal::EntityTypeManager()->getStorage('strawberry_keynameprovider')->loadMultiple();
+
      if (count($plugin_config_entities))  {
        /* @var keyNameProviderEntity[] $plugin_config_entities */
        foreach($plugin_config_entities as $plugin_config_entity) {
@@ -156,6 +160,7 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
          }
        }
      }
+
      return $properties;
    }
 
