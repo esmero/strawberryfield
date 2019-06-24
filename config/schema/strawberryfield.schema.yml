@@ -32,3 +32,14 @@ strawberryfield.strawberry_keynameprovider.jsonld:
     keys:
       type: string
       label: 'Additional Keys to include'
+
+strawberryfield.iiif_configuration:
+  type: config_object
+  label: 'Strawberry IIIF specific config'
+  mapping:
+    pub_server_url:
+      type: string
+      label: 'Public IIIF server URL'
+    int_server_url:
+      type: string
+      label: 'Internal IIIF server URL'
