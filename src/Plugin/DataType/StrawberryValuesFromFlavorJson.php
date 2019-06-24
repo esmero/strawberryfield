@@ -119,7 +119,7 @@ JSON;
       if (isset($flattened[$baseneedle]) &&
         is_array($flattened[$baseneedle]) &&
         isset($flattened[$needle]) &&
-        is_array($flattened[$baseneedle])
+        is_array($flattened[$needle])
       ) {
         $servicearray = $flattened[$needle];
 
