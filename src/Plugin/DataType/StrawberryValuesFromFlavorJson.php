@@ -100,8 +100,6 @@ JSON;
       // our needles are contained inside a baseneedle
       $baseneedle = 'ap:flavours';
 
-
-
       // A single flavor definition goes like this
       /*
       "ap:hocr": {
@@ -188,11 +186,8 @@ JSON;
    * {@inheritdoc}
    */
   public function get($index) {
-    if (!is_numeric($index)) {
-      throw new \InvalidArgumentException('Unable to get a value with a non-numeric delta in a list.');
-    }
     $this->ensureComputedValue();
-    return isset($this->list[$index]) ? $this->list[$index] : NULL;
+    return isset($this->computed[$index]) ? $this->computed[$index] : NULL;
   }
   /**
    * {@inheritdoc}
