@@ -84,7 +84,7 @@ class StrawberryValuesFromJson extends ItemList {
       }
     }
     else {
-      $this->processed = NULL;
+      $this->processed = [];
     }
     $this->computed = TRUE;
   }
