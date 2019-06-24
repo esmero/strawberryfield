@@ -15,6 +15,6 @@
     "require": {
         "ml/json-ld": "^1.0",
         "mtdowling/jmespath.php":"^2.4",
-        "swaggest/json-schema":"^0.*"
+        "swaggest/json-schema":"^0.12.11"
     }
 }
