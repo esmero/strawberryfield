@@ -3,7 +3,21 @@
 entity.strawberry_keynameprovider.collection:
   title: 'Strawberry Key Name Providers'
   route_name: entity.strawberry_keynameprovider.collection
-  description: 'List Strawberry Key Name Providers (bundles)'
+  description: 'List Strawberry Field Key Name Provider Plugins'
   parent: system.admin_structure
+  weight: 99
+# Strawberryfield group admin
+strawberryfield.group.admin:
+  title: 'Archipelago'
+  route_name: system.admin_config_strawberryfield
+  parent: system.admin_config
+  description: 'Archipelago Configuration'
+  weight: -999
+
+strawberryfield.storage_settings_form:
+  title: 'Storage Configuration Form'
+  route_name: strawberryfield.storage_settings_form
+  description: 'Configure strawberry field file persistence settings'
+  parent: strawberryfield.group.admin
   weight: 99
 
