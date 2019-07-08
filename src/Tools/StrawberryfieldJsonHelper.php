@@ -52,6 +52,114 @@ class StrawberryfieldJsonHelper {
        }
     }';
 
+
+  /**
+   * A URI matching regular expression for RFC 3986
+   */
+  const URI_REGEXP =  '/
+    # URI scheme RFC 3986 (http://tools.ietf.org/html/rfc3986)
+    
+    (?(DEFINE)
+    
+      # ABNF notation of RFC 2234 (http://tools.ietf.org/html/rfc2234#section-6.1)
+    
+      (?<ALPHA>     [\x41-\x5A\x61-\x7A] )    # Latin character (A-Z, a-z)
+      (?<CR>        \x0D )                    # Carriage return (\r)
+      (?<DIGIT>     [\x30-\x39] )             # Decimal number (0-9)
+      (?<DQUOTE>    \x22 )                    # Double quote (")
+      (?<HEXDIG>    (?&DIGIT) | [\x41-\x46] ) # Hexadecimal number (0-9, A-F)
+      (?<LF>        \x0A )                    # Line feed (\n)
+      (?<SP>        \x20 )                    # Space
+    
+      # RFC 3986 body
+    
+      (?<uri>    (?&scheme) \: (?&hier_part) (?: \? (?&query) )? (?: \# (?&fragment) )? )
+    
+      (?<hier_part>    \/\/ (?&authority) (?&path_abempty)
+                     | (?&path_absolute)
+                     | (?&path_rootless)
+                     | (?&path_empty) )
+    
+      (?<uri_reference>    (?&uri) | (?&relative_ref) )
+    
+      (?<absolute_uri>    (?&scheme) \: (?&hier_part) (?: \? (?&query) )? )
+    
+      (?<relative_ref>    (?&relative_part) (?: \? (?&query) )? (?: \# (?&fragment) )? )
+    
+      (?<relative_part>     \/\/ (?&authority) (?&path_abempty)
+                          | (?&path_absolute)
+                          | (?&path_noscheme)
+                          | (?&path_empty) )
+    
+      (?<scheme>    (?&ALPHA) (?: (?&ALPHA) | (?&DIGIT) | \+ | \- | \. )* )
+    
+      (?<authority>    (?: (?&userinfo) \@ )? (?&host) (?: \: (?&port) )? )
+      (?<userinfo>     (?: (?&unreserved) | (?&pct_encoded) | (?&sub_delims) | \: )* )
+      (?<host>         (?&ip_literal) | (?&ipv4_address) | (?&reg_name) )
+      (?<port>         (?&DIGIT)* )
+    
+      (?<ip_literal>    \[ (?: (?&ipv6_address) | (?&ipv_future) ) \] )
+    
+      (?<ipv_future>    \x76 (?&HEXDIG)+ \. (?: (?&unreserved) | (?&sub_delims) | \: )+ )
+    
+      (?<ipv6_address>                                              (?: (?&h16) \: ){6} (?&ls32)
+                        |                                      \:\: (?: (?&h16) \: ){5} (?&ls32)
+                        |                           (?&h16)?   \:\: (?: (?&h16) \: ){4} (?&ls32)
+                        | (?: (?: (?&h16) \: ){0,1} (?&h16) )? \:\: (?: (?&h16) \: ){3} (?&ls32)
+                        | (?: (?: (?&h16) \: ){0,2} (?&h16) )? \:\: (?: (?&h16) \: ){2} (?&ls32)
+                        | (?: (?: (?&h16) \: ){0,3} (?&h16) )? \:\:     (?&h16) \:      (?&ls32)
+                        | (?: (?: (?&h16) \: ){0,4} (?&h16) )? \:\:                     (?&ls32)
+                        | (?: (?: (?&h16) \: ){0,5} (?&h16) )? \:\:                     (?&h16)
+                        | (?: (?: (?&h16) \: ){0,6} (?&h16) )? \:\: )
+    
+      (?<h16>             (?&HEXDIG){1,4} )
+      (?<ls32>            (?: (?&h16) \: (?&h16) ) | (?&ipv4_address) )
+      (?<ipv4_address>    (?&dec_octet) \. (?&dec_octet) \. (?&dec_octet) \. (?&dec_octet) )
+    
+      (?<dec_octet>    (?&DIGIT)
+                     | [\x31-\x39] (?&DIGIT)
+                     | \x31 (?&DIGIT){2}
+                     | \x32 [\x30-\x34] (?&DIGIT)
+                     | \x32\x35 [\x30-\x35] )
+    
+      (?<reg_name>     (?: (?&unreserved) | (?&pct_encoded) | (?&sub_delims) )* )
+    
+      (?<path>    (?&path_abempty)
+                | (?&path_absolute)
+                | (?&path_noscheme)
+                | (?&path_rootless)
+                | (?&path_empty) )
+    
+      (?<path_abempty>     (?: \/ (?&segment) )* )
+      (?<path_absolute>    \/ (?: (?&segment_nz) (?: \/ (?&segment) )* )? )
+      (?<path_noscheme>    (?&segment_nz_nc) (?: \/ (?&segment) )* )
+      (?<path_rootless>    (?&segment_nz) (?: \/ (?&segment) )* )
+      (?<path_empty>       (?&pchar){0} ) # For explicity only
+    
+      (?<segment>       (?&pchar)* )
+      (?<segment_nz>    (?&pchar)+ )
+      (?<segment_nz_nc> (?: (?&unreserved) | (?&pct_encoded) | (?&sub_delims) | \@ )+ )
+    
+      (?<pchar>    (?&unreserved) | (?&pct_encoded) | (?&sub_delims) | \: | \@ )
+    
+      (?<query>    (?: (?&pchar) | \/ | \? )* )
+    
+      (?<fragment>    (?: (?&pchar) | \/ | \? )* )
+    
+      (?<pct_encoded>    \% (?&HEXDIG) (?&HEXDIG) )
+    
+      (?<unreserved>    (?&ALPHA) | (?&DIGIT) | \- | \. | \_ | \~ )
+      (?<reserved>      (?&gen_delims) | (?&sub_delims) )
+      (?<gen_delims>    \: | \/ | \? | \# | \[ | \] | \@ )
+      (?<sub_delims>    \! | \$ | \& | \' | \( | \)
+                      | \* | \+ | \, | \; | \= )
+    
+    )
+    ^(?&uri)$
+    /x';
+
+  CONST URN_REGEXP = '/^urn:[a-z0-9][a-z0-9-]{0,31}:[a-z0-9()+,\-.:=@;$_!*\'%\/?#]+$/x';
+
   /**
    * Flattens JSON string into array
    *
@@ -95,7 +203,8 @@ class StrawberryfieldJsonHelper {
     foreach ($sourcearray as $key => $values) {
       // If a Key is an URL chances are we are dealing with many different ones
       // Also we want to build JSON Paths here, so replace with *
-      if(filter_var($key , FILTER_VALIDATE_URL)) {
+      // But PHP does not know anything about URIS.. like URN...
+      if(filter_var($key, FILTER_VALIDATE_URL) || static::validateURN($key)) {
         $key = "*";
       } elseif (is_integer($key)) {
         $key = '[*]';
@@ -190,6 +299,19 @@ class StrawberryfieldJsonHelper {
    */
   public static function searchJson($expression, array $sourcearray =  []) {
     return JmesPath::search($expression, $sourcearray);
+  }
+
+
+  /**
+   * Validate a URI according to RFC 3986
+   *
+   * @param string $uri
+   *
+   * @return bool
+   */
+  public static function validateURN(string $uri)
+  {
+    return (bool) preg_match(self::URN_REGEXP, $uri);
   }
 
 }
