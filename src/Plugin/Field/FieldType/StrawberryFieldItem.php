@@ -154,7 +154,7 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
              ->setClass(
                $processor_class
              )
-             ->setInternal(FALSE)
+             ->setInternal(TRUE)
              ->setSetting('jsonkey', $keyname)
              ->setReadOnly(TRUE);
          }
