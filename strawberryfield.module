@@ -17,6 +17,7 @@ use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Field\FieldItemListInterface;
+use Drupal\strawberryfield\StrawberryfieldUtilityService;
 
 /**
  * Implements hook_ENTITY_TYPE_presave().
@@ -25,7 +26,7 @@ use Drupal\Core\Field\FieldItemListInterface;
  */
 function strawberryfield_node_presave(ContentEntityInterface $entity) {
 
-  if ($sbf_fields = strawberryfield_bears_strawberryfield($entity)) {
+  if ($sbf_fields = \Drupal::service('strawberryfield.utility')->bearsStrawberryfield($entity)) {
     $event_type = StrawberryfieldEventType::PRESAVE;
     $event = new StrawberryfieldCrudEvent($event_type, $entity, $sbf_fields);
     /** @var \Symfony\Component\EventDispatcher\EventDispatcher $dispatcher */
@@ -42,7 +43,7 @@ function strawberryfield_node_presave(ContentEntityInterface $entity) {
  */
 function strawberryfield_node_update(ContentEntityInterface $entity) {
 
-  if ($sbf_fields = strawberryfield_bears_strawberryfield($entity)) {
+  if ($sbf_fields = \Drupal::service('strawberryfield.utility')->bearsStrawberryfield($entity)) {
     $event_type = StrawberryfieldEventType::SAVE;
     $event = new StrawberryfieldCrudEvent($event_type, $entity, $sbf_fields);
     /** @var \Symfony\Component\EventDispatcher\EventDispatcher $dispatcher */
@@ -61,12 +62,13 @@ function strawberryfield_node_insert(ContentEntityInterface $entity) {
   //@TODO move this to an event subscriber.
   strawberryfield_invalidate_fieldefinition_caches($entity);
 
-  if ($sbf_fields = strawberryfield_bears_strawberryfield($entity)) {
+  if ($sbf_fields = \Drupal::service('strawberryfield.utility')->bearsStrawberryfield($entity)) {
     $event_type = StrawberryfieldEventType::INSERT;
     $event = new StrawberryfieldCrudEvent($event_type, $entity, $sbf_fields);
     /** @var \Symfony\Component\EventDispatcher\EventDispatcher $dispatcher */
     $dispatcher = \Drupal::service('event_dispatcher');
-    $dispatcher->dispatch($event_type, $event);
+    $eventback = $dispatcher->dispatch($event_type, $event);
+    //@TODO use $eventback to debug things if an event failed.
   }
 }
 /**
@@ -76,7 +78,7 @@ function strawberryfield_node_insert(ContentEntityInterface $entity) {
  */
 function strawberryfield_node_revision_create(ContentEntityInterface $new_revision, ContentEntityInterface $entity, $keep_untranslatable_fields) {
 
-  if ($sbf_fields = strawberryfield_bears_strawberryfield($entity)) {
+  if ($sbf_fields = \Drupal::service('strawberryfield.utility')->bearsStrawberryfield($entity)) {
     $event_type = StrawberryfieldEventType::NEW_REVISION;
     $event = new StrawberryfieldCrudEvent($event_type, $entity, $sbf_fields);
     /** @var \Symfony\Component\EventDispatcher\EventDispatcher $dispatcher */
@@ -92,7 +94,7 @@ function strawberryfield_node_revision_create(ContentEntityInterface $new_revisi
  */
 function strawberryfield_node_delete(ContentEntityInterface $entity) {
 
-  if ($sbf_fields = strawberryfield_bears_strawberryfield($entity)) {
+  if ($sbf_fields = \Drupal::service('strawberryfield.utility')->bearsStrawberryfield($entity)) {
     $event_type = StrawberryfieldEventType::DELETE;
     $event = new StrawberryfieldCrudEvent($event_type, $entity, $sbf_fields);
     /** @var \Symfony\Component\EventDispatcher\EventDispatcher $dispatcher */
@@ -109,7 +111,7 @@ function strawberryfield_node_delete(ContentEntityInterface $entity) {
  */
 function strawberryfield_node_revision_delete(ContentEntityInterface $entity) {
 
-  if ($sbf_fields = strawberryfield_bears_strawberryfield($entity)) {
+  if ($sbf_fields = \Drupal::service('strawberryfield.utility')->bearsStrawberryfield($entity)) {
     $event_type = StrawberryfieldEventType::DELETE;
     $event = new StrawberryfieldCrudEvent($event_type, $entity, $sbf_fields);
     /** @var \Symfony\Component\EventDispatcher\EventDispatcher $dispatcher */
@@ -148,42 +150,6 @@ function strawberryfield_invalidate_fieldefinition_caches(ContentEntityInterface
       \Drupal::service('plugin.manager.field.field_type')->clearCachedDefinitions();
     }
   }
-}
-
-
-/**
- * Checks if Content entity bears SBF and if so returns machine names
- *
- * This function statically caches per Bundle and entity type the results.
- *
- * @param \Drupal\Core\Entity\ContentEntityInterface $entity
- *
- * @return array
- *  Returns a numberic keyed array with machine names for the SBF fields
- */
-function strawberryfield_bears_strawberryfield(ContentEntityInterface $entity) {
-  $hassbf = &drupal_static(__FUNCTION__);
-  $entitytype = $entity->getEntityTypeId();
-  $bundle = $entity->bundle();
-  $key = $entitytype . ":" . $bundle;
-  if (!isset($hassbf[$key])) {
-    $hassbf[$key] = [];
-    $field_item_lists = $entity->getFields();
-    foreach ($field_item_lists as $field) {
-      if ($field->getFieldDefinition()->getType() == 'strawberryfield_field') {
-        $hassbf[$key][] = $field->getFieldDefinition()->getName();
-      }
-    }
-  }
-  return $hassbf[$key];
-}
-
-
-/**
- * @param \Drupal\Core\Entity\ContentEntityInterface $entity
- */
-function strawberryfield_bundle_bears_strawberryfield(ContentEntityInterface $entity) {
-
 }
 
 /**
@@ -276,4 +242,19 @@ function strawberryfield_file_mimetype_mapping_alter(&$mapping) {
   $mapping['extensions']['fit'] = 'fits_image_mimetype';
   $mapping['extensions']['fts'] = 'fits_image_mimetype';
 
+}
+
+function strawberryfield_s3fs_url_settings_alter(array &$url_settings, $s3_file_path) {
+  // @TODO This is a soft dependency. Means if we have no s3fs module all good.
+  // Idea here is to allow in the future
+  // signed urls to be generated given a certain condition
+  // Or to force AWS S3 metatags to control maybe object lifecycle.
+  //if ($s3_file_path == 'myfile.jpg') {
+  //  $url_settings['presigned_url'] = TRUE;
+  //  $url_settings['timeout'] = 10;
+  //}
+  // An example of adding a custom GET argument to all S3 URLs that
+  // records the name of the currently logged in user.
+  //$account = Drupal::currentUser();
+  //$url_settings['custom_GET_args']['x-user'] = $account->getAccountName();
 }
