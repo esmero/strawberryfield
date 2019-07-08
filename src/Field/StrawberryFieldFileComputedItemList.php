@@ -11,13 +11,26 @@ class StrawberryFieldFileComputedItemList extends FileFieldItemList {
   use ComputedItemListTrait;
 
   protected function computeValue() {
-    dpm($this->getEntity()->getFields(FALSE));
-    // @TODO Only compute values if this applies to a SBF bearing entity
-    // THIS IS JUST STUB to explain how we are going to allow compute to
-    // EDIT the SBF
-    $test_entities = [1,2,3,4,5];
-    foreach ($test_entities as $delta => $id) {
-      $this->list[$delta] = $this->createItem($delta, $id);
+    $sbf_fields = \Drupal::service('strawberryfield.utility')
+      ->bearsStrawberryfield($this->getEntity());
+    foreach ($sbf_fields as $field_name) {
+      /* @var $field \Drupal\Core\Field\FieldItemInterface */
+      $field = $this->getEntity()->get($field_name);
+      if (!$field->isEmpty()) {
+        foreach ($field->getIterator() as $delta => $itemfield) {
+          // Note: we are not longer touching the metadata here.
+          /** @var $itemfield \Drupal\strawberryfield\Plugin\Field\FieldType\StrawberryFieldItem */
+          $flatvalues = (array) $itemfield->provideFlatten();
+          if (isset($flatvalues['dr:fid']) && is_array(
+              $flatvalues['dr:fid']
+            ) && !empty($flatvalues['dr:fid'])) {
+            $file_entities = array_filter($flatvalues['dr:fid'], 'is_int');
+            foreach ($file_entities as $delta => $id) {
+              $this->list[$delta] = $this->createItem($delta, $id);
+            }
+          }
+        }
+      }
     }
   }
 }
