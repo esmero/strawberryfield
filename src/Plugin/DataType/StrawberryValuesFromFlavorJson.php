@@ -71,16 +71,21 @@ JSON;
 
   /**
    * @return array|mixed|null
+   * @throws \Exception
    */
   public function getValue() {
     if ($this->processed == NULL) {
       $this->process();
     }
-    return $this->processed;
+    // This is a Map, serializer expects always an iterable
+    return !empty($this->processed) ? $this->processed: [] ;
   }
+
+
   /**
    * @param null $langcode
    *
+   * @throws \Exception
    */
   public function process($langcode = NULL)
   {
@@ -151,11 +156,14 @@ JSON;
         }
         //@TODO: return really the full list of files inside the zip based on the manifest.
         //This is just a stub as we share code.
-        $this->processed = $servicearray;
+        $this->processed = !empty($servicearray) ? $servicearray : [];
+      } else {
+        // Means we have no service defined in our field.
+        $this->processed = [];
       }
     }
     else {
-      $this->processed = NULL;
+      $this->processed = [];
     }
     $this->computed = TRUE;
   }
@@ -244,5 +252,14 @@ JSON;
   public function applyDefaultValue($notify = TRUE) {
     return $this;
   }
+
+  public function getProperties($include_computed = FALSE) {
+    $this->ensureComputedValue();
+    //@TODO see parent implementation
+    // Since this is a map it would be great to have
+    // A Fixed data definition and properties.
+    return [];
+  }
+
 
 }
