@@ -54,6 +54,14 @@ class StrawberryFieldFileComputedItem extends EntityReferenceItem {
     return parent::getValue();
   }
 
+  public function setValue($values, $notify = TRUE) {
+    $this->ensureCalculated();
+    // Do nothing for now
+    // @TODO make sure we route new fileids into their parent SBF values
+    // Requires to have a way of knowing the "where" using an entity
+    // JSON reference file structure, something like ap:entitymapping
+  }
+
 
   /**
    * Calculates the value of the field and sets it.
@@ -62,16 +70,15 @@ class StrawberryFieldFileComputedItem extends EntityReferenceItem {
     if (!$this->isCalculated) {
       $entity = $this->getEntity();
       if (!$entity->isNew()) {
-        $sbf_parent_field =  $this->getSetting('sbf_field');
-        $random = new Random();
-
-        $values = [
-          'target_id' => 1,
-          'display' => FALSE,
-          'description' => $random->sentences(10),
-        ];
-        error_log('setting value!');
-        $this->setValue($values);
+        $sbf_fields = \Drupal::service('strawberryfield.utility')
+          ->bearsStrawberryfield($entity);
+        if (!empty($sbf_fields)) {
+          /* @var $itemlist \Drupal\strawberryfield\Field\StrawberryFieldFileComputedItemList */
+           $itemlist = $this->parent;
+           // This pieces just makes sure that the parent ItemList
+          // Object runs the compute piece for us.
+           $itemlist->ensureComputedValue();
+        }
       }
       $this->isCalculated = TRUE;
     }
