@@ -67,8 +67,9 @@ function strawberryfield_node_insert(ContentEntityInterface $entity) {
     $event = new StrawberryfieldCrudEvent($event_type, $entity, $sbf_fields);
     /** @var \Symfony\Component\EventDispatcher\EventDispatcher $dispatcher */
     $dispatcher = \Drupal::service('event_dispatcher');
-    $eventback = $dispatcher->dispatch($event_type, $event);
-    //@TODO use $eventback to debug things if an event failed.
+    $dispatcher->dispatch($event_type, $event);
+    //@TODO use updated $event object to debug things if an event failed.
+    //via $event->getProcessedBy();
   }
 }
 /**
@@ -141,7 +142,6 @@ function strawberryfield_invalidate_fieldefinition_caches(ContentEntityInterface
           $strawberry_field_class
         );
       if ($is_ripe) {
-        //@TODO lets accumulate the keys and put then in a new entity type @context
         $needscleaning = TRUE;
       }
     }
@@ -181,6 +181,7 @@ function strawberryfield_entity_base_field_info(EntityTypeInterface $entity_type
     // @see https://www.drupal.org/project/drupal/issues/2346347 to
     // know why we can't use \Drupal\Core\Field\BaseFieldDefinition
     // If we try to make this Bundle specific.
+
     $fields['field_file_drop'] = BaseFieldDefinition::create('entity_reference')
       ->setName('field_file_drop')
       ->setLabel(t('Drop Files'))
@@ -193,8 +194,6 @@ function strawberryfield_entity_base_field_info(EntityTypeInterface $entity_type
       ->setSettings(
         [
           'target_type' => 'file',
-          // @TODO Change this: stub only for now
-          'sbf_field' => 'field_descriptive_metadata',
           'file_directory' => 'sbf_tmp',
           'uri_scheme' => $schema,
         ]
