@@ -20,9 +20,10 @@ use Drupal\Core\StreamWrapper\StreamWrapperManagerInterface;
 use Drupal\Core\Archiver\ArchiverManager;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\file\FileInterface;
-use Drupal\Core\Field\FieldItemInterface;
 use Drupal\Core\Messenger\MessengerTrait;
-use \Drupal\strawberryfield\Field\StrawberryFieldItemList;
+use Drupal\strawberryfield\Field\StrawberryFieldItemList;
+use Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException;
+use Drupal\Component\Plugin\Exception\PluginNotFoundException;
 
 /**
  * Provides a SBF File persisting class.
@@ -226,8 +227,6 @@ class StrawberryfieldFilePersisterService {
    * @param array $cleanjson
    *
    * @return array
-   * @throws \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException
-   * @throws \Drupal\Component\Plugin\Exception\PluginNotFoundException
    * @throws \Drupal\Core\Entity\EntityStorageException
    */
   public function generateAsFileStructure(
@@ -256,19 +255,21 @@ class StrawberryfieldFilePersisterService {
       );
     } catch (InvalidPluginDefinitionException $e) {
       $this->messenger()->addError(
-        $this->t('Sorry, we had real issues loading your files.')
+        $this->t('Sorry, we had real issues loading your files. Invalid Plugin File Definition.')
       );
-      return;
+      return [];
     } catch (PluginNotFoundException $e) {
       $this->messenger()->addError(
-        $this->t('Sorry, we had real issues loading your files.')
+        $this->t('Sorry, we had real issues loading your files. Plugin not File Found')
       );
-      return;
+      return [];
     }
     // Will contain all as:something and its members based on referenced file ids
     $fileinfo_bytype_many = [];
-    // Will contain temporary clasification
+    // Will contain temporary classification
     $files_bytype_many = [];
+    // Simpler structure with classification and file id
+    $file_list = [];
 
     // @TODO if count($files) is different than $file_id_list means we lost
     // a file from storage. Could have been temporary and it was never accounted
@@ -283,7 +284,7 @@ class StrawberryfieldFilePersisterService {
       $uri = $file->getFileUri();
       $mimetype = \Drupal::service('file.mime_type.guesser')->guess($uri);
       if (($file->getMimeType(
-          ) != $mimetype) && ($mimetype != application / octet - stream)) {
+          ) != $mimetype) && ($mimetype != 'application/octet-stream')) {
         $file->setMimeType($mimetype);
         $file->save();
         //@TODO notify the user of the updated mime type.
@@ -294,18 +295,22 @@ class StrawberryfieldFilePersisterService {
       $as_file_type = count($as_file_type) == 2 ? $as_file_type[0] : 'document';
       $as_file_type = ($as_file_type != 'application') ? $as_file_type : 'document';
 
-      $files_bytype_many[$as_file_type][$file->id()] = $file;
+      $files_bytype_many[$as_file_type]['urn:uuid:' . $file->uuid()] = $file;
+      // Simpler structure to iterate over
+      $file_list[$as_file_type][] = $file->id();
     }
     // Second iteration, find if we already have a structure in place for them
-    // Only to avoid calculating checksum again, if not generate
+    // Only to avoid calculating checksum again, if not generate.
+
+
     $to_process = [];
-    foreach ($files_bytype_many as $askey => $files) {
+    foreach ($file_list as $askey => $fileids) {
       $fileinfo_bytype_many['as:' . $askey] = [];
       if (isset($cleanjson['as:' . $askey])) {
         // Gets us structures in place with checksum applied
         $fileinfo_bytype_many['as:' . $askey] = $this->retrieve_filestructure_from_metadata(
           $cleanjson['as:' . $askey],
-          array_keys($files),
+          array_values($fileids),
           $file_source_key
         );
         // Now we need to know which ones still require processing
@@ -380,8 +385,7 @@ class StrawberryfieldFilePersisterService {
             $file_id_list
           )) && isset($info['checksum']) && (isset($info['dr:for']) && $info['dr:for'] == $file_source_key)) {
         // If present means it was persisted so 'url' and $file->getFileUri() will be the same.
-        // We return keyed by fileid to allow easier array_diff on the calling function
-        $found[$info['dr:fid']] = $info;
+        $found['urn:uuid:' . $info['dr:uuid']] = $info;
       }
     }
     return $found;
@@ -430,12 +434,12 @@ class StrawberryfieldFilePersisterService {
                   if ($destination_uri != $current_uri) {
                     $destination_folder = $this->fileSystem
                       ->dirname($destination_uri);
-                    file_prepare_directory(
+                    $this->fileSystem->prepareDirectory(
                       $destination_folder,
-                      FILE_CREATE_DIRECTORY | FILE_MODIFY_PERMISSIONS
+                      FileSystemInterface::CREATE_DIRECTORY | FileSystemInterface::MODIFY_PERMISSIONS
                     );
                     // Copy to new destination
-                    $destination_uri = file_unmanaged_copy(
+                    $destination_uri = $this->fileSystem->copy(
                       $current_uri,
                       $destination_uri
                     );
@@ -463,7 +467,7 @@ class StrawberryfieldFilePersisterService {
                     if (!$entity->isNew()) {
                       // We can not update its usage if the entity is new here
                       // Because we have no entity id yet
-                      _update_file_usage($file, $entity->id());
+                      $this->add_file_usage($file, $entity->id());
                     }
                   }
                 }
@@ -484,5 +488,155 @@ class StrawberryfieldFilePersisterService {
     // Number of files we could store.
     return $persisted;
   }
+  /**
+   * Deals of tracking file usage inside a strawberryfield.
+   *
+   * @param \Drupal\strawberryfield\Field\StrawberryFieldItemList $field
+   *
+   * @return int
+   * @throws \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException
+   * @throws \Drupal\Component\Plugin\Exception\PluginNotFoundException
+   */
+  public function updateUsageFilesInJson(StrawberryFieldItemList $field) {
+    $updated = 0;
+    if (!$field->isEmpty()) {
+      $entity = $field->getEntity();
+      /** @var $field \Drupal\Core\Field\FieldItemList */
+      foreach ($field->getIterator() as $delta => $itemfield) {
+        // Note: we are not touching the metadata here.
+        /** @var $itemfield \Drupal\strawberryfield\Plugin\Field\FieldType\StrawberryFieldItem */
+        $flatvalues = (array) $itemfield->provideFlatten();
+        if (isset($flatvalues['dr:fid'])) {
+          foreach ($flatvalues['dr:fid'] as $fid) {
+            if (is_numeric($fid)) {
+              $file = $this->entityTypeManager->getStorage('file')->load($fid);
+              /** @var $file FileInterface; */
+              if ($file) {
+                $this->add_file_usage($file, $entity->id());
+                $updated++;
+              } else {
+                $this->messenger()->addError(
+                  t(
+                    'Your content references a file with Internal ID @file_id that does not exist or was removed.',
+                    ['@file_id' => $fid]
+                  )
+                );
+              }
+            }
+          }
+        }
+      }
+    }
+    // Number of files we could update its usage record.
+    return $updated;
+  }
 
+  /**
+   * Adds File usage to DB for SBF managed files.
+   *
+   * @param \Drupal\file\FileInterface $file
+   * @param int $nodeid
+   */
+  protected function add_file_usage(FileInterface $file, int $nodeid) {
+    if (!$file || !$this->moduleHandler->moduleExists('file')) {
+      return;
+    }
+    /** @var \Drupal\file\FileUsage\FileUsageInterface $file_usage */
+
+    if ($file) {
+      $this->fileUsage->add($file, 'strawberryfield', 'node', $nodeid);
+    }
+  }
+
+  /**
+   * Deletes File usage from DB for SBF managed files.
+   *
+   * @param \Drupal\file\FileInterface $file
+   * @param int $nodeid
+   * @param int $count
+   */
+  protected function remove_file_usage(
+    FileInterface $file,
+    int $nodeid,
+    $count = 1
+  ) {
+    if (!$file || !$this->moduleHandler->moduleExists('file')) {
+      return;
+    }
+    /** @var \Drupal\file\FileUsage\FileUsageInterface $file_usage */
+
+    if ($file) {
+      $this->fileUsage->delete(
+        $file,
+        'strawberryfield',
+        'node',
+        $nodeid,
+        $count
+      );
+    }
+  }
+
+
+  /**
+   * Deposits String encoded Metadata to file given a URI
+   *
+   * @param string $data
+   *   Data to be written out as a string.
+   * @param string $path
+   *   Destination path with/or without streamwrapper and no trailing slash.
+   * @param string $filename
+   *   Destination filename
+   * @param bool $compress
+   *    If and additional gzip is required
+   * @param bool $onlycompressed
+   *    If gzipped file will be the only one.
+   *    Depends on $compress option. FALSE Ignored if compress is FALSE.
+   * @return bool
+   *    TRUE if all requested operations could be executed, FALSE if not.
+   */
+  public function persistMetadataToDisk(
+    string $data,
+    string $path,
+    string $filename,
+    $compress = FALSE,
+    $onlycompressed = TRUE
+  ) {
+    $success = FALSE;
+    $compress = (extension_loaded('zlib') && $compress);
+    $onlycompressed = ($compress && $onlycompressed);
+    if (!empty($data) && !empty($path) && !empty($filename)) {
+      $success = TRUE;
+      $uri = $path . '/' . $filename;
+
+      if (!$this->fileSystem->prepareDirectory(
+        $path,
+        FileSystemInterface::CREATE_DIRECTORY
+      )) {
+        $success = FALSE;
+        return $success;
+      }
+
+      if (!$onlycompressed) {
+        if (!$this->fileSystem->saveData(
+          $data,
+          $uri,
+          FileSystemInterface::EXISTS_REPLACE
+        )) {
+          $success = FALSE;
+          // We have to return early if this failed.
+          return $success;
+        }
+      }
+      if ($compress) {
+        if (!$this->fileSystem->saveData(
+          gzencode($data, 9, FORCE_GZIP),
+          $uri . '.gz',
+          FileSystemInterface::EXISTS_REPLACE
+        )) {
+          $success = FALSE;
+        }
+      }
+    }
+    return $success;
+  }
 }

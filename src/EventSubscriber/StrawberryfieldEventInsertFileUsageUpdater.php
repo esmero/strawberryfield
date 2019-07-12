@@ -13,7 +13,7 @@ use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 /**
  * Event subscriber for SBF bearing entity presave event.
  */
-class StrawberryfieldEventPresaveSubscriberFilePersister extends StrawberryfieldEventPresaveSubscriber {
+class StrawberryfieldEventInsertFileUsageUpdater extends StrawberryfieldEventInsertSubscriber {
 
   use StringTranslationTrait;
 
@@ -36,13 +36,6 @@ class StrawberryfieldEventPresaveSubscriberFilePersister extends Strawberryfield
   protected $serializer;
 
   /**
-   * The Storage Destination Scheme.
-   *
-   * @var string;
-   */
-  protected $destinationScheme = NULL;
-
-  /**
    * The Strawberryfield File Persister Service
    *
    *  @var \Drupal\strawberryfield\StrawberryfieldFilePersisterService
@@ -51,7 +44,7 @@ class StrawberryfieldEventPresaveSubscriberFilePersister extends Strawberryfield
 
 
   /**
-   * StrawberryfieldEventPresaveSubscriberFilePersister constructor.
+   * StrawberryfieldEventInsertFileUsageUpdater constructor.
    *
    * @param \Drupal\Core\StringTranslation\TranslationInterface $string_translation
    * @param \Drupal\Core\Messenger\MessengerInterface $messenger
@@ -78,20 +71,20 @@ class StrawberryfieldEventPresaveSubscriberFilePersister extends Strawberryfield
    * @throws \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException
    * @throws \Drupal\Component\Plugin\Exception\PluginNotFoundException
    */
-  public function onEntityPresave(StrawberryfieldCrudEvent $event) {
-
+  public function onEntityInsert(StrawberryfieldCrudEvent $event) {
+    // This updates the file usage for first time ingested nodes.
     /* @var $entity \Drupal\Core\Entity\ContentEntityInterface */
     $entity = $event->getEntity();
     $sbf_fields = $event->getFields();
-    $newlysavedcount = 0;
+    $updatedfiles = 0;
     foreach ($sbf_fields as $field_name) {
       /* @var $field \Drupal\Core\Field\FieldItemInterface */
       $field = $entity->get($field_name);
-      /* @var \Drupal\strawberryfield\Field\StrawberryFieldItemList $field */
-      $newlysavedcount = $newlysavedcount + $this->strawberryfilepersister->persistFilesInJsonToDisks($field);
+      $updatedfiles = $updatedfiles + $this->strawberryfilepersister->updateUsageFilesInJson($field);
     }
-    if ($newlysavedcount > 0) {
-      $this->messenger->addStatus($this->stringTranslation->formatPlural($newlysavedcount, 'Very good. New file persisted to permanent Storage.', 'Great! @count new files persisted to permanent Storage.'));
+    $updatedfiles;
+    if ($updatedfiles > 0) {
+      $this->messenger->addStatus($this->stringTranslation->formatPlural($updatedfiles, 'One file usage tracked for this digital Object.', '@count files usage tracked for this digital Object.'));
     }
     $current_class = get_called_class();
     $event->setProcessedBy($current_class, TRUE);

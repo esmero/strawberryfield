@@ -21,13 +21,18 @@ services:
     tags:
       - {name: event_subscriber}
     arguments: ['@string_translation', '@messenger']
+  strawberryfield.presavefilepersister_subscriber:
+    class: Drupal\strawberryfield\EventSubscriber\StrawberryfieldEventPresaveSubscriberFilePersister
+    tags:
+      - {name: event_subscriber}
+    arguments: ['@string_translation', '@messenger','@logger.factory','@strawberryfield.file_persister']
   strawberryfield.insertdeposit_subscriber:
     class: Drupal\strawberryfield\EventSubscriber\StrawberryfieldEventInsertSubscriberDepositDO
     tags:
       - {name: event_subscriber}
-    arguments: ['@string_translation', '@messenger', '@serializer','@config.factory','@logger.factory']
-  strawberryfield.presavefilepersister_subscriber:
-    class: Drupal\strawberryfield\EventSubscriber\StrawberryfieldEventPresaveSubscriberFilePersister
+    arguments: ['@string_translation', '@messenger', '@serializer','@config.factory','@logger.factory','@strawberryfield.file_persister']
+  strawberryfield.insertfileusage_subscriber:
+    class: Drupal\strawberryfield\EventSubscriber\StrawberryfieldEventInsertFileUsageUpdater
     tags:
       - {name: event_subscriber}
     arguments: ['@string_translation', '@messenger','@logger.factory','@strawberryfield.file_persister']

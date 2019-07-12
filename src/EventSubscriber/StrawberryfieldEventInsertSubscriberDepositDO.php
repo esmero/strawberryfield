@@ -9,6 +9,8 @@ use Symfony\Component\Serializer\SerializerInterface;
 use Drupal\Core\Messenger\MessengerInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
+use Drupal\strawberryfield\StrawberryfieldFilePersisterService;
+use Datetime;
 
 /**
  * Event subscriber for SBF bearing entity presave event.
@@ -42,6 +44,13 @@ class StrawberryfieldEventInsertSubscriberDepositDO extends StrawberryfieldEvent
    */
   protected $destinationScheme = NULL;
 
+  /**
+   * The Strawberryfield File Persister Service
+   *
+   *  @var \Drupal\strawberryfield\StrawberryfieldFilePersisterService
+   */
+  protected $strawberryfilepersister;
+
 
   /**
    * StrawberryfieldEventInsertSubscriberDepositDO constructor.
@@ -57,7 +66,8 @@ class StrawberryfieldEventInsertSubscriberDepositDO extends StrawberryfieldEvent
     MessengerInterface $messenger,
     SerializerInterface $serializer,
     ConfigFactoryInterface $config_factory,
-    LoggerChannelFactoryInterface $logger_factory
+    LoggerChannelFactoryInterface $logger_factory,
+    StrawberryfieldFilePersisterService $strawberry_filepersister
   ) {
     $this->stringTranslation = $string_translation;
     $this->messenger = $messenger;
@@ -66,56 +76,105 @@ class StrawberryfieldEventInsertSubscriberDepositDO extends StrawberryfieldEvent
       'strawberryfield.storage_settings'
     )->get('object_file_scheme');
     $this->loggerFactory = $logger_factory;
+    $this->strawberryfilepersister = $strawberry_filepersister;
   }
+
   /**
    * Method called when Event occurs.
-   *
    * @param \Drupal\strawberryfield\Event\StrawberryfieldCrudEvent $event
-   *   The event.
    *
-   * @throws \Drupal\Core\Entity\EntityStorageException
-   * @return StrawberryfieldCrudEvent $event;
+   * @throws \Drupal\Core\Entity\EntityMalformedException
    */
   public function onEntityInsert(StrawberryfieldCrudEvent $event) {
     /* @var $entity \Drupal\Core\Entity\ContentEntityInterface */
     $current_class = get_called_class();
     $entity = $event->getEntity();
     $sbf_fields = $event->getFields();
-    $data = '';
+    // Strawberryfield data
+    $sbf_data = [];
+    // Full node entity
+    $full_node_data = NULL;
+    // Full node serialization
+    $full_node_data = $this->serializer->serialize(
+      $entity,
+      'json',
+      ['plugin_id' => 'entity']
+    );
+    //@TODO right now JSON API does not expose its serialization publicly
+    // We can use JSONAPI_Extras module for this
+    $path = $this->destinationScheme . '://dostorage/' . $entity->uuid();
+    $success = FALSE;
+    if ($full_node_data) {
+      $filename_full_node = 'node:' . $entity->uuid() . '.json';
+      // Create the DO JSON file
+      $success = $this->strawberryfilepersister->persistMetadataToDisk(
+        $full_node_data,
+        $path,
+        $filename_full_node,
+        TRUE,
+        FALSE
+      );
+    }
+    // Now do only SBF data
     foreach ($sbf_fields as $field_name) {
       /* @var $field \Drupal\Core\Field\FieldItemInterface */
       $field = $entity->get($field_name);
       if (!$field->isEmpty()) {
-        // Full entity for now. Waiting for group feedback.
-        $data = $this->serializer->serialize($entity, 'json', ['plugin_id' => 'entity']);
+        $sbf_data[] = '"' . $field_name . '": ' . $this->serializer->serialize(
+            $field,
+            'json',
+            ['plugin_id' => 'field']
+          );
       }
     }
-    if ($data) {
-      $filename = 'do-'.$entity->uuid() . '.json';
-      $path =  $this->destinationScheme.'://dostorage/'.$entity->uuid();
-      $uri = $path . '/' . $filename;
-      // Create the DO JSON file
-      file_prepare_directory($path, FILE_CREATE_DIRECTORY);
-      if (!file_exists($uri) && !file_unmanaged_save_data($data, $uri, FILE_EXISTS_REPLACE)) {
-        $event->setProcessedBy($current_class, FALSE);
-        return $event;
-      }
-      // If zlib extension is available
-      if (extension_loaded('zlib')) {
-        if (!file_exists($uri . '.gz') && !file_unmanaged_save_data(gzencode($data, 9, FORCE_GZIP), $uri . '.gz', FILE_EXISTS_REPLACE)) {
-          // We processed, so returning true, but we could not zip. That is not an error.
-          $event->setProcessedBy($current_class, TRUE);
-          return $event;
-        }
-      }
-      $event->setProcessedBy($current_class, TRUE);
-     // Entity is "assignmed by reference" so any change on the entity here will persist.
-      $this->messenger->addStatus(t('Digital Object persisted to Filesystem'));
-      $this->loggerFactory->get('archipelago')->info('Digital Object persisted to Filesystem.', ['Entity ID' => $entity->id(), 'Entity Title' => $entity->label()]);
-      return $event;
+    if ($sbf_data) {
+      $filename_sbf = 'do-' . $entity->uuid() . '.json';
+      // A lot of string manip. But faster than decode and rencode.
+      $sbf_data[] = '"id": "' . $entity->toUrl('canonical')->toString() . '"';
+      $sbf_data[] = '"type": "' . $entity->bundle() . '"';
+      $sbf_data[] = '"drn:id": ' . $entity->id();
+      $sbf_data[] = '"drn:uuid": "' . $entity->uuid() . '"';
+      $timestamp = $entity->get('created')->value;
+      $datetime = new DateTime();
+      $datetime->setTimestamp($timestamp);
+      $sbf_data[] = '"label": "' . $entity->label() . '"';
+      $sbf_data[] = '"language": "' . $entity->language()->getId() . '"';
+
+      $sbf_data[] = '"datemodified": "' . $datetime->format('c') . '"';
+      $sbf_data[] = '"unixdatemodified": ' . $timestamp;
+      $sbf_data[] = '"username": "'  . $entity->get('uid')->entity->getUsername(). '"';
+      $sbf_data_string = '{' . implode(",", $sbf_data) . '}';
+
+      $success = $this->strawberryfilepersister->persistMetadataToDisk(
+        $sbf_data_string,
+        $path,
+        $filename_sbf,
+        TRUE,
+        FALSE
+      );
     }
-    $event->setProcessedBy($current_class, FALSE);
-    $this->messenger->addError(t('Digital Object Serialization failed? We could not persist to Filesystem. Please check your logs'));
-    $this->loggerFactory->get('archipelago')->critical('Digital Object Serialization failed , We could not persist to Filesystem.', ['Entity ID' => $entity->id(), 'Entity Title' => $entity->label()]);
+    $event->setProcessedBy($current_class, $success);
+    // Entity is "assigned by reference" so any change on the entity here will persist.
+    if ($success) {
+      $this->messenger->addStatus(
+        t('Digital Object persisted to Filesystem.')
+      );
+      $this->loggerFactory->get('archipelago')->info(
+        'Digital Object persisted to Filesystem.',
+        ['Entity ID' => $entity->id(), 'Entity Title' => $entity->label()]
+      );
+    }
+    if (!$success) {
+      $this->messenger->addError(
+        t(
+          'Digital Object Serialization failed? We could not persist to Filesystem. Please check your logs.'
+        )
+      );
+      $this->loggerFactory->get('archipelago')->critical(
+        'Digital Object Serialization failed , we could not persist to Filesystem.',
+        ['Entity ID' => $entity->id(), 'Entity Title' => $entity->label()]
+      );
+    }
   }
+
 }
