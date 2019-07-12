@@ -105,7 +105,7 @@ class StrawberryfieldEventInsertSubscriberDepositDO extends StrawberryfieldEvent
     $path = $this->destinationScheme . '://dostorage/' . $entity->uuid();
     $success = FALSE;
     if ($full_node_data) {
-      $filename_full_node = 'node:' . $entity->uuid() . '.json';
+      $filename_full_node = 'node_' . $entity->bundle() . '_' . $entity->uuid() . '.json';
       // Create the DO JSON file
       $success = $this->strawberryfilepersister->persistMetadataToDisk(
         $full_node_data,
