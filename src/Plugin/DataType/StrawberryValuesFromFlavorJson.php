@@ -8,6 +8,7 @@ use Swaggest\JsonSchema\Schema as JsonSchema;
 use Swaggest\JsonSchema\Exception as JsonSchemaException;
 use Swaggest\JsonSchema\InvalidValue as JsonSchemaInvalidValue;
 use Drupal\Core\Entity\Plugin\DataType\EntityAdapter;
+use frictionlessdata\datapackage\Package;
 
 class StrawberryValuesFromFlavorJson extends Map {
 
