@@ -172,7 +172,6 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
      // All our properties are computed
      // So if main value is empty rest will be too
      $mainproperty = $this->mainPropertyName();
-
      if (isset($this->{$mainproperty})) {
        $mainvalue = $this->{$mainproperty};
        if (empty($mainvalue) || $mainvalue == '') {
@@ -199,7 +198,7 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
      if ($this->isEmpty()) {
        $this->flattenjson = [];
      }
-     else {
+     elseif ($this->validate()->count() == 0) {
        if ($this->flattenjson == NULL || $force) {
          $mainproperty = $this->mainPropertyName();
          $jsonArray = json_decode($this->{$mainproperty}, TRUE, 10);
