@@ -57,7 +57,7 @@ class StrawberryfieldUtilityService {
   }
 
   /**
-   * Checks if Content entity bears SBF and if so returns machine names
+   * Checks if Content entity bears SBF and if so returns field machine names.
    *
    * This function statically caches per Bundle and entity type the results.
    *

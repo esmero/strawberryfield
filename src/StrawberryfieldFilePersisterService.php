@@ -242,7 +242,7 @@ class StrawberryfieldFilePersisterService {
     // @TODO This function is processing heavy
     // In a worst scenario we iterate over every existing file 3 times
     // Given the fact that a book could have 2000 pages,
-    // Processing of 6000 iterations when saving is should be neglectable, IMHO.
+    // Processing of 6000 iterations when saving is/should be neglectable, IMHO.
     // And way less than dealing with same as parent/child entities.
 
     //@TODO chunk $file_id_list in smaller groups, then run this batch.
@@ -260,7 +260,7 @@ class StrawberryfieldFilePersisterService {
       return [];
     } catch (PluginNotFoundException $e) {
       $this->messenger()->addError(
-        $this->t('Sorry, we had real issues loading your files. Plugin not File Found')
+        $this->t('Sorry, we had real issues loading your files. File Plugin not Found')
       );
       return [];
     }
