@@ -236,10 +236,13 @@ function strawberryfield_file_mimetype_mapping_alter(&$mapping) {
   $mapping['mimetypes']['jpeg2000_mimetype'] = 'image/jp2';
   $mapping['extensions']['jp2'] = 'jpeg2000_mimetype';
   $mapping['mimetypes']['fits_image_mimetype'] = 'image/fits';
-  // @See https://en.wikipedia.org/wiki/FITS
+  // @see https://en.wikipedia.org/wiki/FITS
   $mapping['extensions']['fits'] = 'fits_image_mimetype';
   $mapping['extensions']['fit'] = 'fits_image_mimetype';
   $mapping['extensions']['fts'] = 'fits_image_mimetype';
+  $mapping['extensions']['stl'] = 'stl_model_mimetype';
+  // @see https://www.iana.org/assignments/media-types/media-types.xhtml
+  $mapping['mimetypes']['stl_model_mimetype'] = 'model/stl';
 
 }
 
