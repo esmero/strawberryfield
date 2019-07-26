@@ -32,3 +32,25 @@ strawberryfield.strawberry_keynameprovider.jsonld:
     keys:
       type: string
       label: 'Additional Keys to include'
+
+strawberryfield.strawberry_keynameprovider.flavor:
+  type: config_object
+  label: 'Strawberry Key Name Provider Flavor (Service) specific config'
+  mapping:
+    source_key:
+      type: string
+      label: 'The JSON key that contains the Service/Flavor definition'
+    exposed_key:
+      type: string
+      label: 'The field property we expose for the Strawberryfield'
+
+strawberryfield.storage_settings:
+  type: config_object
+  label: 'Strawberry Storage specific config'
+  mapping:
+    file_scheme:
+      type: string
+      label: 'Storage Scheme for Persisting Files'
+    object_file_scheme:
+      type: string
+      label: 'Storage Scheme for Persisting Digital Objects in JSON format'

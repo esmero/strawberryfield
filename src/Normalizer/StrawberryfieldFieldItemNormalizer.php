@@ -9,7 +9,7 @@ use Drupal\serialization\Normalizer\EntityReferenceFieldItemNormalizerTrait;
 use Drupal\Core\TypedData\TypedDataInternalPropertiesHelper;
 
 /**
- * Adds the file URI to embedded file entities.
+ * Normalizes StrawberryfieldFieldItem values and expands to full JSON
  */
 class StrawberryfieldFieldItemNormalizer extends FieldItemNormalizer {
 

@@ -33,6 +33,15 @@ class StrawberryfieldCrudEvent extends Event {
    */
   private $eventType;
 
+
+  /**
+   * Which Subscribers processed this Event
+   *
+   * @var array
+   *
+   */
+  private $processedby;
+
   /**
    * Construct a new entity event.
    *
@@ -41,10 +50,11 @@ class StrawberryfieldCrudEvent extends Event {
    * @param \Drupal\Core\Entity\EntityInterface $entity
    *   The entity which caused the event.
    */
-  public function __construct($event_type, EntityInterface $entity, array $sbfFields) {
+  public function __construct($event_type, EntityInterface $entity, array $sbfFields, array $processedby = []) {
     $this->entity = $entity;
     $this->eventType = $event_type;
     $this->fields =  $sbfFields;
+    $this->processedby = $processedby;
   }
 
   /**
@@ -66,6 +76,18 @@ class StrawberryfieldCrudEvent extends Event {
    */
   public function getEventType() {
     return $this->eventType;
+  }
+  /**
+   * Method to get the all Subscribers that processed this in the past.
+   */
+  public function getProcessedBy() {
+    return $this->processedby;
+  }
+  /**
+   * Method to get the append a Subscriber's processed state.
+   */
+  public function setProcessedBy(string $class, bool $success) {
+    return $this->processedby[] = ['class' => $class, 'success' => $success];
   }
 
 }

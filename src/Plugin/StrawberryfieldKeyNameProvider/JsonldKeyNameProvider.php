@@ -23,7 +23,9 @@ use Drupal\Core\Cache\CacheBackendInterface;
  *
  * @StrawberryfieldKeyNameProvider(
  *    id = "jsonld",
- *    label = @Translation("JSONLD Strawberry Field Key Name Provider")
+ *    label = @Translation("JSONLD Strawberry Field Key Name Provider"),
+ *    processor_class = "\Drupal\strawberryfield\Plugin\DataType\StrawberryValuesFromJson",
+ *    item_type = "string"
  * )
  */
 class JsonldKeyNameProvider extends StrawberryfieldKeyNameProviderBase {
@@ -42,15 +44,14 @@ class JsonldKeyNameProvider extends StrawberryfieldKeyNameProviderBase {
 
   public function defaultConfiguration() {
     return [
-       // e.g https://schema.org/docs/jsonldcontext.json"
-      'url' => '',
+        // e.g https://schema.org/docs/jsonldcontext.json"
+        'url' => '',
         // Since JSON lists like schema.org can be huge
-        // We allow people to provide a subset that will be used to filter agains
+        // We allow a subset that will be used to filter against
         // e.g https://schema.org/Book.jsonld
-      'filterurl' => '',
-      'keys' => '',
-       // The id of the config entity from where these values came from.'
-       'configEntity' => ''
+        'filterurl' => '',
+        'keys' => '',
+        'configEntity' => NULL
       ] + parent::defaultConfiguration();
   }
 
@@ -68,8 +69,8 @@ class JsonldKeyNameProvider extends StrawberryfieldKeyNameProviderBase {
       '#maxlength' => 255,
       '#default_value' => $this->getConfiguration()['url'],
       '#description' => $this->t('Enter a URL to a publicly available JSON-LD <em>@Context</em>.<br> e.g. https://schema.org/docs/jsonldcontext.json'),
-     // '#parents' => $parents
-      ];
+      // '#parents' => $parents
+    ];
 
     $element['filterurl'] = [
       '#type' => 'url',
@@ -91,13 +92,17 @@ class JsonldKeyNameProvider extends StrawberryfieldKeyNameProviderBase {
   }
 
   /**
-   * @return array
+   * {@inheritdoc}
    */
-  public function provideKeyNames() {
+  public function provideKeyNames(string $config_entity_id = NULL) {
 
-    $processedvalues = $this->getCacheTheKeys();
-    $validkeys = [];
-    $extrakeys = [];
+    // In case an empty config_entity_id is passed here try to fetch from
+    // local config.
+    $config_entity_id = !empty($config_entity_id) ?
+      $config_entity_id : $this->getConfiguration()['configEntity'];
+
+    $processedvalues = $this->getCacheTheKeys($config_entity_id);
+
     if (empty($processedvalues)) {
       $jsonldcontext = StrawberryfieldJsonHelper::SIMPLE_JSONLDCONTEXT;
       $processedvalues = json_decode($jsonldcontext, TRUE);
@@ -123,7 +128,11 @@ class JsonldKeyNameProvider extends StrawberryfieldKeyNameProviderBase {
       '@graph',
       'label',
     ];
-    // Mix all keys together.
+    // Mix all keys together and remove values
+    // Values in this case are very rich, like if something is an @id or a value
+    // Even DataTypes
+    // @TODO future use those rich values to drive logic
+
     $validkeys = array_keys(
       array_merge(
         $processedvalues,
@@ -134,42 +143,87 @@ class JsonldKeyNameProvider extends StrawberryfieldKeyNameProviderBase {
     // return them sorted for children's joy.
     sort($validkeys,SORT_NATURAL);
 
-    return $validkeys;
+    // Property creation uses a property name and a key. In this case both are
+    // the same reason we combine.
+    return array_combine($validkeys,$validkeys);
   }
 
-  protected function getCacheTheKeys($bypasscache = false) {
+  /**
+   * @param string $config_entity_id
+   *   The unique config entity id machine name used by the config entity.
+   *   This value is comes from the config entity used to store all this settings
+   *   and needed to generate also separate cache bins for each.
+   *   Plugin Instance.
+   * @param bool $bypasscache
+   *
+   * @return array|null
+   */
+  protected function getCacheTheKeys(string $config_entity_id = NULL, $bypasscache = false) {
     // This is expensive, reason why we process and store in cache
 
-    $config_entity_id = $this->getConfiguration()['configEntity'];
-    if (!empty($config_entity_id)) {}
-    //@TODO what happens if someone changes the pluginID in the plugin Manager list?
-    //@TODO refactor to get the cache service as dependency injection
-    $cid = 'strawberryfieldKeyNameProvider:'.$this->getPluginId().':'.$config_entity_id;
     $data = NULL;
-
     $cachetags = [
       'strawberryfield',
-      'strawberry_keynameprovider:'.$config_entity_id,
+      'strawberryfieldKeyNameProvider:' . $this->getPluginId()
     ];
 
-    if (!$bypasscache && ($cache = \Drupal::cache()
-      ->get($cid))) {
+    if (!empty($config_entity_id)) {
+      $cid = 'strawberryfieldKeyNameProvider:' . $this->getPluginId(
+        ) . ':' . $config_entity_id;
+      $cachetags[] = $cid;
+    }
+    else {
+      $cid = NULL;
+    }
+
+    if ($cid === NULL || $bypasscache) {
+      $data = $this->processFromSource();
+    }
+    elseif ($cid !== NULL && $cache = \Drupal::cache()
+        ->get($cid)) {
       $data = $cache->data;
     }
     else {
       $data = $this->processFromSource();
-
-      if ($bypasscache === false) {
-        \Drupal::cache()
-          ->set(
-            $cid,
-            $data,
-            CacheBackendInterface::CACHE_PERMANENT,
-            $cachetags
-          );
-      }
     }
-    return $data;
+
+    if ($cid !== NULL) {
+      //@TODO refactor to get the cache service as dependency injection
+      \Drupal::cache()
+        ->set(
+          $cid,
+          $data,
+          CacheBackendInterface::CACHE_PERMANENT,
+          $cachetags
+        );
+    }
+
+    $cleandata = array_filter($data, 'is_string',ARRAY_FILTER_USE_KEY);
+
+    return $cleandata;
+  }
+
+  public function processFromSource() {
+
+    $keys = [];
+    $maindata = [];
+    $filterData = [];
+
+    $primaryURL = $this->getConfiguration()['url'];
+    $maindata = $this->getRemoteJsonData($primaryURL);
+    if (!empty($maindata)) {
+
+      $maindata = isset($maindata['@context']) ? $maindata['@context'] : $maindata;
+      $filterURL = $this->getConfiguration()['filterurl'];
+
+      // We won't filter things out there, ::extractKeys will deal with that.
+      $filterData = $this->getRemoteJsonData($filterURL);
+
+      $keys = $this->extractKeys($maindata, $filterData);
+
+    }
+    return $keys;
+
   }
 
   protected function getRemoteJsonData($remoteUrl) {
@@ -185,7 +239,7 @@ class JsonldKeyNameProvider extends StrawberryfieldKeyNameProviderBase {
           ['@pluginid' => $this->label()]
         )
       );
-    return [];
+      return [];
     }
 
     $options['headers']=['Accept' => 'application/ld+json'];
@@ -196,11 +250,11 @@ class JsonldKeyNameProvider extends StrawberryfieldKeyNameProviderBase {
       $responseMessage = $exception->getMessage();
       $this->messenger->addError(
         $this->t('We tried to contact @url from @pluginid but we could not. <br> The WEB says: @response. <br> Check that URL!',
-         [
-           '@url' => $remoteUrl,
-           '@pluginid' =>  $this->label(),
-           '@response' => $responseMessage
-         ]
+          [
+            '@url' => $remoteUrl,
+            '@pluginid' =>  $this->label(),
+            '@response' => $responseMessage
+          ]
         )
       );
       return [];
@@ -255,30 +309,5 @@ class JsonldKeyNameProvider extends StrawberryfieldKeyNameProviderBase {
     }
     return $keystoreturn;
   }
-
-  public function processFromSource() {
-
-    $keys = [];
-    $maindata = [];
-    $filterData = [];
-
-    $primaryURL = $this->getConfiguration()['url'];
-    $maindata = $this->getRemoteJsonData($primaryURL);
-    if (!empty($maindata)) {
-
-      $maindata = isset($maindata['@context']) ? $maindata['@context'] : $maindata;
-      $filterURL = $this->getConfiguration()['filterurl'];
-
-      // We won't filter things out there, ::extractKeys will deal with that.
-      $filterData = $this->getRemoteJsonData($filterURL);
-
-      $keys = $this->extractKeys($maindata, $filterData);
-
-    }
-    return $keys;
-
-  }
-
-
 
 }
