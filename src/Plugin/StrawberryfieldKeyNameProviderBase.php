@@ -142,9 +142,9 @@ abstract class StrawberryfieldKeyNameProviderBase extends PluginBase implements 
   }
 
   /**
-   * @return array
+   * {@inheritdoc}
    */
-  public function provideKeyNames() {
+  public function provideKeyNames(string $config_entity_id) {
     return [];
   }
 

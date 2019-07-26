@@ -13,7 +13,7 @@ use Drupal\Core\Annotation\Translation;
 /**
  * Defines a StrawberryfieldKeyNameProvider item annotation object.
  *
- * Class StrawberryfieldKeyNameProviderAnnotation
+ * Class StrawberryfieldKeyNameProvider
  *
  * @package Drupal\strawberryfield\Annotation
  *
@@ -29,17 +29,31 @@ class StrawberryfieldKeyNameProvider extends Plugin {
   public $id;
 
   /**
-   * @var Translation;
+   * @var label;
    *
    * @ingroup plugin_translatable;
    */
   public $label;
 
   /**
-   * @var Translation;
+   * @var description;
    *
    * @ingroup plugin_translatable;
    */
   public $description;
+
+  /**
+   * @var processor_class;
+   * Use to define which class will process the data from the JSON.
+   * Example: \Drupal\strawberryfield\Plugin\DataType\StrawberryValuesFromJson
+   */
+  public $processor_class;
+
+  /**
+   * @var item_type;
+   * Use to define of which data type each value will be.
+   * Example: \Drupal\strawberryfield\Plugin\DataType\StrawberryValuesFromJson
+   */
+  public $item_type;
 
 }

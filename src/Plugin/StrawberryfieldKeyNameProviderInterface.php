@@ -20,12 +20,19 @@ use Drupal\Component\Plugin\ConfigurablePluginInterface;
  */
 interface StrawberryfieldKeyNameProviderInterface extends PluginInspectionInterface, PluginWithFormsInterface, ConfigurablePluginInterface{
 
+
   /**
    * Provides a list of Key name strawberryfield properties
    *
-   * @return array;
+   * @param string $config_entity_id
+   *   The Config Entity's id where this plugin instance's config is stored.
+   *   This value comes from the config entity used to store all this settings
+   *   and needed to generate separate cache bins for each
+   *   Plugin Instance.
+   *
+   * @return mixed
    */
-  public function provideKeyNames();
+  public function provideKeyNames(string $config_entity_id);
 
   public function label();
 
