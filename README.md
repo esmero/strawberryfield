@@ -18,6 +18,10 @@ Having issues with this module? Check out the Archipelago Commons google groups 
 * [Diego Pino](https://github.com/DiegoPino)
 * [Giancarlo Birello](https://github.com/giancarlobi)
 
+## Acknowledgments
+
+This software is a [Metropolitan New York Library Council](metro.org) Open-Source initiative and part of the Archipelago Commons project.
+
 ## License
 
 [GPLv3](http://www.gnu.org/licenses/gpl-3.0.txt)
