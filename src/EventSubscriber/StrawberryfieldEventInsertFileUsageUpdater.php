@@ -82,7 +82,7 @@ class StrawberryfieldEventInsertFileUsageUpdater extends StrawberryfieldEventIns
       $field = $entity->get($field_name);
       $updatedfiles = $updatedfiles + $this->strawberryfilepersister->updateUsageFilesInJson($field);
     }
-    $updatedfiles;
+
     if ($updatedfiles > 0) {
       $this->messenger->addStatus($this->stringTranslation->formatPlural($updatedfiles, 'One file usage tracked for this digital Object.', '@count files usage tracked for this digital Object.'));
     }
