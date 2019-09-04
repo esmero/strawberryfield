@@ -16,7 +16,8 @@
         "ml/json-ld": "^1.0",
         "mtdowling/jmespath.php":"^2.4",
         "swaggest/json-schema":"^0.12.11",
-        "frictionlessdata/datapackage": "dev-master"
+        "frictionlessdata/datapackage": "dev-master",
+        "drupal/search_api": "~1.14"
     },
     "minimum-stability": "dev",
     "prefer-stable": true
