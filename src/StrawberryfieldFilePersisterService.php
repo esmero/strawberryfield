@@ -193,7 +193,7 @@ class StrawberryfieldFilePersisterService {
     // If no destination scheme was setup on our global config use the original file scheme.
     $desired_scheme = !empty($this->destinationScheme) ? $this->destinationScheme : $file_parts['destination_scheme'];
 
-    // Mime type becomes suffix. Performant for filtering in S3.
+    // First part of Mime type becomes prefix. Performant for filtering in S3.
     $destination_basename = $file_parts['destination_filetype'] . '-' . $file_parts['destination_filename'];
 
     // Sanitize the whole thing.
@@ -202,12 +202,14 @@ class StrawberryfieldFilePersisterService {
     // Edge case, should rarely happen.
     if (empty($destination_basename)) {
       $destination_basename = $file_parts['destination_filetype'] . '-unnamed';
+    } else {
+      $destination_basename = substr($destination_basename, 0, 471);
     }
     // Object name limit for AWS S3 is 512 chars. Minio does not impose any.
     // UUID adds 36 characters,  plus 1 for the dash + 4 for extension.
     // So we shamelessly cut at 471. Someone needs to act!
 
-    $destination_basename = substr($destination_basename, 0, 471);
+
     // WE add the unique UUID at the end. That gives us best protection against
     // name collissions but still keeping human semantically aware file name
 
