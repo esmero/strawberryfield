@@ -116,12 +116,12 @@ class keyNameProviderEntityForm extends EntityForm {
 
     }
 
-    $form['active'] = array(
+    $form['active'] = [
       '#type' => 'checkbox',
       '#title' => $this->t('Is this plugin active?'),
       '#return_value' => TRUE,
       '#default_value' => TRUE
-    );
+    ];
 
     //@TODO allow a preview of the processing via ajax
 

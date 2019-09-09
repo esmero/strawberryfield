@@ -36,3 +36,8 @@ services:
     tags:
       - {name: event_subscriber}
     arguments: ['@string_translation', '@messenger','@logger.factory','@strawberryfield.file_persister']
+  strawberryfield.deletefileusage_subscriber:
+    class: Drupal\strawberryfield\EventSubscriber\StrawberryfieldEventDeleteFileUsageDeleter
+    tags:
+      - {name: event_subscriber}
+    arguments: ['@string_translation', '@messenger','@logger.factory','@strawberryfield.file_persister']

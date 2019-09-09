@@ -11,9 +11,9 @@ use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 
 
 /**
- * Event subscriber for SBF bearing entity presave event.
+ * Event subscriber for SBF bearing entity delete event.
  */
-class StrawberryfieldEventInsertFileUsageUpdater extends StrawberryfieldEventInsertSubscriber {
+class StrawberryfieldEventDeleteFileUsageDeleter extends StrawberryfieldEventDeleteSubscriber {
 
   use StringTranslationTrait;
 
@@ -71,20 +71,19 @@ class StrawberryfieldEventInsertFileUsageUpdater extends StrawberryfieldEventIns
    * @throws \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException
    * @throws \Drupal\Component\Plugin\Exception\PluginNotFoundException
    */
-  public function onEntityInsert(StrawberryfieldCrudEvent $event) {
-    // This updates the file usage for first time ingested nodes.
+  public function onEntityDelete(StrawberryfieldCrudEvent $event) {
+    // This removes the file usage when deleting entities.
     /* @var $entity \Drupal\Core\Entity\ContentEntityInterface */
     $entity = $event->getEntity();
-    $sbf_fields = $event->getFields();
-    $updatedfiles = 0;
-    foreach ($sbf_fields as $field_name) {
-      /* @var $field \Drupal\Core\Field\FieldItemInterface */
-      $field = $entity->get($field_name);
-      $updatedfiles = $updatedfiles + $this->strawberryfilepersister->updateUsageFilesInJson($field);
-    }
+    // First one: removed count, second one:orphaned ones cleaned.
 
-    if ($updatedfiles > 0) {
-      $this->messenger->addStatus($this->stringTranslation->formatPlural($updatedfiles, 'One file usage tracked for this digital Object.', '@count files usage tracked for this digital Object.'));
+    $processedfiles = $this->strawberryfilepersister->removeUsageFilesInJson($entity);
+
+    if ($processedfiles[0] > 0) {
+      $this->messenger->addStatus($this->stringTranslation->formatPlural($processedfiles[0], 'One file usage removed for this digital Object.', '@count files usage removed for this digital Object.'));
+    }
+    if ($processedfiles[1] > 0) {
+      $this->messenger->addStatus($this->stringTranslation->formatPlural($processedfiles[1], 'One file usage removed for a no longer existing digital Object.', '@count files usage removed for no longer existing digital Objects.'));
     }
     $current_class = get_called_class();
     $event->setProcessedBy($current_class, TRUE);
