@@ -7,7 +7,7 @@ use Drupal\strawberryfield\Event\StrawberryfieldCrudEvent;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 /**
- * Event subscriber for SBF bearing entity presave event.
+ * Event subscriber for SBF bearing entity save event.
  */
 abstract class StrawberryfieldEventSaveSubscriber implements EventSubscriberInterface {
 

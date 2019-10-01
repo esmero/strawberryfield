@@ -63,7 +63,6 @@ class keyNameProviderEntityForm extends EntityForm {
       '#disabled' => !$strawberry_keynameprovider->isNew(),
     ];
 
-
     $ajax = [
       'callback' => [get_class($this), 'ajaxCallback'],
       'wrapper' => 'keynameproviderentity-ajax-container',
@@ -73,8 +72,6 @@ class keyNameProviderEntityForm extends EntityForm {
     foreach ($keyprovider_plugin_definitions as $id => $definition) {
       $options[$id] = $definition['label'];
     }
-
-
 
     $form['pluginid'] = [
       '#type' => 'select',
@@ -113,26 +110,20 @@ class keyNameProviderEntityForm extends EntityForm {
         }
       }
     } else {
-
       $form['container']['pluginconfig'] = [
         '#type' => 'container',
       ];
 
     }
 
-    $form['active'] = array(
+    $form['active'] = [
       '#type' => 'checkbox',
       '#title' => $this->t('Is this plugin active?'),
       '#return_value' => TRUE,
       '#default_value' => TRUE
-    );
+    ];
 
-    //@TODO allow a preview of the processing via
-
-
-
-
-
+    //@TODO allow a preview of the processing via ajax
 
     return $form;
   }
@@ -146,13 +137,13 @@ class keyNameProviderEntityForm extends EntityForm {
 
     switch ($status) {
       case SAVED_NEW:
-        drupal_set_message($this->t('Created the %label Strawberry Key Name Provider.', [
+        $this->messenger->addStatus($this->t('Created the %label Strawberry Key Name Provider.', [
           '%label' => $strawberry_keynameprovider->label(),
         ]));
         break;
 
       default:
-        drupal_set_message($this->t('Saved the %label Strawberry Key Name Provider.', [
+        $this->messenger->addStatus($this->t('Saved the %label Strawberry Key Name Provider.', [
           '%label' => $strawberry_keynameprovider->label(),
         ]));
     }

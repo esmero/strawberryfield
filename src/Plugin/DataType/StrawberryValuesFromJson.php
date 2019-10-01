@@ -78,23 +78,13 @@ class StrawberryValuesFromJson extends ItemList {
       elseif (isset($flattened[$needle])) {
         $values[] = trim($flattened[$needle]);
       }
-      /*foreach ($flattened as $graphitems) {
-        if (isset($graphitems[$needle])) {
-          if (is_array($graphitems[$needle])) {
-            $values[] = implode(",", $graphitems[$needle]);
-          }
-          else {
-            $values[] = $graphitems[$needle];
-          }
-        }
-      }*/
       $this->processed = array_values($values);
       foreach ($this->processed as $delta => $item) {
         $this->list[$delta] = $this->createItem($delta, $item);
       }
     }
     else {
-      $this->processed = NULL;
+      $this->processed = [];
     }
     $this->computed = TRUE;
   }

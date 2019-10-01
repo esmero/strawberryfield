@@ -8,6 +8,15 @@ use Drupal\node\NodeInterface;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\strawberryfield\Event\StrawberryfieldCrudEvent;
 use Drupal\strawberryfield\StrawberryfieldEventType;
+use Drupal\Core\Field\BaseFieldDefinition;
+use Drupal\Core\Entity\EntityTypeInterface;
+use Drupal\Core\StreamWrapper\StreamWrapperInterface;
+use Drupal\Core\Field\FieldStorageDefinitionInterface;
+use Drupal\strawberryfield\Field\StrawberryFieldFileComputedItemList;
+use Drupal\Core\Access\AccessResult;
+use Drupal\Core\Field\FieldDefinitionInterface;
+use Drupal\Core\Session\AccountInterface;
+use Drupal\Core\Field\FieldItemListInterface;
 
 /**
  * Implements hook_ENTITY_TYPE_presave().
@@ -16,7 +25,7 @@ use Drupal\strawberryfield\StrawberryfieldEventType;
  */
 function strawberryfield_node_presave(ContentEntityInterface $entity) {
 
-  if ($sbf_fields = strawberryfield_bears_strawberryfield($entity)) {
+  if ($sbf_fields = \Drupal::service('strawberryfield.utility')->bearsStrawberryfield($entity)) {
     $event_type = StrawberryfieldEventType::PRESAVE;
     $event = new StrawberryfieldCrudEvent($event_type, $entity, $sbf_fields);
     /** @var \Symfony\Component\EventDispatcher\EventDispatcher $dispatcher */
@@ -33,7 +42,7 @@ function strawberryfield_node_presave(ContentEntityInterface $entity) {
  */
 function strawberryfield_node_update(ContentEntityInterface $entity) {
 
-  if ($sbf_fields = strawberryfield_bears_strawberryfield($entity)) {
+  if ($sbf_fields = \Drupal::service('strawberryfield.utility')->bearsStrawberryfield($entity)) {
     $event_type = StrawberryfieldEventType::SAVE;
     $event = new StrawberryfieldCrudEvent($event_type, $entity, $sbf_fields);
     /** @var \Symfony\Component\EventDispatcher\EventDispatcher $dispatcher */
@@ -52,12 +61,14 @@ function strawberryfield_node_insert(ContentEntityInterface $entity) {
   //@TODO move this to an event subscriber.
   strawberryfield_invalidate_fieldefinition_caches($entity);
 
-  if ($sbf_fields = strawberryfield_bears_strawberryfield($entity)) {
+  if ($sbf_fields = \Drupal::service('strawberryfield.utility')->bearsStrawberryfield($entity)) {
     $event_type = StrawberryfieldEventType::INSERT;
     $event = new StrawberryfieldCrudEvent($event_type, $entity, $sbf_fields);
     /** @var \Symfony\Component\EventDispatcher\EventDispatcher $dispatcher */
     $dispatcher = \Drupal::service('event_dispatcher');
     $dispatcher->dispatch($event_type, $event);
+    //@TODO use updated $event object to debug things if an event failed.
+    //via $event->getProcessedBy();
   }
 }
 /**
@@ -67,7 +78,7 @@ function strawberryfield_node_insert(ContentEntityInterface $entity) {
  */
 function strawberryfield_node_revision_create(ContentEntityInterface $new_revision, ContentEntityInterface $entity, $keep_untranslatable_fields) {
 
-  if ($sbf_fields = strawberryfield_bears_strawberryfield($entity)) {
+  if ($sbf_fields = \Drupal::service('strawberryfield.utility')->bearsStrawberryfield($entity)) {
     $event_type = StrawberryfieldEventType::NEW_REVISION;
     $event = new StrawberryfieldCrudEvent($event_type, $entity, $sbf_fields);
     /** @var \Symfony\Component\EventDispatcher\EventDispatcher $dispatcher */
@@ -83,7 +94,7 @@ function strawberryfield_node_revision_create(ContentEntityInterface $new_revisi
  */
 function strawberryfield_node_delete(ContentEntityInterface $entity) {
 
-  if ($sbf_fields = strawberryfield_bears_strawberryfield($entity)) {
+  if ($sbf_fields = \Drupal::service('strawberryfield.utility')->bearsStrawberryfield($entity)) {
     $event_type = StrawberryfieldEventType::DELETE;
     $event = new StrawberryfieldCrudEvent($event_type, $entity, $sbf_fields);
     /** @var \Symfony\Component\EventDispatcher\EventDispatcher $dispatcher */
@@ -100,7 +111,7 @@ function strawberryfield_node_delete(ContentEntityInterface $entity) {
  */
 function strawberryfield_node_revision_delete(ContentEntityInterface $entity) {
 
-  if ($sbf_fields = strawberryfield_bears_strawberryfield($entity)) {
+  if ($sbf_fields = \Drupal::service('strawberryfield.utility')->bearsStrawberryfield($entity)) {
     $event_type = StrawberryfieldEventType::DELETE;
     $event = new StrawberryfieldCrudEvent($event_type, $entity, $sbf_fields);
     /** @var \Symfony\Component\EventDispatcher\EventDispatcher $dispatcher */
@@ -130,7 +141,6 @@ function strawberryfield_invalidate_fieldefinition_caches(ContentEntityInterface
           $strawberry_field_class
         );
       if ($is_ripe) {
-        //@TODO lets accumulate the keys and put then in a new entity type @context
         $needscleaning = TRUE;
       }
     }
@@ -141,30 +151,111 @@ function strawberryfield_invalidate_fieldefinition_caches(ContentEntityInterface
   }
 }
 
-
 /**
- * Checks if Content entity bears SBF and if so returns machine names
+ * Implements hook_entity_base_field_info();
  *
- * This function statically caches per Bundle and entity type the results.
- *
- * @param \Drupal\Core\Entity\ContentEntityInterface $entity
+ * @param \Drupal\Core\Entity\EntityTypeInterface $entity_type
  *
  * @return array
- *  Returns a numberic keyed array with machine names for the SBF fields
  */
-function strawberryfield_bears_strawberryfield(ContentEntityInterface $entity) {
-  $hassbf = &drupal_static(__FUNCTION__);
-  $entitytype = $entity->getEntityTypeId();
-  $bundle = $entity->bundle();
-  $key = $entitytype . ":" . $bundle;
-  if (!isset($hassbf[$key])) {
-    $hassbf[$key] = [];
-    $field_item_lists = $entity->getFields();
-    foreach ($field_item_lists as $field) {
-      if ($field->getFieldDefinition()->getType() == 'strawberryfield_field') {
-        $hassbf[$key][] = $field->getFieldDefinition()->getName();
-      }
+function strawberryfield_entity_base_field_info(EntityTypeInterface $entity_type
+) {
+
+  if ($entity_type->id() == 'node') {
+    $scheme_options = \Drupal::service('stream_wrapper_manager')->getNames(
+      StreamWrapperInterface::WRITE_VISIBLE
+    );
+    if (isset($scheme_options['private'])) {
+      $schema = 'private';
     }
+    elseif (isset($scheme_options['public'])) {
+      $schema = 'public';
+    }
+    else {
+      $schema = 'public';
+    }
+
+    $fields = [];
+    // Add a field that serves as a drop box for any entities that bear a SBF
+    // @see https://www.drupal.org/project/drupal/issues/2346347 to
+    // know why we can't use \Drupal\Core\Field\BaseFieldDefinition
+    // If we try to make this Bundle specific.
+
+    $fields['field_file_drop'] = BaseFieldDefinition::create('entity_reference')
+      ->setName('field_file_drop')
+      ->setLabel(t('Drop Files'))
+      ->setComputed(TRUE)
+      ->setRevisionable(FALSE)
+      ->setTranslatable(FALSE)
+      ->setCardinality(FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED)
+      ->setReadOnly(FALSE)
+      ->setTargetEntityTypeId($entity_type->id())
+      ->setSettings(
+        [
+          'target_type' => 'file',
+          'file_directory' => 'sbf_tmp',
+          'uri_scheme' => $schema,
+        ]
+      )
+      ->setClass(StrawberryFieldFileComputedItemList::class)
+      ->setDisplayConfigurable('view', FALSE)
+      ->setDisplayConfigurable('form', FALSE);
+    return $fields;
   }
-  return $hassbf[$key];
+}
+
+/**
+ * Implements hook_entity_field_access();
+ *
+ * @param $operation
+ * @param \Drupal\Core\Field\FieldDefinitionInterface $field_definition
+ * @param \Drupal\Core\Session\AccountInterface $account
+ * @param \Drupal\Core\Field\FieldItemListInterface|NULL $items
+ *
+ * @return \Drupal\Core\Access\AccessResult|\Drupal\Core\Access\AccessResultNeutral
+ */
+function strawberryfield_entity_field_access($operation, FieldDefinitionInterface $field_definition, AccountInterface $account, FieldItemListInterface $items = NULL) {
+  if ($field_definition
+      ->getName() == 'field_file_drop') {
+    return AccessResult::allowedIfHasPermission($account, 'upload to Digital Object file dropbox field');
+  }
+  return AccessResult::neutral();
+}
+
+
+function strawberryfield_file_mimetype_mapping_alter(&$mapping) {
+
+  // Add relevant Repository Mimetypes missing from D8
+  $mapping['mimetypes']['json_mimetype'] = 'application/json';
+  $mapping['extensions']['json'] = 'json_mimetype';
+  $mapping['mimetypes']['jsonld_mimetype'] = 'application/ld+json';
+  $mapping['extensions']['jsonld'] = 'jsonld_mimetype';
+  $mapping['mimetypes']['jpeg2000_mimetype'] = 'image/jp2';
+  $mapping['extensions']['jp2'] = 'jpeg2000_mimetype';
+  $mapping['mimetypes']['jpeg2000_mimetype'] = 'image/jp2';
+  $mapping['extensions']['jp2'] = 'jpeg2000_mimetype';
+  $mapping['mimetypes']['fits_image_mimetype'] = 'image/fits';
+  // @see https://en.wikipedia.org/wiki/FITS
+  $mapping['extensions']['fits'] = 'fits_image_mimetype';
+  $mapping['extensions']['fit'] = 'fits_image_mimetype';
+  $mapping['extensions']['fts'] = 'fits_image_mimetype';
+  $mapping['extensions']['stl'] = 'stl_model_mimetype';
+  // @see https://www.iana.org/assignments/media-types/media-types.xhtml
+  $mapping['mimetypes']['stl_model_mimetype'] = 'model/stl';
+
+}
+
+function strawberryfield_s3fs_url_settings_alter(array &$url_settings, $s3_file_path) {
+  // @TODO This is a soft dependency. Means if we have no s3fs module all good.
+  // Idea here is to allow in the future
+  // signed urls to be generated given a certain condition
+  // Or to force AWS S3 metatags to control maybe object lifecycle.
+  //if ($s3_file_path == 'myfile.jpg') {
+  //  $url_settings['presigned_url'] = TRUE;
+  //  $url_settings['timeout'] = 10;
+  //}
+  // An example of adding a custom GET argument to all S3 URLs that
+  // records the name of the currently logged in user.
+  //$account = Drupal::currentUser();
+  //$url_settings['custom_GET_args']['x-user'] = $account->getAccountName();
 }

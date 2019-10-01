@@ -7,7 +7,7 @@ use Drupal\strawberryfield\Event\StrawberryfieldServiceEvent;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 /**
- * Event subscriber for SBF bearing entity presave event.
+ * Event subscriber for SBF bearing entity json process event.
  */
 abstract class StrawberryfieldEventJsonProcessingSubscriber implements EventSubscriberInterface {
 

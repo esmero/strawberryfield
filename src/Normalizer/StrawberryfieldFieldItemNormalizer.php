@@ -9,7 +9,7 @@ use Drupal\serialization\Normalizer\EntityReferenceFieldItemNormalizerTrait;
 use Drupal\Core\TypedData\TypedDataInternalPropertiesHelper;
 
 /**
- * Adds the file URI to embedded file entities.
+ * Normalizes StrawberryfieldFieldItem values and expands to full JSON
  */
 class StrawberryfieldFieldItemNormalizer extends FieldItemNormalizer {
 
@@ -44,7 +44,6 @@ class StrawberryfieldFieldItemNormalizer extends FieldItemNormalizer {
    */
   public function normalize($field_item, $format = NULL, array $context = []) {
     //@TODO check what options we can get from $context
-
     //@TODO allow per Field instance to limit which prop is internal or external
     //@TODO do the inverse, a denormalizer for 'value' to allow API ingests
     // Only do this because parent implementation can change.
@@ -57,11 +56,29 @@ class StrawberryfieldFieldItemNormalizer extends FieldItemNormalizer {
     return $values;
   }
 
-  /**
+  public function denormalize($data, $class, $format = NULL, array $context = []) {
+    if (!isset($context['target_instance'])) {
+      throw new InvalidArgumentException('$context[\'target_instance\'] must be set to denormalize with the FieldItemNormalizer');
+    }
+
+    if ($context['target_instance']->getParent() == NULL) {
+      throw new InvalidArgumentException('The field item passed in via $context[\'target_instance\'] must have a parent set.');
+    }
+
+    /** @var \Drupal\Core\Field\FieldItemInterface $field_item */
+    $field_item = $context['target_instance'];
+    $this->checkForSerializedStrings($data, $class, $field_item);
+
+    $field_item->setValue($this->constructValue($data, $context));
+    return $field_item;
+  }
+
+
+/**
    * {@inheritdoc}
    */
   protected function constructValue($data, $context) {
-
+    //$data = $this->serializer->encode($data, 'json');
     return parent::constructValue($data, $context);
   }
 

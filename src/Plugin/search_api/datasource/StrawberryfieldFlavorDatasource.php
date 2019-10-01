@@ -126,8 +126,13 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
    * {@inheritdoc}
    */
   public function getItemId(ComplexDataInterface $item) {
-    $values = $item->get('item_id')->getValue();
-    return $values ?: NULL;
+    // @TODO This id is not the one for a particular flavor
+    // but the one from the source, which in this case is a node
+    // This is tricky since we really have a lot of id's for each node
+    // we will return  NULL and deal with trackin in our own hook.
+    // @see search_api.module \search_api_node_access_records_alter
+
+    return NULL;
   }
 
   /**
@@ -540,9 +545,6 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
     $documents = [];
     $sbfflavordata_definition = StrawberryfieldFlavorDataDefinition::create('strawberryfield_flavor_data');
 
-    dpm("In loadmultiple");
-    dpm($ids);
-
     foreach($ids as $id){
       $splitted_id = explode(':',$id);
       $data = [
@@ -556,8 +558,6 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
       $documents[$id]->setValue($data);
 
     }
-
-    dpm("Return doc in loadmultiple");
 
     return $documents;
   }
