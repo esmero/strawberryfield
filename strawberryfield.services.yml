@@ -41,3 +41,8 @@ services:
     tags:
       - {name: event_subscriber}
     arguments: ['@string_translation', '@messenger','@logger.factory','@strawberryfield.file_persister']
+  strawberryfield.paramconverter.entity:
+    class: Drupal\strawberryfield\ParamConverter\UuidEntityConverter
+    tags:
+      - { name: paramconverter , priority: 10 }
+    arguments: ['@entity_type.manager']
