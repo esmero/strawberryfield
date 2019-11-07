@@ -120,7 +120,7 @@ class keyNameProviderEntityForm extends EntityForm {
       '#type' => 'checkbox',
       '#title' => $this->t('Is this plugin active?'),
       '#return_value' => TRUE,
-      '#default_value' => TRUE
+      '#default_value' => $strawberry_keynameprovider->isActive(),
     ];
 
     //@TODO allow a preview of the processing via ajax

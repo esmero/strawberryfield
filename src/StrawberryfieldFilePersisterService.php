@@ -633,7 +633,7 @@ class StrawberryfieldFilePersisterService {
       if (!empty($usage)) {
       if (isset($usage['strawberryfield']) && isset($usage['strawberryfield'][$entity_type_id])) {
         foreach ($usage['strawberryfield'][$entity_type_id] as $id => $count) {
-          dpm($id);
+
           $values = \Drupal::entityQuery($entity_type_id)->condition(
             'nid',
             $id
