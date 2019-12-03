@@ -66,7 +66,7 @@ class JmesPathNameProvider extends StrawberryfieldKeyNameProviderBase {
       '#size' => 40,
       '#maxlength' => 255,
       '#default_value' => $this->getConfiguration()['source_key'],
-      '#description' => $this->t('JMespath(s) will be evaluated against your <em>Strawberry field</em> JSON to extract data.<br> e.g. ap:hocr'),
+      '#description' => $this->t('JMespath(s) will be evaluated against your <em>Strawberry field</em> JSON to extract data.<br> e.g. subject_loc[*].label'),
       '#required' => true,
     ];
     // We need the parent form structure, if any, to make machine name work.
