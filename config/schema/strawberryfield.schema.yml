@@ -44,6 +44,17 @@ strawberryfield.strawberry_keynameprovider.flavor:
       type: string
       label: 'The field property we expose for the Strawberryfield'
 
+strawberryfield.strawberry_keynameprovider.jmespath:
+  type: config_object
+  label: 'Strawberry Key Name Provider JMesPath specific config'
+  mapping:
+    source_key:
+      type: string
+      label: 'A Comma separated string containing one or more JMESPaths '
+    exposed_key:
+      type: string
+      label: 'The field property we expose for the Strawberryfield'
+
 strawberryfield.storage_settings:
   type: config_object
   label: 'Strawberry Storage specific config'
