@@ -292,7 +292,7 @@ class StrawberryfieldJsonHelper {
   /**
    * Another array helper that checks if an array is associative or not
    *
-   * This is faster for large arrays than ::jsonIsList()
+   * This is faster for large arrays than ::arrayIsMultiSimple()
    * @param array $sourcearray
    *
    * @return bool
