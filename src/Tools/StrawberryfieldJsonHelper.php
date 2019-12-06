@@ -283,10 +283,29 @@ class StrawberryfieldJsonHelper {
    * @param array $sourcearray
    *
    * @return bool
+   *  TRUE if is associative
    */
-  public static function jsonIsList(array $sourcearray =  []) {
-      return empty(array_filter(array_keys($sourcearray), 'is_string'));
+  public static function arrayIsMultiSimple(array $sourcearray =  []) {
+      return !empty(array_filter(array_keys($sourcearray), 'is_string'));
   }
+
+  /**
+   * Another array helper that checks if an array is associative or not
+   *
+   * This is faster for large arrays than ::arrayIsMultiSimple()
+   * @param array $sourcearray
+   *
+   * @return bool
+   *  TRUE if is associative
+   */
+  public static function arrayIsMultiIterative(array $sourcearray =  []) {
+    foreach ($sourcearray as $item) {
+      if (is_array($item)) return true;
+    }
+    return false;
+  }
+
+
 
   /**
    *
@@ -314,4 +333,64 @@ class StrawberryfieldJsonHelper {
     return (bool) preg_match(self::URN_REGEXP, $uri);
   }
 
+  /**
+   * Transforms our stored JSON Property Paths/Tax. terms into a valid JMESPath.
+   *
+   * This function assumes the given JSON Property path lacks the
+   * last .[] or .{} present in the return expression of a JMESPath.
+   * Basically it translates thing like
+   *  `ap:images.*.url` into
+   *  `"ap:images".*.url"
+   *  or
+   *  `subject_loc.[*].label` into
+   *  `subject_loc[*].label"
+   *
+   * NOTE: This function is not meant to deal with full JSON Path expressions
+   * and value based selectors.
+   *
+   * @param $jsonproppath
+   *
+   * @return string
+   */
+  public static function jsonPropertyPathToJmesPath($jsonproppath) {
+    $path_parts_raw = explode(".", $jsonproppath);
+
+    $terms = new CachingIterator(
+      new ArrayIterator($path_parts_raw)
+    );
+    $term_path = [];
+    foreach ($terms as $json_node) {
+      if ($terms->hasNext()) {
+        $next = $terms->getInnerIterator()->current();
+        if ($next == '*') {
+          $term_path[] = $json_node . "." . $next;
+          continue;
+        }
+        elseif ($next == '[*]') {
+          $term_path[] = $json_node . $next;
+          continue;
+        }
+      }
+      if ($json_node != '[*]' && $json_node != '*') {
+        $term_path[] = self::surroundInDuobleQuotes($json_node);
+      }
+    }
+      $term_path = array_filter($term_path);
+      $jmespath = implode('.',$term_path);
+    return $jmespath;
+  }
+
+
+  /**
+   * Simple helper method that surrounds strings with : in doublequotes
+   * @param $string
+   *
+   * @return string
+   */
+  public static function surroundInDuobleQuotes($string) {
+    // For the sake of performance. Just surround everything.
+    // If we check for : or @ or ! we would be doing a lot of
+    // Extra processing when JMESPATH loves already double quotes.
+    return '"' . $string . '"';
+  }
 }
