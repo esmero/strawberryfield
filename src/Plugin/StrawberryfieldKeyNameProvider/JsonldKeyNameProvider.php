@@ -13,8 +13,9 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
 use Drupal\strawberryfield\Plugin\StrawberryfieldKeyNameProviderBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Component\Utility\UrlHelper;
-use GuzzleHttp\Exception\ClientException;
+use GuzzleHttp\Exception\GuzzleException;
 use Drupal\Core\Cache\CacheBackendInterface;
+use Drupal\Core\File\FileSystemInterface;
 
 
 /**
@@ -90,6 +91,7 @@ class JsonldKeyNameProvider extends StrawberryfieldKeyNameProviderBase {
     ];
     return $element;
   }
+
 
   /**
    * {@inheritdoc}
@@ -229,47 +231,101 @@ class JsonldKeyNameProvider extends StrawberryfieldKeyNameProviderBase {
   protected function getRemoteJsonData($remoteUrl) {
     // This is expensive, reason why we process and store in cache
     $jsondata = [];
+    $remoteUrl = trim($remoteUrl);
     if (empty($remoteUrl)){
-      // No need to alarm. all good. If not URL just return.
+      // No need to alarm. all good. If no URL just return.
       return [];
     }
     if (!UrlHelper::isValid($remoteUrl, $absolute = TRUE)) {
       $this->messenger->addError(
-        $this->t('We can not fetch Data from @pluginid, check your URL',
-          ['@pluginid' => $this->label()]
-        )
-      );
-      return [];
-    }
-
-    $options['headers']=['Accept' => 'application/ld+json'];
-    try {
-      $request = $this->httpClient->get($remoteUrl, $options);
-    }
-    catch(ClientException $exception) {
-      $responseMessage = $exception->getMessage();
-      $this->messenger->addError(
-        $this->t('We tried to contact @url from @pluginid but we could not. <br> The WEB says: @response. <br> Check that URL!',
+        $this->t('Provided URL @url for @pluginid is invalid. Replace it with a valid one.',
           [
+            '@pluginid' => $this->label(),
             '@url' => $remoteUrl,
-            '@pluginid' =>  $this->label(),
-            '@response' => $responseMessage
           ]
         )
       );
       return [];
     }
-    $body = $request->getBody()->getContents();
-    $jsondata = json_decode($body, TRUE);
-    $json_error = json_last_error();
-    if ($json_error == JSON_ERROR_NONE) {
+    // Let's check if we have a downloaded local version around
+    // https://api.drupal.org/api/drupal/core%21includes%21file.inc/function/file_unmanaged_save_data/8.2.x
+    $possible_name = hash('md5',$remoteUrl);
+    $directory =  "public://jsonld";
+    $path = "{$directory}/{$possible_name}.jsonld";
+    $filecache = FALSE;
+    if (file_exists($path)) {
+      $filecache = file_get_contents($path, FALSE);
+    }
+
+    if ($filecache) {
+      $jsondata = json_decode($filecache, TRUE);
+      $json_error = json_last_error();
+      if ($json_error == JSON_ERROR_NONE) {
+        return $jsondata;
+      } else {
+        // Basically whatever that we have is not JSON, lets go for it again.
+        $filecache = FALSE;
+      }
+    }
+
+    if (!$filecache) {
+      // If we had no local cache file, lets do the HTTP thing.
+      // Funny. Today Dec 3 2019 schema.org was out. That is the reason we do this.
+      $options['headers'] = ['Accept' => 'application/ld+json'];
+      try {
+        $request = $this->httpClient->get($remoteUrl, $options);
+      } catch (GuzzleException $exception) {
+        $responseMessage = $exception->getMessage();
+        $responseCode = $exception->getCode();
+        $this->messenger->addError(
+          $this->t(
+            'We tried to contact @url from @pluginid but we could not. <br> HTTP with code @code says: @response. <br> Check that URL or try later again!',
+            [
+              '@url' => $remoteUrl,
+              '@pluginid' => $this->label(),
+              '@response' => $responseMessage,
+              '@code' => $responseCode,
+            ]
+          )
+        );
+        return [];
+      }
+      $body = $request->getBody()->getContents();
+
+      $jsondata = json_decode($body, TRUE);
+      $json_error = json_last_error();
+      if ($json_error == JSON_ERROR_NONE) {
+        // Lets deposit a cached file version, just in case
+        if (\Drupal::service('file_system')->prepareDirectory(
+          $directory,
+          FileSystemInterface::CREATE_DIRECTORY
+        )) {
+          if (!\Drupal::service('file_system')->saveData(
+            $body,
+            $path,
+            FileSystemInterface::EXISTS_REPLACE
+          )) {
+            $this->messenger->addWarning(
+              $this->t(
+                'We tried to generate a local cached copy of @url at @path, but we could not. Please check your logs. Not terrible, just a warning.',
+                [
+                  '@url' => $remoteUrl,
+                  '@path' => $path,
+                ]
+              )
+            );
+          }
+        }
+      }
       return $jsondata;
     }
+    // This means we had an error on the JSON decode.
     $this->messenger->addError(
-      $this->t('Looks like data fetched from @url by @pluginid is not in JSON format.<br> JSON says: @$jsonerror <br>Please check your URL!',
+      $this->t(
+        'Looks like data fetched from @url by @pluginid is not in JSON format.<br> JSON says: @$jsonerror <br>Please check your URL!',
         [
           '@url' => $remoteUrl,
-          '@pluginid' =>  $this->label(),
+          '@pluginid' => $this->label(),
           '@$jsonerror' => $json_error
         ]
       )

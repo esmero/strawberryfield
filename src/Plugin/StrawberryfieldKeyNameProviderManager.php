@@ -16,7 +16,7 @@ use Drupal\Core\Plugin\DefaultPluginManager;
 /**
  * Provides the Strawberryfield KeyName Provider Plugin  Manager.
  *
- * Class StrabwerryfieldKeyNameProviderManager
+ * Class StrawberryfieldKeyNameProviderManager
  *
  * @package Drupal\strawberryfield\Plugin
  */
