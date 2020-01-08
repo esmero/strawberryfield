@@ -21,3 +21,10 @@ strawberryfield.storage_settings_form:
   parent: strawberryfield.group.admin
   weight: 99
 
+strawberryfield.important_solr_settings_form:
+  title: 'Important Solr Settings Form'
+  route_name: strawberryfield.important_solr_settings_form
+  description: 'Configure which Solr field is used in ADO Type Mapping'
+  parent: strawberryfield.group.admin
+  weight: 99
+
