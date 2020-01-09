@@ -66,20 +66,6 @@ strawberryfield.storage_settings:
       type: string
       label: 'Storage Scheme for Persisting Digital Objects in JSON format'
       
-xstrawberryfield.archipelago_solr_settings:
-  type: config_object
-  label: 'Important Solr settings for Archipelago'
-  mapping:
-    type_server: 
-      type: string
-      label: 'The Solr server for type in ADO to View Mode mapping'
-    type_index:
-      type: string
-      label: 'The Solr index used for type in ADO to View Mode mapping'
-    type_field:
-      type: string
-      label: 'The Solr field used for type in ADO to View Mode mapping'
-      
 strawberryfield.archipelago_solr_settings:
   type: config_object
   label: 'Important Solr Settings for Archipelago'
