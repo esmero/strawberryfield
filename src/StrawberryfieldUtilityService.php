@@ -15,7 +15,7 @@ use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\file\FileInterface;
 use Drupal\Core\Entity\ContentEntityInterface;
-
+use Drupal\search_api\Entity\Index; 
 /**
  * Provides a SBF utility class.
  */
@@ -82,4 +82,29 @@ class StrawberryfieldUtilityService {
     }
     return $hassbf[$key];
   }
+
+  /**
+   * Checks whether the Solr Fields in a Solr Index are from SBFs
+   **
+   * @param Drupal\search_api\Entity\Index $index_entity
+   *
+   * @return array
+   *  Returns array of solr fields
+   */
+  public function getStrawberryfieldSolrFields(Index $index_entity) {
+    $solr_fields = $index_entity->get('field_settings');
+    $sbf_solr_fields = array();
+
+    foreach ($solr_fields as $field) {
+      $property_path = explode(":", $field['property_path']);
+      $has_sbf_property_path = in_array('field_descriptive_metadata', $property_path);
+      $has_node_datasource = array_key_exists('datasource_id', $field) ? $field['datasource_id'] === "entity:node" : false;
+      if ($has_sbf_property_path && $has_node_datasource) {
+        $sbf_solr_fields[] = $field;
+      }
+    }
+    
+    return $sbf_solr_fields;
+  }
 }
+
