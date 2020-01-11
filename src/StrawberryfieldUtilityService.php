@@ -138,7 +138,7 @@ class StrawberryfieldUtilityService {
     
     $sbf_solr_fields = array();
     
-    foreach ($solr_fields as $field) {
+    foreach ($solr_fields as $id => $field) {
       $property_path = explode(":", $field['property_path']);
       // use the first part of the property path (this will be the field machine name)
       $field_name = $property_path[0];
@@ -151,7 +151,7 @@ class StrawberryfieldUtilityService {
       $has_node_datasource = array_key_exists('datasource_id', $field) ? $field['datasource_id'] === "entity:node" : false;
 
       if ($has_sbf_property_path && $has_node_datasource) {
-        $sbf_solr_fields[] = $field;
+        $sbf_solr_fields[$id] = $field;
       }
     }
     
