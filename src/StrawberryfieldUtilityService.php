@@ -60,9 +60,14 @@ class StrawberryfieldUtilityService {
 
    */
   protected $entityFieldManager;
-  
-  // TODO phpdoc
-  protected $strawberryfieldMachineNames;
+
+  /**
+   * A list of Field names of type SBF
+   *
+   * @var array|NULL
+   *
+   */
+  protected $strawberryfieldMachineNames = NULL;
 
   public function __construct(
     FileSystemInterface $file_system,
@@ -113,6 +118,13 @@ class StrawberryfieldUtilityService {
    *  Returns array of names
    */
   public function getStrawberryfieldMachineNames() {
+    // Only NUll if not initialized. The moment this Service
+    // Gets constructed we set this data.
+    // @TODO. Do we want to calculate this expensive function
+    // everytime or just on demand?
+    if ($this->strawberryfieldMachineNames !== NULL) {
+      return $this->strawberryfieldMachineNames;
+    }
     $node_field_definitions = $this->entityFieldManager->getFieldStorageDefinitions('node');
     $sbf_field_names = array();
     foreach ($node_field_definitions as $field_definition) {
