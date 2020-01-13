@@ -65,3 +65,23 @@ strawberryfield.storage_settings:
     object_file_scheme:
       type: string
       label: 'Storage Scheme for Persisting Digital Objects in JSON format'
+      
+strawberryfield.archipelago_solr_settings:
+  type: config_object
+  label: 'Important Solr Settings for Archipelago'
+  mapping:
+    ado_type:
+      type: strawberryfield.archipelago_solr_settings.field_config
+      label: 'Source for Archipelago Digital Object Type'
+      
+strawberryfield.archipelago_solr_settings.field_config:
+  type: mapping
+  label: 'Field Config for Archipelago Solr Settings'
+  mapping:
+    index_id:
+      type: string
+      label: 'ID of Solr Index'
+    field:
+      type: string
+      label: 'Solr Field'
+      
