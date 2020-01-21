@@ -84,4 +84,36 @@ strawberryfield.archipelago_solr_settings.field_config:
     field:
       type: string
       label: 'Solr Field'
-      
+
+plugin.plugin_configuration.search_api_datasource.strawberryfield_flavor_datasource:
+  type: mapping
+  label: 'Strawberryfield Flavour datasource configuration'
+  mapping:
+    bundles:
+      type: mapping
+      label: 'Bundles bearing Strawberryfields'
+      mapping:
+        default:
+          type: boolean
+          label: 'Whether to exclude (TRUE) or include (FALSE) the selected bundles bearing a Strawberryfield.'
+        selected:
+          type: sequence
+          label: 'The selected bundles'
+          orderby: value
+          sequence:
+            type: string
+            label: 'A bundle machine name'
+    languages:
+      type: mapping
+      label: 'Languages'
+      mapping:
+        default:
+          type: boolean
+          label: 'Whether to exclude (TRUE) or include (FALSE) the selected languages.'
+        selected:
+          type: sequence
+          label: 'The selected languages'
+          orderby: value
+          sequence:
+            type: string
+            label: 'A language code'
