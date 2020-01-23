@@ -26,6 +26,11 @@ services:
     tags:
       - {name: event_subscriber}
     arguments: ['@string_translation', '@messenger','@logger.factory','@strawberryfield.file_persister']
+  strawberryfield.presavesetlabelfrommetadata_subscriber:
+     class: Drupal\strawberryfield\EventSubscriber\StrawberryfieldEventPresaveSubscriberSetTitlefromMetadata
+     tags:
+       - {name: event_subscriber}
+     arguments: ['@string_translation', '@messenger','@logger.factory']
   strawberryfield.insertdeposit_subscriber:
     class: Drupal\strawberryfield\EventSubscriber\StrawberryfieldEventInsertSubscriberDepositDO
     tags:
