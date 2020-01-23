@@ -74,10 +74,11 @@ class StrawberryfieldEventPresaveSubscriberSetTitlefromMetadata extends Strawber
       if ($entity->original->getTitle() != $entity->getTitle()) {
         // Means someone manually, via a Title Widget, changed the title
         // If so, enforce that and don't try to overwrite.
-        // But, weform widget, if updating title automatically is set, will
-        // Unset the ->title, allowing us to always get metadata title into
+        // But, webform widget, if updating title automatically is set, should
+        // unset the 'title', allowing us to always get metadata title into
         // the node one. Still, allowing other widgets to set titles without us
         // overriding it. Smart?
+        // Reality is, if you don't use Title, just leave it out.
         $forceupdate = FALSE;
       }
     }
