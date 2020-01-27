@@ -802,8 +802,7 @@ class StrawberryfieldFilePersisterService {
    *  'dr:uuid' => $uuid,
    *  'name' => $file->getFilename(),
    *  'tags' => [],
-  ];
-
+   * ];
    * @param $a
    * @param $b
    *
