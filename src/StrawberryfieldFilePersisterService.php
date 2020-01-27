@@ -407,6 +407,20 @@ class StrawberryfieldFilePersisterService {
         // @TODO see if having the same file in different keys is even
         // a good idea.
       }
+      // Natural Order Sort.
+      // @TODO how should we deal with manually ordered files?
+      // This will always reorder everything based on filenames.
+      uasort($fileinfo_bytype_many['as:' . $askey], array($this,'sortByFileName'));
+      // For each always wins over array_walk
+      $i=0;
+      foreach ($fileinfo_bytype_many['as:' . $askey] as &$item) {
+        $i++;
+       //Order is already given by uasort but not trustable in JSON
+       //So we set sequence number
+        $item['sequence'] = $i;
+      }
+
+
     }
 
     return $fileinfo_bytype_many;
@@ -773,4 +787,30 @@ class StrawberryfieldFilePersisterService {
     }
     return $success;
   }
+
+  /**
+   * Natural Sort function to be used as uasort callback
+   *
+   * Only works for as: structures like
+   *  $fileinfo = [
+   *  'type' => ucfirst($askey),
+   *  'url' => $destinationuri,
+   *  'crypHashFunc' => 'md5',
+   *  'checksum' => $md5,
+   *  'dr:for' => $file_source_key,
+   *  'dr:fid' => (int) $file->id(),
+   *  'dr:uuid' => $uuid,
+   *  'name' => $file->getFilename(),
+   *  'tags' => [],
+  ];
+
+   * @param $a
+   * @param $b
+   *
+   * @return int
+   */
+  public function sortByFileName($a, $b) {
+    return strnatcmp($a['name'],$b['name']);
+  }
+
 }
