@@ -45,14 +45,15 @@ class StrawberryfieldFieldItemNormalizer extends FieldItemNormalizer {
   public function normalize($field_item, $format = NULL, array $context = []) {
     //@TODO check what options we can get from $context
     //@TODO allow per Field instance to limit which prop is internal or external
-    //@TODO do the inverse, a denormalizer for 'value' to allow API ingests
     // Only do this because parent implementation can change.
     $values = parent::normalize($field_item, $format , $context);
+
+    //  Get the main property and decode
     $mainproperty = $field_item->mainPropertyName();
-    // Now get the mainPropertyName and decode
     if ((isset($values[$mainproperty])) && (!empty($values[$mainproperty])) || $values[$mainproperty]!='') {
       $values[$mainproperty] = $this->serializer->decode($values[$mainproperty], 'json');
     }
+    
     return $values;
   }
 
@@ -67,19 +68,42 @@ class StrawberryfieldFieldItemNormalizer extends FieldItemNormalizer {
 
     /** @var \Drupal\Core\Field\FieldItemInterface $field_item */
     $field_item = $context['target_instance'];
-    $this->checkForSerializedStrings($data, $class, $field_item);
 
-    $field_item->setValue($this->constructValue($data, $context));
+    $this->checkForSerializedStrings($data, $class, $field_item);
+    
+    // Set each key in the field_item with its constructed value
+    // At this point all values will be encoded JSON strings
+    // Coming from minio data, keys should be 'value' and 'str_flatten_keys'
+    $constructedValue = $this->constructValue($data, $context);
+    foreach ($constructedValue as $key => $value) {
+      $field_item->set($key, $value);
+    }
+    
     return $field_item;
   }
 
-
-/**
-   * {@inheritdoc}
-   */
+  /**
+   * Encodes the $data items that are not already strings.
+   * 
+   * @param mixed $data
+   * @param array $context
+   * 
+   * @return array|mixed
+   */  
   protected function constructValue($data, $context) {
-    //$data = $this->serializer->encode($data, 'json');
-    return parent::constructValue($data, $context);
+    // Encode individually, otherwise 'value' gets nested and breaks the SBF
+    $individualEncodedValues = [];
+    foreach ($data as $key => $value ) {
+      $isJSONString = is_string($value) && is_array(json_decode($value, true)) && (json_last_error() == JSON_ERROR_NONE);
+      if ($isJSONString) {
+        $encoded = $value;
+      } else {
+        $encoded = $this->serializer->encode($value, 'json');
+      }
+      $individualEncodedValues[$key] = $encoded;
+    }
+    
+    return $individualEncodedValues;
   }
 
 }
