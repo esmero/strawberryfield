@@ -438,4 +438,16 @@ class StrawberryfieldJsonHelper {
       }
     );
   }
+  
+  /** Test if an input is a valid JSON string.
+   * 
+   * @param $input
+   *
+   * @return boolean 
+   */
+  public static function isJsonString($input) {
+    
+    return is_string($input) && is_array(json_decode($input, true)) && (json_last_error() == JSON_ERROR_NONE);
+  }
+  
 }
