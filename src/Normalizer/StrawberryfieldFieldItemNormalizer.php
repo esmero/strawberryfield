@@ -3,10 +3,13 @@
 namespace Drupal\strawberryfield\Normalizer;
 use Drupal\Core\Field\FieldItemInterface;
 use Drupal\Core\Entity\EntityRepositoryInterface;
+use Drupal\Core\TypedData\DataDefinition;
 use Drupal\serialization\Normalizer\FieldItemNormalizer;
 use Drupal\strawberryfield\Plugin\Field\FieldType\StrawberryFieldItem;
 use Drupal\serialization\Normalizer\EntityReferenceFieldItemNormalizerTrait;
 use Drupal\Core\TypedData\TypedDataInternalPropertiesHelper;
+use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
+
 
 /**
  * Normalizes StrawberryfieldFieldItem values and expands to full JSON
@@ -68,12 +71,10 @@ class StrawberryfieldFieldItemNormalizer extends FieldItemNormalizer {
 
     /** @var \Drupal\Core\Field\FieldItemInterface $field_item */
     $field_item = $context['target_instance'];
-
     $this->checkForSerializedStrings($data, $class, $field_item);
-    
+
     // Set each key in the field_item with its constructed value
     // At this point all values will be encoded JSON strings
-    // Coming from minio data, keys should be 'value' and 'str_flatten_keys'
     $constructedValue = $this->constructValue($data, $context);
     foreach ($constructedValue as $key => $value) {
       $field_item->set($key, $value);
@@ -83,7 +84,7 @@ class StrawberryfieldFieldItemNormalizer extends FieldItemNormalizer {
   }
 
   /**
-   * Encodes the $data items that are not already strings.
+   * Encodes the $data items that aren't already strings or computed/readOnly properties
    * 
    * @param mixed $data
    * @param array $context
@@ -93,9 +94,18 @@ class StrawberryfieldFieldItemNormalizer extends FieldItemNormalizer {
   protected function constructValue($data, $context) {
     // Encode individually, otherwise 'value' gets nested and breaks the SBF
     $individualEncodedValues = [];
+    
+    $data_definition = $context['target_instance']->getDataDefinition();
+
     foreach ($data as $key => $value ) {
-      $isJSONString = is_string($value) && is_array(json_decode($value, true)) && (json_last_error() == JSON_ERROR_NONE);
-      if ($isJSONString) {
+      // Don't bother with properties that were defined computed or readOnly in StrawberryFieldItem data definition
+      // These values won't be returned to denormalize() and won't be set
+      if ($data_definition->getPropertyDefinition($key)->isComputed() || $data_definition->getPropertyDefinition($key)->isReadOnly()) {
+        continue;
+      }
+      
+      $isJsonString = StrawberryfieldJsonHelper::isJsonString($value);
+      if ($isJsonString) {
         $encoded = $value;
       } else {
         $encoded = $this->serializer->encode($value, 'json');
