@@ -27,3 +27,15 @@ strawberryfield.important_solr_settings_form:
     _permission: 'access administration pages'
   options:
     _admin_route: TRUE
+    
+strawberryfield.custom_node_edit: 
+  path: '/node/{node}/custom-edit'
+  defaults:
+    _entity_form: 'node.edit'
+  requirements:
+    _entity_access: 'node.update'
+    _permission: 'access content'
+  options:
+    parameters:
+      node:
+        type: 'entity:node'

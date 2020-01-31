@@ -1,0 +1,9 @@
+# Add an additional tab to the node page.
+strawberryfield.custom_node_edit: # The ID of local task is the same as route, to make it easier to control.
+  route_name: 'strawberryfield.custom_node_edit'
+  title: 'Custom Edit' 
+  base_route: 'entity.node.canonical'
+  weight: 3
+  class: '\Drupal\strawberryfield\Plugin\Menu\CustomEditTab'
+strawberryfield.custom_node_edit.derived_tabs:
+  deriver: 'Drupal\strawberryfield\Plugin\Derivative\StrawberryLocalTasks'
