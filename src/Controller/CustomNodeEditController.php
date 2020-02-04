@@ -95,8 +95,8 @@ class CustomNodeEditController extends ControllerBase {
    * @return RedirectResponse
    */
   public function redirectToForm(NodeInterface $node) {
+    // Use the first available active form mode
     $firstActiveFormMode = array_key_first($this->activeNodeFormModes);
-    // Use the first available active form mode, and simplify the ID for appending to routes.
     if ($firstActiveFormMode) {
       return $this->redirect("entity.node.edit_form.{$firstActiveFormMode}", ["node" => $node->id()]);
     } else {
