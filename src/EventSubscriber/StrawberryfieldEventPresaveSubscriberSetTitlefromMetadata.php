@@ -71,7 +71,8 @@ class StrawberryfieldEventPresaveSubscriberSetTitlefromMetadata extends Strawber
     $titleadded = NULL;
     $forceupdate = TRUE;
     if (!$entity->isNew()) {
-      if ($entity->original->getTitle() != $entity->getTitle()) {
+      // Check if we had a title, if the new one is different and not empty.
+      if (($entity->original->getTitle() != $entity->label()) && !empty($entity->label())) {
         // Means someone manually, via a Title Widget, changed the title
         // If so, enforce that and don't try to overwrite.
         // But, webform widget, if updating title automatically is set, should
@@ -83,7 +84,7 @@ class StrawberryfieldEventPresaveSubscriberSetTitlefromMetadata extends Strawber
       }
     }
 
-    if (!$entity->getTitle() || $forceupdate) {
+    if (!$entity->label() || $forceupdate) {
       foreach ($sbf_fields as $field_name) {
         /* @var $field \Drupal\Core\Field\FieldItemInterface */
         $field = $entity->get($field_name);
@@ -116,9 +117,15 @@ class StrawberryfieldEventPresaveSubscriberSetTitlefromMetadata extends Strawber
           )
         );
       } else {
-        // Means we need a title, got nothing from metadata or node, dealing with it.
-        $title = $this->t('New Untitled Archipelago Digital Object by @author', ['@author' => $entity->getOwner()->getDisplayName()]);
-        $entity->setTitle($title);
+        // But maybe its just not in our metadata or someone forget to set a label key. Don't try to add it if so
+        if (!$entity->label()) {
+          // Means we need a title, got nothing from metadata or node, dealing with it.
+          $title = $this->t(
+            'New Untitled Archipelago Digital Object by @author',
+            ['@author' => $entity->getOwner()->getDisplayName()]
+          );
+          $entity->setTitle($title);
+        }
       }
       $current_class = get_called_class();
       $event->setProcessedBy($current_class, TRUE);
