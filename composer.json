@@ -13,9 +13,9 @@
         }
     ],
     "require": {
-        "ml/json-ld": "^1.0",
-        "mtdowling/jmespath.php":"^2.4",
-        "swaggest/json-schema":"^0.12.11",
+        "ml/json-ld": "^1.1",
+        "mtdowling/jmespath.php":"^2.5",
+        "swaggest/json-schema":"^0.12.25",
         "frictionlessdata/datapackage": "dev-master",
         "drupal/search_api": "~1.14"
     },

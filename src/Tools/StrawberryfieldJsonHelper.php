@@ -17,10 +17,21 @@ use JmesPath\Env as JmesPath;
  * @package Drupal\strawberryfield\Tools
  */
 class StrawberryfieldJsonHelper {
+  /**
+   * Defines all types of keys we generated based on file types.
+   */
+  const AS_FILE_TYPE = [
+    'as:image',
+    'as:document',
+    'as:video',
+    'as:audio',
+    'as:application',
+    'as:text'
+  ];
 
   /**
-* Defines a minimal JSON-LD context.
-*/
+   * Defines a minimal JSON-LD context.
+   */
   CONST SIMPLE_JSONLDCONTEXT = '{
     "@context":  {
        "type": "@type",
@@ -393,4 +404,50 @@ class StrawberryfieldJsonHelper {
     // Extra processing when JMESPATH loves already double quotes.
     return '"' . $string . '"';
   }
+
+  /**
+   * Sort an array by reference based on a sequence key integer.
+   *
+   * @param array $jsondata
+   *    Full JSON data, e.g, from a SBF value, as an array.
+   * @param string $mainkey
+   *    The Key we want to sort
+   * @param string $orderkey
+   *    The associative Array key used to compare order
+   */
+  public static function orderSequence(
+    array &$jsondata,
+    $mainkey = 'as:image',
+    $orderkey = 'sequence'
+  ) {
+    if (!isset($jsondata[$mainkey])) {
+      return;
+    }
+    uasort(
+      $jsondata[$mainkey],
+      function ($a, $b) use ($orderkey) {
+        if ((array_key_exists($orderkey, $a)) && (array_key_exists(
+            $orderkey,
+            $b
+          ))) {
+          return (int) $a[$orderkey] <=> (int) $b[$orderkey];
+        }
+        else {
+          return 0;
+        }
+      }
+    );
+  }
+  
+  /** Test if an input is a valid JSON string.
+   * 
+   * @param $input
+   *
+   * @return boolean 
+   */
+  public static function isJsonString($input) {
+    
+    return is_string($input) && is_array(json_decode($input, true)) && (json_last_error() == JSON_ERROR_NONE);
+  }
+  
 }
