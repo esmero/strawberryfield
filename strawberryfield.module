@@ -259,3 +259,47 @@ function strawberryfield_s3fs_url_settings_alter(array &$url_settings, $s3_file_
   //$account = Drupal::currentUser();
   //$url_settings['custom_GET_args']['x-user'] = $account->getAccountName();
 }
+
+/**
+ * Implements hook_theme_suggestions_HOOK_alter() for node templates.
+ * @param array $suggestions
+ * @param array $variables
+ */
+function strawberryfield_theme_suggestions_page_alter(array &$suggestions, array $variables) {
+  $node = \Drupal::routeMatch()->getParameter('node');
+  $sbf = \Drupal::service('strawberryfield.utility')->bearsStrawberryfield($node);
+  if ($node instanceof \Drupal\node\NodeInterface && $sbf ) {
+    // Use _ for - and __ for -- in filenames
+    // Add general Strawberryfield theme hook
+    $suggestions[] = 'page__node__strawberryfield';
+    // Get the JSON
+    // TODO what if there are more than 1 sbf fields?
+    $sbfJson = Json::decode($node->get($sbf[0])->value);
+    foreach ($sbfJson as $key => $value) {
+      if (starts_with($key, 'as:')) {
+        switch ($key) {
+          case 'as:image':
+            $suggestions[] = 'page__node__strawberryfield__image';
+            break;
+          case 'as:model':
+            $suggestions[] = 'page__node__strawberryfield__3D_model';
+            break;
+          case 'as:video':
+            $suggestions[] = 'page__node__strawberryfield__video';
+            break;
+          case 'as:audio':
+            $suggestions[] = 'page__node__strawberryfield__audio';
+            break;
+          case 'as:application':
+            $suggestions[] = 'page__node__strawberryfield__application';
+            break;
+          case 'as:text':
+            $suggestions[] = 'page__node__strawberryfield__text';
+            break;
+          default:
+            continue;
+        }
+      }
+    }
+  }
+}
