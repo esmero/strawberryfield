@@ -129,8 +129,8 @@ field.widget.settings.strawberry_textarea:
       label: 'Rows'
 field.value.strawberryfield_field:
   type: mapping
-  label: 'Strawberryfield value'
+  label: 'Strawberryfield Value'
   mapping:
     value:
       type: string
-      label: 'Strawvberry Metadata'
+      label: 'Strawberryfield Metadata'
