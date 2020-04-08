@@ -23,7 +23,8 @@ abstract class StrawberryfieldEventPresaveSubscriber implements EventSubscriberI
     // Make sure we have access before everything else here since we want
     // Enrich our JSON before anything runs.
     // @TODO check event priority and adapt to future D9 needs.
-    $events[StrawberryfieldEventType::PRESAVE][] = ['onEntityPresave', self::$priority];
+    // Use late binding. Never use self:: or we will all get -800 in every class.
+    $events[StrawberryfieldEventType::PRESAVE][] = ['onEntityPresave', static::$priority];
     return $events;
   }
 

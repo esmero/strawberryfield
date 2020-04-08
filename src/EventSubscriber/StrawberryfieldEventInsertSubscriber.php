@@ -12,12 +12,17 @@ use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 abstract class StrawberryfieldEventInsertSubscriber implements EventSubscriberInterface {
 
   /**
+   * @var int
+   */
+  protected static $priority = -700;
+
+  /**
    * {@inheritdoc}
    */
   public static function getSubscribedEvents() {
 
     // @TODO check event priority and adapt to future D9 needs.
-    $events[StrawberryfieldEventType::INSERT][] = ['onEntityInsert', 100];
+    $events[StrawberryfieldEventType::INSERT][] = ['onEntityInsert', static::$priority];
     return $events;
   }
 
