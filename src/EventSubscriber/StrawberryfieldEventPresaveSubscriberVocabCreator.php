@@ -19,7 +19,7 @@ class StrawberryfieldEventPresaveSubscriberVocabCreator extends StrawberryfieldE
   /**
    * @var int
    */
-  protected static $priority = -700;
+  protected static $priority = -1000;
 
   /**
    * The messenger.
