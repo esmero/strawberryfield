@@ -69,10 +69,12 @@ class StrawberryfieldEventPresaveSubscriberSetTitlefromMetadata extends Strawber
     $entity = $event->getEntity();
     $sbf_fields = $event->getFields();
     $titleadded = NULL;
+    $originallabel = NULL;
     $forceupdate = TRUE;
     if (!$entity->isNew()) {
       // Check if we had a title, if the new one is different and not empty.
-      if (($entity->original->getTitle() != $entity->label()) && !empty($entity->label())) {
+      $originallabel = $entity->original->getTitle();
+      if (($originallabel != $entity->label()) && !empty($entity->label())) {
         // Means someone manually, via a Title Widget, changed the title
         // If so, enforce that and don't try to overwrite.
         // But, webform widget, if updating title automatically is set, should
@@ -102,6 +104,8 @@ class StrawberryfieldEventPresaveSubscriberSetTitlefromMetadata extends Strawber
             }
             if (strlen(trim($title)) > 0) {
               $title = Unicode::truncate($title,128,TRUE,TRUE, 24);
+              // we could check if originallabel != from the new title
+              // I feel safer assinging and checking only for the status.
               $entity->setTitle($title);
               $titleadded = $title;
               break 2;
@@ -109,7 +113,9 @@ class StrawberryfieldEventPresaveSubscriberSetTitlefromMetadata extends Strawber
           }
         }
       }
-      if ($titleadded) {
+
+      // Only notify the user if the title actually changed.
+      if (($titleadded) && ($originallabel != $titleadded)) {
         $this->messenger->addStatus(
           $this->t(
             'Your New Object title is @title',
