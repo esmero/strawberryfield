@@ -42,6 +42,11 @@ class StrawberryfieldEventDeleteFileUsageDeleter extends StrawberryfieldEventDel
    */
   protected $strawberryfilepersister;
 
+  /**
+   * The logger factory.
+   * @var \Drupal\Core\Logger\LoggerChannelFactoryInterface
+   */
+  protected $loggerFactory;
 
   /**
    * StrawberryfieldEventInsertFileUsageUpdater constructor.
