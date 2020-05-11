@@ -398,6 +398,7 @@ class StrawberryfieldFilePersisterService {
           'dr:for' => $file_source_key,
           'dr:fid' => (int) $file->id(),
           'dr:uuid' => $uuid,
+          'dr:mimetype' => $mime,
           'name' => $file->getFilename(),
           'tags' => [],
         ];
