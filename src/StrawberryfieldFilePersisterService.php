@@ -26,6 +26,9 @@ use Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException;
 use Drupal\Component\Plugin\Exception\PluginNotFoundException;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\strawberryfield\Event\StrawberryfieldJsonProcessEvent;
+use Drupal\Core\StreamWrapper\StreamWrapperInterface;
+use Drupal\Core\Logger\LoggerChannelFactoryInterface;
+use Drupal\Core\Config\ImmutableConfig;
 use Drupal\strawberryfield\StrawberryfieldEventType;
 use Symfony\Component\Process\Exception\ProcessFailedException;
 use Symfony\Component\Process\Process;
@@ -104,6 +107,20 @@ class StrawberryfieldFilePersisterService {
   protected $transliteration;
 
   /**
+   * The SBF configuration settings.
+   *
+   * @var \Drupal\Core\Config\ImmutableConfig
+   */
+  protected $config;
+
+  /**
+   * The logger factory.
+   * @var \Drupal\Core\Logger\LoggerChannelFactoryInterface
+   */
+  protected $loggerFactory;
+
+
+  /**
    * StrawberryfieldFilePersisterService constructor.
    *
    * @param \Drupal\Core\File\FileSystemInterface $file_system
@@ -127,7 +144,8 @@ class StrawberryfieldFilePersisterService {
     AccountInterface $current_user,
     LanguageManagerInterface $language_manager,
     TransliterationInterface $transliteration,
-    ModuleHandlerInterface $module_handler
+    ModuleHandlerInterface $module_handler,
+    LoggerChannelFactoryInterface $logger_factory
   ) {
     $this->fileSystem = $file_system;
     $this->fileUsage = $file_usage;
@@ -138,9 +156,11 @@ class StrawberryfieldFilePersisterService {
     $this->destinationScheme = $config_factory->get(
       'strawberryfield.storage_settings'
     )->get('file_scheme');
+    $this->config = $config_factory->get('strawberryfield.settings');
     $this->languageManager = $language_manager;
     $this->transliteration = $transliteration;
     $this->moduleHandler = $module_handler;
+    $this->loggerFactory = $logger_factory;
   }
 
 
@@ -358,6 +378,7 @@ class StrawberryfieldFilePersisterService {
         // @TODO Fills up the md5 for all files and updates a single node at a time
         // @TODO evaluate Node locking while this happens.
         $md5 = md5_file($uri);
+        $filemetadata = $this->getBaseFileMetadata($file);
         $relativefolder = substr($md5, 0, 3);
         $uuid = $file->uuid();
         // again, i know!
@@ -381,9 +402,11 @@ class StrawberryfieldFilePersisterService {
           'tags' => [],
         ];
 
+        // Add Metadata from exif/fido
+        $fileinfo = array_merge($fileinfo, $filemetadata);
         // Dispatch event with just the $fileinfo for a single file as JSON
         // This is used allow other functions to do things based on the JSON.
-        // IN this case we want 'someone' to count the number of pages e.g
+        // IN this case we want 'someone' to count txhe number of pages e.g
         // If the file is a PDF.
         // @TODO inject event dispatcher and move this to its own method.
         $event_type = StrawberryfieldEventType::JSONPROCESS;
@@ -810,6 +833,143 @@ class StrawberryfieldFilePersisterService {
    */
   public function sortByFileName($a, $b) {
     return strnatcmp($a['name'],$b['name']);
+  }
+
+
+  /**
+   * Gets basic metadata from a File to be put back into a SBF
+   *
+   * Also deals with the fact that it can be local v/s remote.
+   *
+   * @param \Drupal\file\FileInterface $file
+   *
+   * @return array
+   *    Metadata extracted for the image in array format if any
+   */
+  public function getBaseFileMetadata(FileInterface $file) {
+
+    // These are the 2 basic binaries we want eventually be able to run
+    // For each referenced Files
+    // With certain conditions of course
+    // Like:
+    // - How many files? Like 1 is cool, 2000 not cool
+    // - Size? Like moving realtime 'Sync' 2TB back to TEMP to MD5 it not cool
+    $metadata = [];
+
+    $exif_exec_path = $this->config->get(
+      'exif_exec_path'
+    ) ?: '/usr/bin/exiftool';
+    $fido_exec_path = $this->config->get('fido_exec_path') ?: '/usr/bin/fido';
+    $file_size = $file->getSize();
+    $uri = $file->getFileUri();
+
+    /** @var \Drupal\Core\File\FileSystem $file_system */
+    $scheme = $this->streamWrapperManager->getScheme($uri);
+    $templocation = NULL;
+
+    // If the file isn't stored locally make a temporary copy.
+    if (!isset(
+      $this->streamWrapperManager->getWrappers(
+        StreamWrapperInterface::LOCAL
+      )[$scheme]
+    )) {
+      // Local stream.
+      $cache_key = md5($uri);
+      $templocation = $this->fileSystem->copy(
+        $uri,
+        'temporary://sbr_' . $cache_key . '_' . basename($uri),
+        FileSystemInterface::EXISTS_REPLACE
+      );
+      $templocation = \Drupal::service('file_system')->realpath(
+        $templocation
+      );
+    }
+    else {
+      $templocation = \Drupal::service('file_system')->realpath(
+        $file->getFileUri()
+      );
+    }
+
+    if (!$templocation) {
+      $this->loggerFactory->get('strawberryfield')->warning(
+        'Could not adquire a local accesible location for metadata extraction for file with URL @fileurl',
+        [
+          '@fileurl' => $file->getFileUri(),
+        ]
+      );
+      return $metadata;
+    }
+
+
+    if ($templocation) {
+      // @TODO MOVE CHECKSUM here
+      $output_exif = '';
+      $output_fido = '';
+      $result_exif = exec(
+        $exif_exec_path . ' -json -q ' . escapeshellcmd($templocation),
+        $output_exif,
+        $status_exif
+      );
+
+      $result_fido = exec(
+        $fido_exec_path . ' ' . escapeshellcmd($templocation),
+        $output_fido,
+        $status_fido
+      );
+
+      // First EXIF
+      if ($status_exif != 0) {
+        // Means exiftool did not work
+        $this->loggerFactory->get('strawberryfield')->warning(
+          'Could not process EXIF on @temlocation for @fileurl',
+          [
+            '@fileurl' => $file->getFileUri(),
+            '@templocation' => $templocation,
+          ]
+        );
+      }
+      else {
+        // JSON-ify EXIF data
+        // remove RW Properties?
+        $output_exif = implode('', $output_exif);
+        $exif_full = json_decode($output_exif, TRUE);
+        $json_error = json_last_error();
+        if ($json_error == JSON_ERROR_NONE && isset($exif_full[0])) {
+          $exif = $exif_full[0];
+          unset($exif['FileName']);
+          unset($exif['SourceFile']);
+          unset($exif['Directory']);
+          unset($exif['FilePermissions']);
+          unset($exif['ThumbnailImage']);
+          $metadata['flv:exif'] = $exif;
+        }
+      }
+      // Second FIDO
+      if ($status_fido != 0) {
+        // Means Fido did not work
+        $this->loggerFactory->get('strawberryfield')->warning(
+          'Could not process FIDO on @temlocation for @fileurl',
+          [
+            '@fileurl' => $file->getFileUri(),
+            '@templocation' => $templocation,
+          ]
+        );
+      }
+      else {
+        // JSON-ify EXIF data
+        // remove RW Properties?
+        $output_fido = explode(',', str_replace('"', '', $result_fido));
+        if (count($output_fido) && $output_fido[0] == 'OK') {
+          // Means FIDO could do its JOB
+          $pronom['pronom_id'] = isset($output_fido[2]) ? 'info:pronom/' . $output_fido[2] : NULL;
+          $pronom['label'] = $output_fido[3] ?: NULL;
+          $pronom['mimetype'] = $output_fido[7] ?: NULL;
+          $pronom['detection_type'] = $output_fido[8] ?: NULL;
+          $metadata['flv:pronom'] = $pronom;
+        }
+      }
+    }
+    return $metadata;
   }
 
 }
