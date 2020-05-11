@@ -51,6 +51,11 @@ class StrawberryfieldEventInsertSubscriberDepositDO extends StrawberryfieldEvent
    */
   protected $strawberryfilepersister;
 
+  /**
+   * The logger factory.
+   * @var \Drupal\Core\Logger\LoggerChannelFactoryInterface
+   */
+  protected $loggerFactory;
 
   /**
    * StrawberryfieldEventInsertSubscriberDepositDO constructor.

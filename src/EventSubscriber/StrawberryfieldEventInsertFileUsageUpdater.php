@@ -36,6 +36,12 @@ class StrawberryfieldEventInsertFileUsageUpdater extends StrawberryfieldEventIns
   protected $serializer;
 
   /**
+   * The logger factory.
+   * @var \Drupal\Core\Logger\LoggerChannelFactoryInterface
+   */
+  protected $loggerFactory;
+
+  /**
    * The Strawberryfield File Persister Service
    *
    *  @var \Drupal\strawberryfield\StrawberryfieldFilePersisterService
