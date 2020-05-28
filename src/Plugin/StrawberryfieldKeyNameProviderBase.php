@@ -22,6 +22,7 @@ use Drupal\Core\Field\FieldDefinitionInterface;
 use GuzzleHttp\Client;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Drupal\Core\Plugin\PluginWithFormsTrait;
+use Drupal\Core\Messenger\MessengerInterface;
 
 
 abstract class StrawberryfieldKeyNameProviderBase extends PluginBase implements KeyNameProviderPluginInterface, ContainerFactoryPluginInterface {
@@ -51,6 +52,14 @@ abstract class StrawberryfieldKeyNameProviderBase extends PluginBase implements 
    */
   protected $entityTypeBundleInfo;
 
+  /**
+   * The messenger.
+   *
+   * @var \Drupal\Core\Messenger\MessengerInterface
+   */
+  protected $messenger;
+
+
   public function __construct(
     array $configuration,
     string $plugin_id,
@@ -59,7 +68,9 @@ abstract class StrawberryfieldKeyNameProviderBase extends PluginBase implements 
     EntityTypeBundleInfoInterface $entityTypeBundleInfo,
     FieldTypePluginManager $fieldTypePluginManager,
     EntityFieldManagerInterface $entityFieldManager,
-    Client $httpClient
+    Client $httpClient,
+    MessengerInterface $messenger
+
   ) {
     parent::__construct($configuration, $plugin_id, $plugin_definition);
     $this->entityTypeBundleInfo = $entityTypeBundleInfo;
@@ -68,6 +79,8 @@ abstract class StrawberryfieldKeyNameProviderBase extends PluginBase implements 
     $this->entityFieldManager = $entityFieldManager;
     $this->setConfiguration($configuration);
     $this->httpClient = $httpClient;
+    $this->messenger = $messenger;
+
   }
 
   public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
@@ -80,7 +93,9 @@ abstract class StrawberryfieldKeyNameProviderBase extends PluginBase implements 
       $container->get('entity_type.bundle.info'),
       $container->get('plugin.manager.field.field_type'),
       $container->get('entity_field.manager'),
-      $container->get('http_client')
+      $container->get('http_client'),
+      $container->get('messenger')
+
     );
   }
 
