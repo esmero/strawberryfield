@@ -39,6 +39,13 @@ class StrawberryfieldEventPresaveSubscriberSetTitlefromMetadata extends Strawber
   protected $destinationScheme = NULL;
 
   /**
+   * The logger factory.
+   * @var \Drupal\Core\Logger\LoggerChannelFactoryInterface
+   */
+  protected $loggerFactory;
+
+
+  /**
    * StrawberryfieldEventPresaveSubscriberFilePersister constructor.
    *
    * @param \Drupal\Core\StringTranslation\TranslationInterface $string_translation
@@ -59,20 +66,18 @@ class StrawberryfieldEventPresaveSubscriberSetTitlefromMetadata extends Strawber
 
   /**
    * @param \Drupal\strawberryfield\Event\StrawberryfieldCrudEvent $event
-   *
-   * @throws \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException
-   * @throws \Drupal\Component\Plugin\Exception\PluginNotFoundException
    */
   public function onEntityPresave(StrawberryfieldCrudEvent $event) {
 
-    /* @var $entity \Drupal\Core\Entity\ContentEntityBase */
+    /* @var $entity \Drupal\node\Entity\Node */
     $entity = $event->getEntity();
     $sbf_fields = $event->getFields();
-    $titleadded = NULL;
+    $originallabel = NULL;
     $forceupdate = TRUE;
     if (!$entity->isNew()) {
       // Check if we had a title, if the new one is different and not empty.
-      if (($entity->original->getTitle() != $entity->label()) && !empty($entity->label())) {
+      $originallabel = $entity->original->getTitle();
+      if (($originallabel != $entity->label()) && !empty($entity->label())) {
         // Means someone manually, via a Title Widget, changed the title
         // If so, enforce that and don't try to overwrite.
         // But, webform widget, if updating title automatically is set, should
@@ -92,6 +97,7 @@ class StrawberryfieldEventPresaveSubscriberSetTitlefromMetadata extends Strawber
         // This will try with any possible match.
         foreach ($field->getIterator() as $delta => $itemfield) {
           $flat = $itemfield->provideFlatten();
+          // @TODO Should we allow which JSON key sets the label a setting?
           if (isset($flat['label'])) {
             // Flattener should always give me an array?
             if (is_array($flat['label'])) {
@@ -101,34 +107,28 @@ class StrawberryfieldEventPresaveSubscriberSetTitlefromMetadata extends Strawber
               $title = $flat['label'];
             }
             if (strlen(trim($title)) > 0) {
-              $title = Unicode::truncate($title,128,TRUE,TRUE, 24);
+              $title = Unicode::truncate($title, 128, TRUE, TRUE, 24);
+              // we could check if originallabel != from the new title
+              // I feel safer assinging and checking only for the status.
               $entity->setTitle($title);
-              $titleadded = $title;
               break 2;
             }
           }
         }
       }
-      if ($titleadded) {
-        $this->messenger->addStatus(
-          $this->t(
-            'Your New Object title is @title',
-            ['@title' => $titleadded ]
-          )
+
+      // If at this stage we have no entity label, but maybe its just not in our metadata,
+      // or someone forget to set a label key.
+      if (!$entity->label()) {
+        // Means we need a title, got nothing from metadata or node, dealing with it.
+        $title = $this->t(
+          'No New Untitled Archipelago Digital Object by @author',
+          ['@author' => $entity->getOwner()->getDisplayName()]
         );
-      } else {
-        // But maybe its just not in our metadata or someone forget to set a label key. Don't try to add it if so
-        if (!$entity->label()) {
-          // Means we need a title, got nothing from metadata or node, dealing with it.
-          $title = $this->t(
-            'New Untitled Archipelago Digital Object by @author',
-            ['@author' => $entity->getOwner()->getDisplayName()]
-          );
-          $entity->setTitle($title);
-        }
+        $entity->setTitle($title);
       }
-      $current_class = get_called_class();
-      $event->setProcessedBy($current_class, TRUE);
     }
+    $current_class = get_called_class();
+    $event->setProcessedBy($current_class, TRUE);
   }
 }
