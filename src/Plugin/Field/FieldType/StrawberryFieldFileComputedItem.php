@@ -11,6 +11,8 @@ use Drupal\Core\Field\Plugin\Field\FieldType\EntityReferenceItem;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\StreamWrapper\StreamWrapperInterface;
 use Drupal\Core\TypedData\DataDefinition;
+use Drupal\Core\Render\BubbleableMetadata;
+use Drupal\Core\File\FileSystemInterface;
 
 /**
  * Plugin implementation of a virtual 'file' field type.
@@ -143,7 +145,9 @@ class StrawberryFieldFileComputedItem extends EntityReferenceItem {
 
     // Replace tokens. As the tokens might contain HTML we convert it to plain
     // text.
-    $destination = PlainTextOutput::renderFromHtml(\Drupal::token()->replace($destination, $data));
+    $metadata = new BubbleableMetadata();
+    // Just in case we hit the ugly leaked cacheable render metadata problem.
+    $destination = PlainTextOutput::renderFromHtml(\Drupal::token()->replace($destination, $data, $metadata));
     return $settings['uri_scheme'] . '://' . $destination;
   }
 
@@ -159,7 +163,7 @@ class StrawberryFieldFileComputedItem extends EntityReferenceItem {
     $settings = $this->getSettings();
 
     // Cap the upload size according to the PHP limit.
-    $max_filesize = Bytes::toInt(file_upload_max_size());
+    $max_filesize = Bytes::toInt(\Drupal\Component\Utility\Environment::getUploadMaxSize());
     if (!empty($settings['max_filesize'])) {
       $max_filesize = min($max_filesize, Bytes::toInt($settings['max_filesize']));
     }
@@ -184,12 +188,12 @@ class StrawberryFieldFileComputedItem extends EntityReferenceItem {
 
     // Prepare destination.
     $dirname = static::doGetUploadLocation($settings);
-    file_prepare_directory($dirname, FILE_CREATE_DIRECTORY);
+    \Drupal::service('file_system')->prepareDirectory($dirname, FileSystemInterface::CREATE_DIRECTORY);
 
     // Generate a file entity.
     $destination = $dirname . '/' . $random->name(10, TRUE) . '.txt';
     $data = $random->paragraphs(3);
-    $file = file_save_data($data, $destination, FILE_EXISTS_ERROR);
+    $file = file_save_data($data, $destination,  FileSystemInterface::EXISTS_ERROR);
     $values = [
       'target_id' => $file->id(),
       'display' => (int) $settings['display_default'],
