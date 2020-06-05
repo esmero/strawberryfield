@@ -2,10 +2,9 @@ services:
   strawberryfield.utility:
     class: Drupal\strawberryfield\StrawberryfieldUtilityService
     arguments: [ '@file_system', '@entity_type.manager', '@config.factory','@module_handler', '@entity_field.manager']
-
   strawberryfield.file_persister:
     class: Drupal\strawberryfield\StrawberryfieldFilePersisterService
-    arguments: [ '@file_system', '@file.usage', '@entity_type.manager', '@stream_wrapper_manager', '@plugin.manager.archiver', '@config.factory','@current_user','@language_manager','@transliteration','@module_handler', '@logger.factory']
+    arguments: [ '@file_system', '@file.usage', '@entity_type.manager', '@stream_wrapper_manager', '@plugin.manager.archiver', '@config.factory','@current_user','@language_manager','@transliteration','@module_handler', '@logger.factory','@strawberryfield.utility']
     tags:
       - { name: backend_overridable }
   strawberryfield.keyname_manager:
