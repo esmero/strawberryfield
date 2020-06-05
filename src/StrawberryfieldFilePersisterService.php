@@ -28,6 +28,7 @@ use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\strawberryfield\Event\StrawberryfieldJsonProcessEvent;
 use Drupal\Core\StreamWrapper\StreamWrapperInterface;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
+use Drupal\strawberryfield\StrawberryfieldUtilityService;
 use Drupal\Core\Config\ImmutableConfig;
 use Drupal\strawberryfield\StrawberryfieldEventType;
 use Symfony\Component\Process\Exception\ProcessFailedException;
@@ -115,10 +116,24 @@ class StrawberryfieldFilePersisterService {
 
   /**
    * The logger factory.
+   *
    * @var \Drupal\Core\Logger\LoggerChannelFactoryInterface
    */
   protected $loggerFactory;
 
+  /**
+   * The Strawberry Field Utility Service.
+   *
+   * @var \Drupal\strawberryfield\StrawberryfieldUtilityService
+   */
+  protected $strawberryfieldUtility;
+
+  /**
+   * If getBaseFileMetadata should be processed
+   *
+   * @var bool
+   */
+  protected $extractFileMetadata = FALSE;
 
   /**
    * StrawberryfieldFilePersisterService constructor.
@@ -133,6 +148,7 @@ class StrawberryfieldFilePersisterService {
    * @param \Drupal\Core\Language\LanguageManagerInterface $language_manager
    * @param \Drupal\Component\Transliteration\TransliterationInterface $transliteration
    * @param \Drupal\Core\Extension\ModuleHandlerInterface $module_handler
+   * @param StrawberryfieldUtilityService $strawberryfield_utility_service,
    */
   public function __construct(
     FileSystemInterface $file_system,
@@ -145,7 +161,8 @@ class StrawberryfieldFilePersisterService {
     LanguageManagerInterface $language_manager,
     TransliterationInterface $transliteration,
     ModuleHandlerInterface $module_handler,
-    LoggerChannelFactoryInterface $logger_factory
+    LoggerChannelFactoryInterface $logger_factory,
+    StrawberryfieldUtilityService $strawberryfield_utility_service
   ) {
     $this->fileSystem = $file_system;
     $this->fileUsage = $file_usage;
@@ -156,11 +173,31 @@ class StrawberryfieldFilePersisterService {
     $this->destinationScheme = $config_factory->get(
       'strawberryfield.storage_settings'
     )->get('file_scheme');
-    $this->config = $config_factory->get('strawberryfield.settings');
+    $this->config = $config_factory->get('strawberryfield.filepersister_service_settings');
     $this->languageManager = $language_manager;
     $this->transliteration = $transliteration;
     $this->moduleHandler = $module_handler;
     $this->loggerFactory = $logger_factory;
+    $this->strawberryfieldUtility = $strawberryfield_utility_service;
+    // This will verify once per injection of the service, not every time
+    if ((boolean) $this->config->get('extractmetadata')) {
+      $canrun_exif = $this->strawberryfieldUtility->verifyCommand(
+        $this->config->get('exif_exec_path')
+      );
+      $canrun_fido = $this->strawberryfieldUtility->verifyCommand(
+        $this->config->get('fido_exec_path')
+      );
+      if ($canrun_exif || $canrun_fido) {
+        $this->extractFileMetadata = TRUE;
+      }
+      else {
+        // This will be moved to runners anyway so won't work it too
+        // much more.
+        $this->loggerFactory->get('strawberryfield')->warning(
+          'File Metadata Extraction is enabled on ingest via Strawberryfield but neither EXIF or FIDO paths are correct executables. Please correct of disable.'
+        );
+      }
+    }
   }
 
 
@@ -854,14 +891,28 @@ class StrawberryfieldFilePersisterService {
     // With certain conditions of course
     // Like:
     // - How many files? Like 1 is cool, 2000 not cool
-    // - Size? Like moving realtime 'Sync' 2TB back to TEMP to MD5 it not cool
+    // - Size? Like moving realtime 'Sync' 2TB back to TEMP to MD5-it not cool
     $metadata = [];
+    // Check if we should even run the file id service
+    // Reasons why we can not are:
+    // - Wrong path settings.
+    // - Disabled.
+    // Should we notify the user if processing is enabled and binaries can not
+    // be found? and or can not run?
 
-    $exif_exec_path = $this->config->get(
-      'exif_exec_path'
-    ) ?: '/usr/bin/exiftool';
-    $fido_exec_path = $this->config->get('fido_exec_path') ?: '/usr/bin/fido';
-    $file_size = $file->getSize();
+    if (!$this->extractFileMetadata) {
+      // early return if not allowed.
+      return $metadata;
+    }
+    // I'm assuming binaries exists and are there.
+    // Should we check everytime?
+    // Or just when saving via the form?
+
+    $exif_exec_path = trim($this->config->get(
+      'exif_exec_path'));
+    $fido_exec_path = trim($this->config->get('fido_exec_path'));
+
+
     $uri = $file->getFileUri();
 
     /** @var \Drupal\Core\File\FileSystem $file_system */
@@ -876,17 +927,24 @@ class StrawberryfieldFilePersisterService {
     )) {
       // Local stream.
       $cache_key = md5($uri);
-      $templocation = $this->fileSystem->copy(
-        $uri,
-        'temporary://sbr_' . $cache_key . '_' . basename($uri),
-        FileSystemInterface::EXISTS_REPLACE
-      );
-      $templocation = \Drupal::service('file_system')->realpath(
-        $templocation
-      );
+      // Check first if the file is already around in temp?
+      // @TODO can be sure its the same one? Ideas?
+      if (is_readable($this->fileSystem->realpath('temporary://sbr_' . $cache_key . '_' . basename($uri)))) {
+        $templocation = $this->fileSystem->realpath('temporary://sbr_' . $cache_key . '_' . basename($uri));
+      }
+      else {
+        $templocation = $this->fileSystem->copy(
+          $uri,
+          'temporary://sbr_' . $cache_key . '_' . basename($uri),
+          FileSystemInterface::EXISTS_REPLACE
+        );
+        $templocation = $this->fileSystem->realpath(
+          $templocation
+        );
+      }
     }
     else {
-      $templocation = \Drupal::service('file_system')->realpath(
+      $templocation = $this->fileSystem->realpath(
         $file->getFileUri()
       );
     }
@@ -922,7 +980,7 @@ class StrawberryfieldFilePersisterService {
       if ($status_exif != 0) {
         // Means exiftool did not work
         $this->loggerFactory->get('strawberryfield')->warning(
-          'Could not process EXIF on @temlocation for @fileurl',
+          'Could not process EXIF on @templocation for @fileurl',
           [
             '@fileurl' => $file->getFileUri(),
             '@templocation' => $templocation,
@@ -949,7 +1007,7 @@ class StrawberryfieldFilePersisterService {
       if ($status_fido != 0) {
         // Means Fido did not work
         $this->loggerFactory->get('strawberryfield')->warning(
-          'Could not process FIDO on @temlocation for @fileurl',
+          'Could not process FIDO on @templocation for @fileurl',
           [
             '@fileurl' => $file->getFileUri(),
             '@templocation' => $templocation,
