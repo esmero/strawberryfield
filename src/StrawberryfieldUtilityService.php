@@ -181,4 +181,23 @@ class StrawberryfieldUtilityService {
     
     return $sbf_solr_fields;
   }
+
+  /**
+   * Checks if a given command exists and is executable.
+   *
+   * @param $command
+   *
+   * @return bool
+   */
+  public function verifyCommand($execpath) :bool {
+    $iswindows = strpos(PHP_OS, 'WIN') === 0;
+    $canexecute = FALSE;
+    $execpath = trim(escapeshellcmd($execpath));
+    $test = $iswindows ? 'where' : 'command -v';
+    $output = shell_exec("$test $execpath");
+    if ($output) {
+      $canexecute = is_executable($execpath);
+    }
+    return $canexecute;
+  }
 }
