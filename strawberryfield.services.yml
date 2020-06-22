@@ -20,6 +20,11 @@ services:
     tags:
       - {name: event_subscriber}
     arguments: ['@string_translation', '@messenger']
+  strawberryfield.presave_as_filestructure_subscriber:
+      class: Drupal\strawberryfield\EventSubscriber\StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator
+      tags:
+        - {name: event_subscriber}
+      arguments: ['@string_translation', '@messenger','@logger.factory','@strawberryfield.file_persister']
   strawberryfield.presavefilepersister_subscriber:
     class: Drupal\strawberryfield\EventSubscriber\StrawberryfieldEventPresaveSubscriberFilePersister
     tags:
