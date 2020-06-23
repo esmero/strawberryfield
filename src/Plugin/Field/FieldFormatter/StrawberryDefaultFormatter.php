@@ -10,6 +10,9 @@ namespace Drupal\strawberryfield\Plugin\Field\FieldFormatter;
 
 use Drupal\Core\Field\FormatterBase;
 use Drupal\Core\Field\FieldItemListInterface;
+use Drupal\Core\Session\AccountInterface;
+use Drupal\user\EntityOwnerInterface;
+use Drupal\Core\Entity\ContentEntityBase;
 
 /**
  * Simplistic Strawberry Field formatter.
@@ -51,11 +54,32 @@ class StrawberryDefaultFormatter extends FormatterBase {
    */
   public function viewElements(FieldItemListInterface $items, $langcode) {
     $element = [];
-    $entity = $items->getEntity();
-    $access = $entity
-      ->access('edit', NULL, TRUE)->isAllowed();
+    $account = $this->prepareUser();
 
-    if ($access) {
+    // Only enforce owner permissions here if the entity has an owner
+    $entity = $items->getEntity();
+    $access = FALSE;
+
+    //@TODO make this its own Method and reuse in every Formatter.
+    if ($entity instanceof EntityOwnerInterface) {
+      /* @var ContentEntityBase $entity */
+      // Check if the entity can have an owner?
+
+      if (($account->id() == $entity->getOwner()->id()) &&
+        $account->hasPermission('view own Raw Strawberryfield')) {
+        $access = TRUE;
+      }
+      elseif ($account->hasPermission('view any Raw Strawberryfield')) {
+        $access = TRUE;
+      }
+    }
+    else {
+      // Users with Edit access can always see this?
+      $access = $entity
+        ->access('edit', NULL, TRUE)->isAllowed();
+    }
+
+    if ($access || $account->hasPermission('bypass node access')) {
       foreach ($items as $delta => $item) {
         // Render each element as markup.
         $element[$delta] = [
@@ -69,11 +93,27 @@ class StrawberryDefaultFormatter extends FormatterBase {
             ),
             '#prefix' => '<pre>',
             '#suffix' => '</pre>',
-          ]
+          ],
         ];
       }
     }
     return $element;
+  }
+
+  /**
+  * Loads the current account object, if it does not exist yet.
+  *
+  * @param \Drupal\Core\Session\AccountInterface $account
+  *   The account interface instance.
+  *
+  * @return \Drupal\Core\Session\AccountInterface
+  *   Returns the current account object.
+  */
+  protected function prepareUser(AccountInterface $account = NULL) {
+    if (!$account) {
+      $account = \Drupal::currentUser();
+    }
+    return $account;
   }
 
 
