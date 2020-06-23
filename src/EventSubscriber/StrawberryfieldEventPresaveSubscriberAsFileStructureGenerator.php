@@ -189,8 +189,8 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
       $this->messenger->addStatus(
         $this->stringTranslation->formatPlural(
           $newlyprocessed,
-          'Very good. New file metadata structured created.',
-          'Great! @count new files metadata structured created.'
+          'Very good. New file metadata structure created.',
+          'Great! @count new files metadata structures created.'
         )
       );
     }

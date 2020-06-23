@@ -25,12 +25,38 @@ use Drupal\Core\Field\FieldItemListInterface;
  */
 function strawberryfield_node_presave(ContentEntityInterface $entity) {
 
+
   if ($sbf_fields = \Drupal::service('strawberryfield.utility')->bearsStrawberryfield($entity)) {
+    $config = \Drupal::config('strawberryfield.general');
+    $bench = FALSE;
+    // When benchmark is enabled a simple but effective report will be found in the reports/logs
+    if ($config->get('benchmark')) {
+      $bench = TRUE;
+    }
+    // Introducing our newest development, the processing time stats!
+    $start_time = microtime(true);
+
     $event_type = StrawberryfieldEventType::PRESAVE;
     $event = new StrawberryfieldCrudEvent($event_type, $entity, $sbf_fields);
     /** @var \Symfony\Component\EventDispatcher\EventDispatcher $dispatcher */
     $dispatcher = \Drupal::service('event_dispatcher');
     $dispatcher->dispatch($event_type, $event);
+
+    if ($bench) {
+      $end_time = microtime(TRUE);
+      $time = bcsub($end_time, $start_time, 4);
+      $max_memory = memory_get_peak_usage(TRUE);
+      \Drupal::logger('strawberryfield')->notice(
+        'ADO with UUID @uuid spend @time ms on all presave event subscriber processing and max memory usage was @maxmem. Event Subscribers that run where the following <br> @events',
+        [
+          '@uuid' => $entity->uuid(),
+          '@time' => $time,
+          '@maxmem' => \Drupal::service('strawberryfield.utility')->formatBytes($max_memory, 2),
+          '@events' => print_r($event->getProcessedBy(), TRUE),
+        ]
+      );
+    }
+
   }
 
 }

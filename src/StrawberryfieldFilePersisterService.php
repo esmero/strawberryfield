@@ -528,7 +528,6 @@ class StrawberryfieldFilePersisterService {
         $found['urn:uuid:' . $info['dr:uuid']] = $info;
       }
     }
-    dpm(count($found));
     return $found;
   }
 

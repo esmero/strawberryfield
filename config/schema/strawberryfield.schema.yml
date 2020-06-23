@@ -148,3 +148,11 @@ strawberryfield.filepersister_service_settings:
     fido_exec_path:
       type: string
       label: 'FIDO binary full executable path'
+
+strawberryfield.general:
+  type: config_object
+  label: General SBF Module settings
+  mapping:
+    benchmark:
+      type: boolean
+      label: Benchmark time and memory usage of Event Subscribers
