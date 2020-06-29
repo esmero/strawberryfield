@@ -297,7 +297,7 @@ JSON;
     // Build the POST URI for the request
     $base_url = $this->input()->getOption('uri');
     //$filename = basename();
-    $this->output()->writeln('BASE URL is  ' . $base_url . '!');
+    $this->output()->writeln('BASE URL is  ' . $base_url . '!\n');
     $fileurlpost = $base_url . '/jsonapi/node/' . $bundle . '/field_file_drop';
     $nodeurlpost = $base_url . '/jsonapi/node/' . $bundle;
 
@@ -315,14 +315,17 @@ JSON;
             'min_depth' => 0,
           ]
         );
+        if (count($files) ) {
+          $this->output()->writeln(dt('Files in provided location'));
+        }
         foreach ($files as $file) {
           //@TODO list files here?
-          error_log(var_export($file, TRUE));
+          $this->output()->writeln($file->filename);
         }
 
       }
       else {
-
+        $this->output()->writeln(dt('No files provided'));
 
       }
     }
@@ -332,10 +335,10 @@ JSON;
 
     // We could use Guzzle and stuff, but to be honest we just need to call CURL.
 
-    // This will also allow us to do some crazy stuff like allowing partial JSONS
+    // This will also allow us to do some crazy stuff like allowing partial JSONs
     // SBF only pushes and also check for validity
     // In the end all this will serve as wrap around for the AMI UI processing
-    // Module.
+    // module.
 
     $json_data = @file_get_contents($jsonfilepath);
 
@@ -355,7 +358,7 @@ JSON;
           $schema->in((Object) $data);
         } catch (JsonSchemaException $exception) {
           throw new \Exception(
-            dt('The provided JSON is not a valid JSON API payload')
+            dt('The provided JSON is not a valid JSON API payload. Suspending the ingest')
           );
         }
       }
@@ -421,7 +424,6 @@ JSON;
           $this->output()->writeln($args);
           $process = Drush::process(implode(' ', $args));
           $process->mustRun();
-          error_log($process->getExitCode());
           if ($process->getExitCode() == 0) {
             error_log(var_export($process->getOutput(), TRUE));
             $response = json_decode($process->getOutput(),true);
@@ -465,7 +467,7 @@ JSON;
           }
           else {
             $this->output()->writeln($process->getExitCodeText());
-            throw new \Exception(dt('We failed to upload the file'));
+            throw new \Exception(dt('We failed to upload the file. Suspending the ingest'));
           }
         }
       }
@@ -482,8 +484,16 @@ JSON;
       ];
 
       if ($options['moderation_state']) {
-        // @TODO Should we validate possible moderation states?
-        $data_body['data']['attributes']['moderation_state'] =  $options['moderation_state'];
+        // Check if the bundle has actually the field.
+        $all_bundle_fields = \Drupal::service('entity_field.manager')->getFieldDefinitions('node', $bundle);
+        if (isset($all_bundle_fields['moderation_state'])) {
+          $data_body['data']['attributes']['moderation_state'] = $options['moderation_state'];
+        }
+        else {
+          $this->output()->writeln(dt('Bundle @bundle is not moderated so skipping moderation state', [
+            '@bundle' => $bundle
+          ]));
+        }
       }
 
       $curl_body = json_encode($data_body);
