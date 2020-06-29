@@ -204,7 +204,7 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
    *     "videos",
    *     "models"
    *     ],
-   *   "entity:node": [
+   *   "entity:node": {[
    *     "ismemberof"
    *   }
    *
