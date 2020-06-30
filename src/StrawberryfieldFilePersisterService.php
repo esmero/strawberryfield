@@ -360,7 +360,7 @@ class StrawberryfieldFilePersisterService {
     // @TODO: should we alert the user in case the list of ids does not yield in
     // the same amount of files loaded?
 
-    
+
     // Will contain all as:something and its members based on referenced file ids
     $fileinfo_bytype_many = [];
     // Will contain temporary classification
@@ -423,9 +423,10 @@ class StrawberryfieldFilePersisterService {
     // Final iteration
     // Only do this if file was not previously processed and stored.
     foreach ($to_process as $askey => $files) {
+      $newforsorting = FALSE;
       foreach ($files as $file) {
         $uri = $file->getFileUri();
-        error_log('processing' . $uri);
+
         // This can get heavy.
         // @TODO make md5 a queue worker task.
         // @TODO build two queues. Top one that calls all subqueues and then
@@ -479,6 +480,7 @@ class StrawberryfieldFilePersisterService {
         //The node save hook will deal with moving data.
         // We don't need the key here but makes cleaning easier
         $fileinfo_bytype_many['as:' . $askey]['urn:uuid:' . $uuid] = $fileinfo;
+        $newforsorting = TRUE;
         // Side effect of this is that if the same file id is referenced twice
         // by different fields, as:something will contain it once only.
         // Not bad, just saying.
@@ -487,15 +489,46 @@ class StrawberryfieldFilePersisterService {
       }
       // Natural Order Sort.
       // @TODO how should we deal with manually ordered files?
-      // This will always reorder everything based on filenames.
+      // This will always reorder everything based on filenames only if the original order is still that one
+      // So, here is how things go:
+      // We sort anyway, faster than dividing and thingking too much.
+      // But, we assign new sequence only to newer ones. So never (for now) to existing ones
+      // with one exception. If the sequence matches the new order, which basically means
+      // we are good.
+
       uasort($fileinfo_bytype_many['as:' . $askey], array($this,'sortByFileName'));
+      $max_sequence = 0;
+      // Let's get the max sequence first.
+      $max_sequence = array_reduce($fileinfo_bytype_many['as:' . $askey], function($a, $b) {
+       if (isset($b['sequence'])) {
+         return max($a, (int) $b['sequence']);
+          } else {
+         return $a;
+       }
+      }, 1);
+
       // For each always wins over array_walk
       $i=0;
+      $j=0;
       foreach ($fileinfo_bytype_many['as:' . $askey] as &$item) {
         $i++;
        //Order is already given by uasort but not trustable in JSON
-       //So we set sequence number
-        $item['sequence'] = $i;
+       //So we set sequence number but let's check first what we got
+        if (isset($item['sequence'])) {
+          if ($item['sequence'] != $i) {
+            // means this was ordered manually. Preserve this.
+            // @TODO program some exception?
+          } else {
+            // Means new order matches expected order
+            // @TODO means we can simply avoid the offset totally
+          }
+        } else {
+          // Why $j and no $i? Because i want to only count ones without a sequence
+          $j++;
+          // Why -1? Because we want to offset new sequence elements
+          $item['sequence'] =  $j +  ($max_sequence);
+        }
+
       }
 
 
