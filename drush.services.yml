@@ -1,0 +1,5 @@
+services:
+  strawberryfield.commands:
+    class: Drupal\strawberryfield\Commands\JsonApiDrushCommands
+    tags:
+       - { name: drush.command }

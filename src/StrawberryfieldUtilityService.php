@@ -126,7 +126,7 @@ class StrawberryfieldUtilityService {
       return $this->strawberryfieldMachineNames;
     }
     $node_field_definitions = $this->entityFieldManager->getFieldStorageDefinitions('node');
-    $sbf_field_names = array();
+    $sbf_field_names = [];
     foreach ($node_field_definitions as $field_definition) {
       if ($field_definition->getType() === "strawberryfield_field") {
         $sbf_field_names[] = $field_definition->getName();
@@ -134,6 +134,18 @@ class StrawberryfieldUtilityService {
     }
     
     return $sbf_field_names;
+  }
+
+  /**
+   * Given a Bundle returns the SBF field machine names
+   *
+   * @return array
+   *  Returns array of SBF names
+   */
+  public function getStrawberryfieldMachineForBundle($bundle = 'digital_object') {
+    $all_bundled_fields = $this->entityFieldManager->getFieldDefinitions('node', $bundle);
+    $all_sbf_fields = $this->getStrawberryfieldMachineNames();
+    return array_intersect(array_keys($all_bundled_fields), $all_sbf_fields );
   }
 
   /**
@@ -169,4 +181,42 @@ class StrawberryfieldUtilityService {
     
     return $sbf_solr_fields;
   }
+
+  /**
+   * Checks if a given command exists and is executable.
+   *
+   * @param $command
+   *
+   * @return bool
+   */
+  public function verifyCommand($execpath) :bool {
+    $iswindows = strpos(PHP_OS, 'WIN') === 0;
+    $canexecute = FALSE;
+    $execpath = trim(escapeshellcmd($execpath));
+    $test = $iswindows ? 'where' : 'command -v';
+    $output = shell_exec("$test $execpath");
+    if ($output) {
+      $canexecute = is_executable($execpath);
+    }
+    return $canexecute;
+  }
+
+  /**
+   * Format a quantity of bytes.
+   *
+   * @param int $size
+   * @param int $precision
+   *
+   * @return string
+   */
+  public function formatBytes($size, $precision = 2)
+  {
+    if ($size === 0) {
+      return 0;
+    }
+    $base = log($size, 1024);
+    $suffixes = array('', 'k', 'M', 'G', 'T');
+    return round(pow(1024, $base - floor($base)), $precision) . $suffixes[floor($base)];
+  }
+
 }

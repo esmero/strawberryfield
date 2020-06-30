@@ -134,3 +134,25 @@ field.value.strawberryfield_field:
     value:
       type: string
       label: 'Strawberryfield Metadata'
+
+strawberryfield.filepersister_service_settings:
+  type: config_object
+  label: 'Archipelago IIIF Server configurations'
+  mapping:
+    extractmetadata:
+      type: boolean
+      label: 'Whether to run (TRUE) or to skip (FALSE) file identification directly on file persistence.'
+    exif_exec_path:
+      type: string
+      label: 'Exifinfo binary full executable path'
+    fido_exec_path:
+      type: string
+      label: 'FIDO binary full executable path'
+
+strawberryfield.general:
+  type: config_object
+  label: General SBF Module settings
+  mapping:
+    benchmark:
+      type: boolean
+      label: Benchmark time and memory usage of Event Subscribers

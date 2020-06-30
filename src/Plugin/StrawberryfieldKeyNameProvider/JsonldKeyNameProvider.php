@@ -219,7 +219,8 @@ class JsonldKeyNameProvider extends StrawberryfieldKeyNameProviderBase {
       $filterURL = $this->getConfiguration()['filterurl'];
 
       // We won't filter things out there, ::extractKeys will deal with that.
-      $filterData = $this->getRemoteJsonData($filterURL);
+      $filderdatapre = $this->getRemoteJsonData($filterURL);
+      $filterData = $filderdatapre ? $filderdatapre : [];
 
       $keys = $this->extractKeys($maindata, $filterData);
 
@@ -261,7 +262,7 @@ class JsonldKeyNameProvider extends StrawberryfieldKeyNameProviderBase {
       $jsondata = json_decode($filecache, TRUE);
       $json_error = json_last_error();
       if ($json_error == JSON_ERROR_NONE) {
-        return $jsondata;
+        return is_array($jsondata) ? $jsondata: [$jsondata];
       } else {
         // Basically whatever that we have is not JSON, lets go for it again.
         $filecache = FALSE;
@@ -317,7 +318,7 @@ class JsonldKeyNameProvider extends StrawberryfieldKeyNameProviderBase {
           }
         }
       }
-      return $jsondata;
+      return is_array($jsondata) ? $jsondata: [$jsondata];
     }
     // This means we had an error on the JSON decode.
     $this->messenger->addError(
