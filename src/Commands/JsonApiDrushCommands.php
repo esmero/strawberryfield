@@ -28,9 +28,11 @@ use Swaggest\JsonSchema\InvalidValue as JsonSchemaInvalidValue;
 class JsonApiDrushCommands extends DrushCommands {
 
   use ExecTrait;
+
   protected $user;
 
   protected $password;
+
   /**
    * JSON SCHEMA Draft 7.0 for a JSON API NODE via POST
    */
@@ -250,18 +252,34 @@ JSON;
    * Wraps a JSON API node post call back with added files.
    *
    * @param string $jsonfilepath
-   *    A file containing either a full JSON API data payload or just SBF JSON data.
+   *    A file containing either a full JSON API data payload or just SBF JSON
+   *   data.
+   *
    * @command archipelago:jsonapi-ingest
    * @aliases ap-jsonapi-ingest
    * @options user JSON API capable user
    * @options password JSON API capable user's password
-   * @options files file or folder containing things to be uploaded and attached to json
+   * @options files file or folder containing things to be uploaded and
+   *   attached to json
    * @options bundle Machine name of the bundle.
    * @options uuid target uuid for new digital object.
    *
-   * @usage archipelago:jsonapi-ingest digital_object.json --user=jsonapi --password=yourpassword --files=/home/www/someplace --bundle=digital_object --moderation_state=published
+   * @usage archipelago:jsonapi-ingest digital_object.json --user=jsonapi
+   *   --password=yourpassword --files=/home/www/someplace
+   *   --bundle=digital_object --moderation_state=published
    */
-  public function ingest($jsonfilepath, $options = ['files' => '', 'user' => NULL, 'password' => NULL, 'bundle' => 'digital_object', 'fieldname' => 'field_descriptive_metadata', 'uuid' => NULL, 'moderation_state' => NULL]) {
+  public function ingest(
+    $jsonfilepath,
+    $options = [
+      'files' => '',
+      'user' => NULL,
+      'password' => NULL,
+      'bundle' => 'digital_object',
+      'fieldname' => 'field_descriptive_metadata',
+      'uuid' => NULL,
+      'moderation_state' => NULL,
+    ]
+  ) {
 
     // If you want to help please read https://weitzman.github.io/blog/port-to-drush9
     if (!\Drupal::moduleHandler()->moduleExists('jsonapi')) {
@@ -272,7 +290,9 @@ JSON;
       );
     }
     //@see https://www.drupal.org/project/drupal/issues/3072076
-    if (!\Drupal::moduleHandler()->moduleExists('jsonapi_earlyrendering_workaround')) {
+    if (!\Drupal::moduleHandler()->moduleExists(
+      'jsonapi_earlyrendering_workaround'
+    )) {
       throw new \Exception(
         dt(
           'This module needs the jsonapi_earlyrendering_workaround module installed while https://www.drupal.org/project/drupal/issues/3072076 gets merged. Please run php -dmemory_limit=-1 /usr/bin/composer require drupal/jsonapi_earlyrendering_workaround; drush en jsonapi_earlyrendering_workaround; '
@@ -296,8 +316,6 @@ JSON;
     }
     // Build the POST URI for the request
     $base_url = $this->input()->getOption('uri');
-    //$filename = basename();
-    $this->output()->writeln('BASE URL is  ' . $base_url . '!\n');
     $fileurlpost = $base_url . '/jsonapi/node/' . $bundle . '/field_file_drop';
     $nodeurlpost = $base_url . '/jsonapi/node/' . $bundle;
 
@@ -315,12 +333,12 @@ JSON;
             'min_depth' => 0,
           ]
         );
-        if (count($files) ) {
-          $this->output()->writeln(dt('Files in provided location'));
+        if (count($files)) {
+          $this->output()->writeln(dt('Files in provided location:'));
         }
         foreach ($files as $file) {
           //@TODO list files here?
-          $this->output()->writeln($file->filename);
+          $this->output()->writeln(' - '.$file->filename);
         }
 
       }
@@ -358,7 +376,9 @@ JSON;
           $schema->in((Object) $data);
         } catch (JsonSchemaException $exception) {
           throw new \Exception(
-            dt('The provided JSON is not a valid JSON API payload. Suspending the ingest')
+            dt(
+              'The provided JSON is not a valid JSON API payload. Suspending the ingest'
+            )
           );
         }
       }
@@ -366,7 +386,14 @@ JSON;
         // Means we need to create our own body
         if (!$options['uuid']) {
           $options['uuid'] = \Drupal::service('uuid')->generate();
-          error_log($options['uuid']);
+          $this->output()->writeln(
+            dt(
+              'Using the following @uuid for your new ADO',
+              [
+                '@uuid' => $options['uuid'],
+              ]
+            )
+          );
         }
         $field_name = NULL;
         $sbf_fields = array_values(
@@ -408,7 +435,7 @@ JSON;
           '-H "Content-Disposition: attachment; filename=\"' . urlencode(
             $file->filename
           ) . '\""',
-          '--data-binary @' . $file->uri
+          '--data-binary @' . $file->uri,
         ];
         if ($options['user'] && $options['password']) {
           $args = array_merge(
@@ -416,18 +443,25 @@ JSON;
             [
               '--user',
               $options['user'] . ':' . $options['password'],
-              $fileurlpost
+              $fileurlpost,
             ]
           );
-          $this->output()->writeln(implode(' ', $args));
 
-          $this->output()->writeln($args);
           $process = Drush::process(implode(' ', $args));
           $process->mustRun();
           if ($process->getExitCode() == 0) {
-            error_log(var_export($process->getOutput(), TRUE));
-            $response = json_decode($process->getOutput(),true);
+
+            $response = json_decode($process->getOutput(), TRUE);
             if (isset($response['data']['attributes']['drupal_internal__fid'])) {
+              $this->output()->writeln(
+                dt(
+                  'File @file sucessfully uploaded with file ID @fileid ',
+                  [
+                    '@file' => $file->filename,
+                    '@fileod' => $response['data']['attributes']['drupal_internal__fid'],
+                  ]
+                )
+              );
               $mime_type = $response['data']['attributes']['filemime'];
               // Calculate the destination json key
               $as_file_type = explode('/', $mime_type);
@@ -467,32 +501,41 @@ JSON;
           }
           else {
             $this->output()->writeln($process->getExitCodeText());
-            throw new \Exception(dt('We failed to upload the file. Suspending the ingest'));
+            throw new \Exception(
+              dt('We failed to upload the file. Suspending the ingest')
+            );
           }
         }
       }
 
       // Now ingest the actual OBJECT
       $data_body = [];
+      $ado_title = isset($data['label']) ? $data['label'] : 'Unnamed Digital Object';
       $data_body['data'] = [
         'id' => $options['uuid'],
         'type' => 'node--' . $bundle,
         'attributes' => [
           $field_name => json_encode($data),
-          'title' => isset($data['label']) ? $data['label'] : 'Unnamed Digital Object',
-        ]
+          'title' =>  $ado_title,
+        ],
       ];
 
       if ($options['moderation_state']) {
         // Check if the bundle has actually the field.
-        $all_bundle_fields = \Drupal::service('entity_field.manager')->getFieldDefinitions('node', $bundle);
+        $all_bundle_fields = \Drupal::service('entity_field.manager')
+          ->getFieldDefinitions('node', $bundle);
         if (isset($all_bundle_fields['moderation_state'])) {
           $data_body['data']['attributes']['moderation_state'] = $options['moderation_state'];
         }
         else {
-          $this->output()->writeln(dt('Bundle @bundle is not moderated so skipping moderation state', [
-            '@bundle' => $bundle
-          ]));
+          $this->output()->writeln(
+            dt(
+              'Bundle @bundle is not moderated so skipping moderation state',
+              [
+                '@bundle' => $bundle,
+              ]
+            )
+          );
         }
       }
 
@@ -505,7 +548,7 @@ JSON;
         '-H "Accept: application/vnd.api+json;"',
         '-H "Content-type: application/vnd.api+json"',
         '-XPOST',
-        "--data '" . $curl_body . "'"
+        "--data '" . $curl_body . "'",
       ];
       if ($options['user'] && $options['password']) {
         $args_node = array_merge(
@@ -513,17 +556,37 @@ JSON;
           [
             '--user',
             $options['user'] . ':' . $options['password'],
-            $nodeurlpost
+            $nodeurlpost,
           ]
         );
-        $this->output()->writeln(implode(' ', $args_node));
 
-        $this->output()->writeln($args_node);
         $process_node = Drush::process(implode(' ', $args_node));
         $process_node->mustRun();
-        error_log($process_node->getExitCode());
+
         if ($process_node->getExitCode() == 0) {
-          error_log(var_export($process_node->getOutput(), TRUE));
+          $response = json_decode($process_node->getOutput(), TRUE);
+          if (isset($response['data']['id'])) {
+            $this->output()->writeln(dt("New Object '@title' with UUID @id successfully ingested. Thanks!",[
+              '@title' =>  $ado_title,
+              '@id' => $response['data']['id']
+            ]));
+          }
+          else {
+            throw new \Exception(
+              dt('We failed to Ingest the ADO. Sorry this is the output: @errorcode. Suspending the ingest.', [
+                '@errorcode' => $process_node->getOutput()
+              ])
+            );
+          }
+        }
+        else {
+
+          throw new \Exception(
+            dt('We failed to Ingest the ADO with error: @errorcode. Suspending the ingest.', [
+              '@errorcode' => $this->output()->writeln($process->getExitCodeText())
+            ])
+          );
+          // Should i roll back the files?
         }
       }
     }
