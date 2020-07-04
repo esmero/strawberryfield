@@ -137,15 +137,69 @@ class StrawberryfieldUtilityService {
   }
 
   /**
+   * Given a Bundle returns yes if it contains a SBF defined via a field config
+   *
+   * @param string $bundle
+   *
+   * @return bool
+   * @throws \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException
+   * @throws \Drupal\Component\Plugin\Exception\PluginNotFoundException
+   */
+  public function bundleHasStrawberryfield($bundle = 'digital_object') {
+
+    $field = $this->entityTypeManager->getStorage('field_config');
+    $field_ids = $this->entityTypeManager->getStorage('field_config')->getQuery()
+        ->condition('entity_type', 'node')
+        ->condition('bundle', $bundle)
+        ->condition('field_type' , 'strawberryfield_field')
+        ->execute();
+    $fields = $this->entityTypeManager->getStorage('field_config')->loadMultiple($field_ids);
+
+    return count($field_ids)? TRUE : FALSE;
+  }
+
+  /**
+   * Given a Bundle returns SBF's field config Object
+   * @param string $bundle
+   *
+   * @return \Drupal\Core\Entity\EntityInterface[]
+   * @throws \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException
+   * @throws \Drupal\Component\Plugin\Exception\PluginNotFoundException
+   */
+  public function getStrawberryfieldConfigFromStorage($bundle = 'digital_object') {
+
+    $field = $this->entityTypeManager->getStorage('field_config');
+    $field_ids = $this->entityTypeManager->getStorage('field_config')->getQuery()
+      ->condition('entity_type', 'node')
+      ->condition('bundle', $bundle)
+      ->condition('field_type' , 'strawberryfield_field')
+      ->execute();
+    $fields = $this->entityTypeManager->getStorage('field_config')->loadMultiple($field_ids);
+
+    return $fields;
+  }
+
+  /**
    * Given a Bundle returns the SBF field machine names
+   *
+   * This include Code generated, overrides, etc. For just the directly created via the UI
+   * Which are FieldConfig Instances use:
+   * \Drupal\strawberryfield\StrawberryfieldUtilityService::getStrawberryfieldConfigFromStorage
+   *
+   * @param $bundle
+   *    A Node Bundle
    *
    * @return array
    *  Returns array of SBF names
    */
   public function getStrawberryfieldMachineForBundle($bundle = 'digital_object') {
+    // @WARNING Never call this function inside any field based hook
+    // Chances are the hook will be called invoked inside ::getFieldDefinitions
+    // All you will find yourself inside a SUPER ETERNAL LOOP. You are adviced.
+
     $all_bundled_fields = $this->entityFieldManager->getFieldDefinitions('node', $bundle);
     $all_sbf_fields = $this->getStrawberryfieldMachineNames();
-    return array_intersect(array_keys($all_bundled_fields), $all_sbf_fields );
+    return array_intersect(array_keys($all_bundled_fields), $all_sbf_fields);
   }
 
   /**
