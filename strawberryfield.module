@@ -34,7 +34,11 @@ function strawberryfield_node_presave(ContentEntityInterface $entity) {
       $bench = TRUE;
     }
     // Introducing our newest development, the processing time stats!
+    // Starting on PHP 7.3 we should use hrtime for docker and VMS.
+    // https://www.php.net/manual/en/function.microtime.php
     $start_time = microtime(true);
+    //@TODO make bench simply an Event Method! That way we can measure every
+    //Event by calling it and for new ones. Etc.
 
     $event_type = StrawberryfieldEventType::PRESAVE;
     $event = new StrawberryfieldCrudEvent($event_type, $entity, $sbf_fields);
@@ -44,21 +48,21 @@ function strawberryfield_node_presave(ContentEntityInterface $entity) {
 
     if ($bench) {
       $end_time = microtime(TRUE);
-      $time = bcsub($end_time, $start_time, 4);
+      // Removed bsuc
+      $time = round($end_time, $start_time, 4);
       $max_memory = memory_get_peak_usage(TRUE);
+      $events = implode("\n\r",$event->getProcessedBy());
       \Drupal::logger('strawberryfield')->notice(
-        'ADO with UUID @uuid spend @time ms on all presave event subscriber processing and max memory usage was @maxmem. Event Subscribers that run where the following <br> @events',
+        'ADO with UUID @uuid spend @time in seconds on all presave event subscriber processing and max memory usage was @maxmem. Event Subscribers that run where the following <br> @events',
         [
           '@uuid' => $entity->uuid(),
           '@time' => $time,
           '@maxmem' => \Drupal::service('strawberryfield.utility')->formatBytes($max_memory, 2),
-          '@events' => print_r($event->getProcessedBy(), TRUE),
+          '@events' => $events,
         ]
       );
     }
-
   }
-
 }
 
 /**
@@ -184,9 +188,7 @@ function strawberryfield_invalidate_fieldefinition_caches(ContentEntityInterface
  *
  * @return array
  */
-function strawberryfield_entity_base_field_info(EntityTypeInterface $entity_type
-) {
-
+function strawberryfield_entity_base_field_info(EntityTypeInterface $entity_type) {
   if ($entity_type->id() == 'node') {
     $scheme_options = \Drupal::service('stream_wrapper_manager')->getNames(
       StreamWrapperInterface::WRITE_VISIBLE
@@ -203,9 +205,18 @@ function strawberryfield_entity_base_field_info(EntityTypeInterface $entity_type
 
     $fields = [];
     // Add a field that serves as a drop box for any entities that bear a SBF
-    // @see https://www.drupal.org/project/drupal/issues/2346347 to
+    // @see https://www.drupal.org/project/drupal/issues/2346347
+    // (still WIP as June 2020)
     // know why we can't use \Drupal\Core\Field\BaseFieldDefinition
-    // If we try to make this Bundle specific.
+    // @TODO If we try to make this Bundle specific?
+    // @Update 20202: https://www.previousnext.com.au/blog/how-create-and-expose-computed-properties-rest-api-drupal-8
+    // Issue with that approach is we need to have a hook update for every bundle
+    // Which makes adding new bundles and attaching automagically super complex
+
+    // @TODO future work on exposing other JSON properties as other REAL field types
+    // Dymanically can be archieved by creating a new Class extending BaseFieldDefinition
+    // That manages without hickups the 'Bundle' option
+    // \Drupal\Core\Field\BaseFieldDefinition::setTargetBundle
 
     $fields['field_file_drop'] = BaseFieldDefinition::create('entity_reference')
       ->setName('field_file_drop')
@@ -231,6 +242,46 @@ function strawberryfield_entity_base_field_info(EntityTypeInterface $entity_type
 }
 
 /**
+ * Implements hook_entity_bundle_field_info();
+ *
+ * @param \Drupal\Core\Entity\EntityTypeInterface $entity_type
+ *   The entity type definition.
+ * @param string $bundle
+ *   The bundle.
+ * @param \Drupal\Core\Field\FieldDefinitionInterface[] $base_field_definitions
+ *   The list of base field definitions for the entity type.
+ *
+ * @return \Drupal\Core\Field\FieldDefinitionInterface[]
+ *   An array of bundle field definitions, keyed by field name.
+ */
+function strawberryfield_entity_bundle_field_info(
+  EntityTypeInterface $entity_type,
+  $bundle,
+  array $base_field_definitions
+) {
+  // This is a good workaround for ISSUE-86
+  // Will basically attach the base field as a bundled one and by doing so
+  // Allow our bundle based permissions to be evaluated
+
+  if (($entity_type->id() == 'node') && isset($base_field_definitions['field_file_drop'])) {
+    if (\Drupal::service('strawberryfield.utility')
+      ->bundleHasStrawberryfield($bundle)) {
+
+      // Add the target bundle to the field_file_drop base field
+      // only if it carries a Strawberryfield
+      // In practice this will allow Bundle specific create access permissions
+      // to work and force anything not Strawberryfield to either have the node
+      // access override or simply not work.
+
+      $base_field_definitions['field_file_drop']->setTargetBundle($bundle);
+      return [
+        'field_file_drop' => $base_field_definitions['field_file_drop'],
+      ];
+    }
+  }
+}
+
+/**
  * Implements hook_entity_field_access();
  *
  * @param $operation
@@ -243,11 +294,10 @@ function strawberryfield_entity_base_field_info(EntityTypeInterface $entity_type
 function strawberryfield_entity_field_access($operation, FieldDefinitionInterface $field_definition, AccountInterface $account, FieldItemListInterface $items = NULL) {
   if ($field_definition
       ->getName() == 'field_file_drop') {
-    return AccessResult::allowedIfHasPermission($account, 'upload to Digital Object file dropbox field');
+     return AccessResult::allowedIfHasPermission($account, 'upload to Digital Object file dropbox field');
   }
   return AccessResult::neutral();
 }
-
 
 function strawberryfield_file_mimetype_mapping_alter(&$mapping) {
 
@@ -258,8 +308,6 @@ function strawberryfield_file_mimetype_mapping_alter(&$mapping) {
   $mapping['extensions']['jsonld'] = 'jsonld_mimetype';
   $mapping['mimetypes']['jpeg2000_mimetype'] = 'image/jp2';
   $mapping['extensions']['jp2'] = 'jpeg2000_mimetype';
-  $mapping['mimetypes']['jpeg2000_mimetype'] = 'image/jp2';
-  $mapping['extensions']['jp2'] = 'jpeg2000_mimetype';
   $mapping['mimetypes']['fits_image_mimetype'] = 'image/fits';
   // @see https://en.wikipedia.org/wiki/FITS
   $mapping['extensions']['fits'] = 'fits_image_mimetype';
@@ -268,7 +316,6 @@ function strawberryfield_file_mimetype_mapping_alter(&$mapping) {
   $mapping['extensions']['stl'] = 'stl_model_mimetype';
   // @see https://www.iana.org/assignments/media-types/media-types.xhtml
   $mapping['mimetypes']['stl_model_mimetype'] = 'model/stl';
-
 }
 
 function strawberryfield_s3fs_url_settings_alter(array &$url_settings, $s3_file_path) {
