@@ -48,8 +48,10 @@ class StrawberryfieldJsonProcessEvent extends Event {
    *
    * @param string $event_type
    *   The event type.
-   * @param \Drupal\Core\Entity\EntityInterface $entity
-   *   The entity which caused the event.
+   * @param array $originalJson
+   *   The original JSON
+   * @param array $processedJson
+   *   The processed JSON since these are arrays and not Objects by reference.
    */
   public function __construct($event_type, array $originalJson, array $processedJson) {
     $this->eventType = $event_type;

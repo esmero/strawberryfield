@@ -1,2 +1,9 @@
 'upload to Digital Object file dropbox field':
   title: Upload to Digital Object file dropbox field
+'view any Raw Strawberryfield':
+  title: 'View any raw JSON stored in a Strawberryfield when showed through the provided Formatter'
+  description: 'Allows viewing <em>all</em> Strawberryfield RAW JSON when a "Strawberry Default Formatter" is rendered.'
+  warning: 'Warning: This permission affects every Strawberryfield JSON in the repository and can expose, e.g. private EXIF data. Note: To allow users per Formatter instance, e.g when using multiple Display Modes you can also use the ''Access'' option on the Formatter Configuration Form'
+'view own Raw Strawberryfield':
+  title: 'View own raw JSON in a Strawberryfield when showed through the provided Formatter'
+  description: 'Allows viewing <em>own</em> Strawberryfield RAW JSON when a "Strawberry Default Formatter" is rendered.'
