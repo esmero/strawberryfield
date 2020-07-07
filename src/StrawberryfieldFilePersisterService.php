@@ -228,9 +228,9 @@ class StrawberryfieldFilePersisterService {
         $current_uri,
         PATHINFO_EXTENSION
       );
-      $file_parts['destination_scheme'] = $this->fileSystem->uriScheme(
-        $file->getFileUri()
-      );
+      $file_parts['destination_scheme'] =  $this->streamWrapperManager
+        ->getScheme($current_uri);
+
       list($file_parts['destination_filetype'],) = explode(
         '/',
         $file->getMimeType()
