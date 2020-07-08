@@ -55,15 +55,16 @@ function strawberryfield_node_presave(ContentEntityInterface $entity) {
       $events = '';
       foreach($event->getProcessedBy() as $event_info) {
         $success = $event_info['success']? 'Successful' : 'Failure';
-        $events .= $event_info['class'].'=>'.$success.'\n\r>';
+        $events .= '<li>'.$event_info['class']. ' => '.$success.'</li>';
       }
+      $events_markup = \Drupal\Core\Render\Markup::create($events);
       \Drupal::logger('strawberryfield')->notice(
-        'ADO with UUID @uuid spent @time seconds on all presave event subscriber processing and max memory usage was @maxmem. Event Subscribers that run where the following <br> @events',
+        'ADO with UUID @uuid spent @time seconds on all presave event subscriber processing and max memory usage was @maxmem. <br> Event Subscribers that could run were the following: <br><ul>@events</ul>',
         [
           '@uuid' => $entity->uuid(),
           '@time' => $time,
           '@maxmem' => \Drupal::service('strawberryfield.utility')->formatBytes($max_memory, 2),
-          '@events' => $events,
+          '@events' => $events_markup,
         ]
       );
     }
