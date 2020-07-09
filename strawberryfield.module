@@ -32,11 +32,12 @@ function strawberryfield_node_presave(ContentEntityInterface $entity) {
     // When benchmark is enabled a simple but effective report will be found in the reports/logs
     if ($config->get('benchmark')) {
       $bench = TRUE;
+      $start_time = microtime(true);
     }
     // Introducing our newest development, the processing time stats!
     // Starting on PHP 7.3 we should use hrtime for docker and VMS.
     // https://www.php.net/manual/en/function.microtime.php
-    $start_time = microtime(true);
+
     //@TODO make bench simply an Event Method! That way we can measure every
     //Event by calling it and for new ones. Etc.
 
@@ -49,16 +50,21 @@ function strawberryfield_node_presave(ContentEntityInterface $entity) {
     if ($bench) {
       $end_time = microtime(TRUE);
       // Removed bsuc
-      $time = round($end_time, $start_time, 4);
+      $time = round($end_time - $start_time, 4);
       $max_memory = memory_get_peak_usage(TRUE);
-      $events = implode("\n\r",$event->getProcessedBy());
+      $events = '';
+      foreach($event->getProcessedBy() as $event_info) {
+        $success = $event_info['success']? 'Successful' : 'Failure';
+        $events .= '<li>'.$event_info['class']. ' => '.$success.'</li>';
+      }
+      $events_markup = \Drupal\Core\Render\Markup::create($events);
       \Drupal::logger('strawberryfield')->notice(
-        'ADO with UUID @uuid spend @time in seconds on all presave event subscriber processing and max memory usage was @maxmem. Event Subscribers that run where the following <br> @events',
+        'ADO with UUID @uuid spent @time seconds on all presave event subscriber processing and max memory usage was @maxmem. <br> Event Subscribers that could run were the following: <br><ul>@events</ul>',
         [
           '@uuid' => $entity->uuid(),
           '@time' => $time,
           '@maxmem' => \Drupal::service('strawberryfield.utility')->formatBytes($max_memory, 2),
-          '@events' => $events,
+          '@events' => $events_markup,
         ]
       );
     }

@@ -9,7 +9,8 @@
 namespace Drupal\strawberryfield\Plugin;
 use Drupal\Component\Plugin\PluginInspectionInterface;
 use Drupal\Core\Plugin\PluginWithFormsInterface;
-use Drupal\Component\Plugin\ConfigurablePluginInterface;
+use Drupal\Component\Plugin\ConfigurableInterface;
+use Drupal\Component\Plugin\DependentPluginInterface;
 
 /**
  * Defines and Interface for StrawberryfieldKeyNameProvider Plugins
@@ -18,7 +19,7 @@ use Drupal\Component\Plugin\ConfigurablePluginInterface;
  *
  * @package Drupal\strawberryfield\Plugin
  */
-interface StrawberryfieldKeyNameProviderInterface extends PluginInspectionInterface, PluginWithFormsInterface, ConfigurablePluginInterface{
+interface StrawberryfieldKeyNameProviderInterface extends PluginInspectionInterface, PluginWithFormsInterface, ConfigurableInterface, DependentPluginInterface{
 
 
   /**

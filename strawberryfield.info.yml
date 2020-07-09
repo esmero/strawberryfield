@@ -2,10 +2,9 @@ name: Strawberry Field
 description: Creates a field type that stores JSON and makes it available to other Drupal modules.
 package: Archipelago
 type: module
-core: 8.x
+core_version_requirement: ^8.8 || ^9
 php: 7.1
 dependencies:
-  - 'drupal:system (>= 8.7)'
   - 'drupal:user'
   - 'drupal:field'
   - 'drupal:serialization'

@@ -228,9 +228,9 @@ class StrawberryfieldFilePersisterService {
         $current_uri,
         PATHINFO_EXTENSION
       );
-      $file_parts['destination_scheme'] = $this->fileSystem->uriScheme(
-        $file->getFileUri()
-      );
+      $file_parts['destination_scheme'] =  $this->streamWrapperManager
+        ->getScheme($current_uri);
+
       list($file_parts['destination_filetype'],) = explode(
         '/',
         $file->getMimeType()
@@ -1024,13 +1024,13 @@ class StrawberryfieldFilePersisterService {
       $output_exif = '';
       $output_fido = '';
       $result_exif = exec(
-        $exif_exec_path . ' -json -q -a -gps:all -Common "-gps*" -xmp:all  -ImageWidth -ImageHeight -Canon -Nikon-AllDates -pdf:all -ee -MIMEType ' . escapeshellcmd($templocation),
+        $exif_exec_path . ' -json -q -a -gps:all -Common "-gps*" -xmp:all  -ImageWidth -ImageHeight -Canon -Nikon-AllDates -pdf:all -ee -MIMEType ' . escapeshellarg($templocation),
         $output_exif,
         $status_exif
       );
 
       $result_fido = exec(
-        $fido_exec_path . ' ' . escapeshellcmd($templocation),
+        $fido_exec_path . ' ' . escapeshellarg($templocation),
         $output_fido,
         $status_fido
       );
