@@ -539,7 +539,7 @@ JSON;
         }
       }
 
-      $curl_body = json_encode($data_body);
+      $curl_body = json_encode($data_body, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE);
 
       $args_node = [
         'curl',
