@@ -247,13 +247,22 @@ class JsonApiDrushCommands extends DrushCommands {
 }
 JSON;
 
-
   /**
    * Wraps a JSON API node post call back with added files.
    *
    * @param string $jsonfilepath
    *    A file containing either a full JSON API data payload or just SBF JSON
    *   data.
+   * @param array $options
+   *  'files' => A folder or file that will be attached to the ADO
+   *  'user' =>  Drupal user that will do the action via JSON API
+   *  'password' => password for 'user'
+   *  'bundle' => 'digital_object',
+   *  'fieldname' => 'field_descriptive_metadata',
+   *  'uuid' => If provided and ADO exists ingest will not happen,
+   *  'moderation_state' => draft/published. Anything that is valid.
+   *
+   * @throws \Exception if ingest is not possible
    *
    * @command archipelago:jsonapi-ingest
    * @aliases ap-jsonapi-ingest
@@ -370,6 +379,15 @@ JSON;
       // Check if JSON is a full JSON API data payload or just our SBF.
       // If just SBF, we need to have the machine name of the field to push data
       $data = json_decode($json_data, TRUE);
+      $json_error = json_last_error();
+      if ($json_error != JSON_ERROR_NONE) {
+        // Well this is how life ends.
+        throw new \Exception(
+          dt(
+            'The provided JSON could not be parsed or is not a valid JSON. Suspending the ingest'
+          )
+        );
+      }
       if (isset($data['data']['type']) && $data['data']['type'] == 'node--' . $bundle) {
         try {
           // @see https://github.com/swaggest/php-json-schema
@@ -415,7 +433,13 @@ JSON;
       }
 
     }
-
+    else {
+      throw new \Exception(
+        dt(
+          'JSON payload seems to be missing or invalid JSON. Suspending the ingest'
+        )
+      );
+    }
 
     if ($field_name) {
       foreach ($files as $file) {
@@ -455,10 +479,10 @@ JSON;
             if (isset($response['data']['attributes']['drupal_internal__fid'])) {
               $this->output()->writeln(
                 dt(
-                  'File @file sucessfully uploaded with file ID @fileid ',
+                  'File @file sucessfully uploaded with Internal Drupal file ID @fileid ',
                   [
                     '@file' => $file->filename,
-                    '@fileod' => $response['data']['attributes']['drupal_internal__fid'],
+                    '@fileid' => $response['data']['attributes']['drupal_internal__fid'],
                   ]
                 )
               );
@@ -539,7 +563,7 @@ JSON;
         }
       }
 
-      $curl_body = json_encode($data_body);
+      $curl_body = json_encode($data_body, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE);
 
       $args_node = [
         'curl',
