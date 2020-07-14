@@ -433,7 +433,13 @@ JSON;
       }
 
     }
-
+    else {
+      throw new \Exception(
+        dt(
+          'JSON payload seems to be missing or invalid JSON. Suspending the ingest'
+        )
+      );
+    }
 
     if ($field_name) {
       foreach ($files as $file) {
