@@ -67,7 +67,7 @@ class StrawberryKeysFromJson extends ItemList {
     $item = $this->getParent();
     if (!empty($item->value)) {
       // Should 10 be enough? this is json-ld not github.. so maybe...
-      $jsonArray = json_decode($item->value, TRUE, 10);
+      $jsonArray = json_decode($item->value, TRUE, 50);
       //@TODO deal with JSON exceptions as we have done before
 
       $flattened = [];

@@ -186,6 +186,62 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
 
 
    /**
+    * Decodes main value JSON string into an array
+    *
+    * We don't keep this around because this will be mainly used to be
+    * modified and re encoded afterwards.
+    *
+    * @param bool $assoc
+    *   If return is array or a stdclass Object.
+    *
+    * @return array|\stdClass
+    */
+   public function provideDecoded($assoc = TRUE) {
+     if ($this->isEmpty()) {
+       $this->flattenjson = [];
+       $jsonArray = [];
+     }
+     elseif ($this->validate()->count() == 0) {
+       $mainproperty = $this->mainPropertyName();
+       $jsonArray = [];
+       $jsonArray = json_decode($this->{$mainproperty}, $assoc, 50);
+
+     }
+     return $jsonArray;
+   }
+
+
+   /**
+    * Encodes and sets main value from array
+    *
+    * This method also clears flattenjson and jsonjmesresult caches.
+    *
+    * @param array $jsonarray
+    *   Array of data we want to save in the main property
+    *
+    * @return string|boolean
+    *   Returns either the correctly encoded string or boolean FALSE
+    *   Make sure you compare using === FALSE!.
+    *
+    * @throws  \InvalidArgumentException
+    *    If what is passed to ::setValue() is not an array.
+    */
+   public function setMainValueFromArray(array $jsonarray) {
+
+     $jsonstring = json_encode($jsonarray, JSON_PRETTY_PRINT, 50);
+
+     if ($jsonstring) {
+       $this->setValue([$this->mainPropertyName() => $jsonstring], TRUE);
+       // Clear this caches just in case
+       $this->flattenjson = [];
+       $this->jsonjmesresults = [];
+     }
+
+     return $jsonstring;
+   }
+
+
+   /**
     * Calculates / keeps around a flatten common keys array for the main value.
     *
     * @param bool $force
@@ -201,7 +257,8 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
      elseif ($this->validate()->count() == 0) {
        if ($this->flattenjson == NULL || $force) {
          $mainproperty = $this->mainPropertyName();
-         $jsonArray = json_decode($this->{$mainproperty}, TRUE, 10);
+         $jsonArray = [];
+         $jsonArray = json_decode($this->{$mainproperty}, TRUE, 50);
          $flattened = [];
          StrawberryfieldJsonHelper::arrayToFlatCommonkeys(
            $jsonArray,
@@ -234,7 +291,7 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
      else {
        if ($this->jsonjmesresults == NULL || !isset($this->jsonjmesresults[$expression]) || $force) {
          $mainproperty = $this->mainPropertyName();
-         $jsonArray = json_decode($this->{$mainproperty}, TRUE, 10);
+         $jsonArray = json_decode($this->{$mainproperty}, TRUE, 50);
          $searchresult = StrawberryfieldJsonHelper::searchJson($expression, $jsonArray);
          $this->jsonjmesresults[$expression] = $searchresult;
          return $searchresult;

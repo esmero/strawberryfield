@@ -40,7 +40,7 @@ class StrawberryfieldCrudEvent extends Event {
    * @var array
    *
    */
-  private $processedby;
+  private $processedby = [];
 
   /**
    * Construct a new entity event.

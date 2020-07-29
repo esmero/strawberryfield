@@ -14,12 +14,12 @@ strawberryfield.group.admin:
   description: 'Archipelago Configuration'
   weight: -999
 
-strawberryfield.storage_settings_form:
-  title: 'Storage Configuration Form'
-  route_name: strawberryfield.storage_settings_form
-  description: 'Configure strawberry field file persistence settings'
+strawberryfield.file_persister_settings_form:
+  title: 'File Persister Service Configuration Form'
+  route_name: strawberryfield.file_persister_settings_form
+  description: 'Configure strawberry field file persistence service and storage settings'
   parent: strawberryfield.group.admin
-  weight: 99
+  weight: 98
 
 strawberryfield.important_solr_settings_form:
   title: 'Important Solr Settings Form'
@@ -27,4 +27,3 @@ strawberryfield.important_solr_settings_form:
   description: 'Configure which Solr field is used in ADO Type Mapping'
   parent: strawberryfield.group.admin
   weight: 99
-
