@@ -459,7 +459,7 @@ JSON;
           '-H "Content-Disposition: attachment; filename=\"' . urlencode(
             $file->filename
           ) . '\""',
-          '--data-binary @' . $file->uri,
+          '--data-binary @"' . escapeshellarg($file->uri) .'"',
         ];
         if ($options['user'] && $options['password']) {
           $args = array_merge(
