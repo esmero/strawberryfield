@@ -470,7 +470,7 @@ JSON;
               $fileurlpost,
             ]
           );
-
+          $this->output()->writeln(implode(' ', $args));
           $process = Drush::process(implode(' ', $args));
           $process->mustRun();
           if ($process->getExitCode() == 0) {
