@@ -459,7 +459,7 @@ JSON;
           '-H "Content-Disposition: attachment; filename=\"' . urlencode(
             $file->filename
           ) . '\""',
-          '--data-binary @' . $file->uri,
+          '--data-binary @"' . $file->uri.'"',
         ];
         if ($options['user'] && $options['password']) {
           $args = array_merge(
@@ -470,7 +470,7 @@ JSON;
               $fileurlpost,
             ]
           );
-
+          $this->output()->writeln(implode(' ', $args));
           $process = Drush::process(implode(' ', $args));
           $process->mustRun();
           if ($process->getExitCode() == 0) {
