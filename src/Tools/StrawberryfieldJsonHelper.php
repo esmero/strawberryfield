@@ -480,16 +480,20 @@ class StrawberryfieldJsonHelper {
    */
   public static function isValidJsonSchema(string $jsonstring, string $acceptedjsonschema) {
     $jsonarray = json_decode(trim($jsonstring));
+    dpm($jsonarray);
     $json_error = json_last_error();
+    dpm($json_error);
     if ($json_error == JSON_ERROR_NONE) {
     try {
       $schema = JsonSchema::import(
         json_decode($acceptedjsonschema)
       );
-      $schema->in((Object) $jsonarray);
+
+      $schema->in($jsonarray);
       return $jsonarray;
     }
     catch (JsonSchemaException $exception) {
+      dpm($exception->getMessage());
       return FALSE;
     }
     }
