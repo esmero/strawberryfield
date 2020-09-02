@@ -71,8 +71,9 @@ class StrawberryKeysFromJson extends ItemList {
       //@TODO deal with JSON exceptions as we have done before
 
       $flattened = [];
+      $blacklist = ['ap:importeddata.content'];
       $flattened = StrawberryfieldJsonHelper::arrayToFlatJsonPropertypaths(
-        $jsonArray
+        $jsonArray, '', $blacklist
       );
       $this->processed = array_keys($flattened);
       $this->computed = TRUE;

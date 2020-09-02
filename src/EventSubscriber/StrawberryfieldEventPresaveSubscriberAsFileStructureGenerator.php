@@ -131,6 +131,9 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
           $fullvalues = $itemfield->provideDecoded(TRUE);
           // SBF needs to have the entity mapping key
           // helper structure to keep elements that map to entities around
+          if (!is_array($fullvalues)) {
+            break;
+          }
           $fullvalues = $this->cleanUpEntityMappingStructure($fullvalues);
           // 'ap:entitymapping' will always exists of ::cleanUpEntityMappingStructure
           $entity_mapping_structure = $fullvalues['ap:entitymapping'];
