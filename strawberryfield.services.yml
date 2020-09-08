@@ -54,4 +54,6 @@ services:
     class: Drupal\strawberryfield\ParamConverter\UuidEntityConverter
     tags:
       - { name: paramconverter , priority: 10 }
-    arguments: ['@entity_type.manager']
+    arguments:
+      - '@entity_type.manager'
+      - '@entity.repository'

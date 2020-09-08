@@ -28,7 +28,6 @@ strawberryfield.file_persister_settings_form:
   options:
     _admin_route: TRUE
 
-
 strawberryfield.multiple_patch_confirm:
   path: '/admin/config/archipelago/actions/jsonpatch'
   defaults:

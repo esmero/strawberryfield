@@ -11,6 +11,7 @@ use Drupal\Core\Action\ConfigurableActionBase;
 use Drupal\Component\Plugin\DependentPluginInterface;
 use Drupal\Core\TempStore\PrivateTempStoreFactory;
 use Drupal\strawberryfield\StrawberryfieldUtilityService;
+use Swaggest\JsonDiff\Exception as JsonDiffException;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
@@ -200,31 +201,35 @@ JSON;
           /* @var $field \Drupal\Core\Field\FieldItemInterface */
           $field = $entity->get($field_name);
           /* @var \Drupal\strawberryfield\Field\StrawberryFieldItemList $field */
-
-          $newlyprocessed = 0;
-
-            $entity = $field->getEntity();
-            $entity_type_id = $entity->getEntityTypeId();
-            /** @var $field \Drupal\Core\Field\FieldItemList */
-            foreach ($field->getIterator() as $delta => $itemfield) {
-              $allprocessedAsValues = [];
-              /** @var $itemfield \Drupal\strawberryfield\Plugin\Field\FieldType\StrawberryFieldItem */
-              $fullvalues = $itemfield->provideDecoded(FALSE);
-              // SBF needs to have the entity mapping key
-              // helper structure to keep elements that map to entities around
-              dpm($fullvalues);
-              $patch = JsonPatch::import($this->patchArray);
-              $patch->apply($fullvalues);
-              dpm($fullvalues);
-
-              /*if (!$itemfield->setMainValueFromArray((array) $fullvalues)) {
-                $this->messenger->addError(
+          $entity = $field->getEntity();
+          /** @var $field \Drupal\Core\Field\FieldItemList */
+          foreach ($field->getIterator() as $delta => $itemfield) {
+            /** @var $itemfield \Drupal\strawberryfield\Plugin\Field\FieldType\StrawberryFieldItem */
+            $fullvalues = $itemfield->provideDecoded(FALSE);
+            dpm($fullvalues);
+            $patch = JsonPatch::import($this->patchArray);
+            try {
+              $patch->apply($fullvalues,TRUE);
+              if (!$itemfield->setMainValueFromArray((array) $fullvalues)) {
+                $this->messenger()->addError(
                   $this->t(
-                    'We could not persist file classification. Please contact the site admin.'
+                    'We could not persist patched metadata for @entity. Please contact the site admin.', [
+                      '@entity' => $entity->label()
+                    ]
                   )
                 );
-              }; */
+              };
+
+            } catch (JsonDiffException $exception) {
+              $this->messenger()->addWarning(
+                $this->t(
+                  'Patch could not be applied for @entity', [
+                    '@entity' => $entity->label()
+                  ]
+                )
+              );
             }
+          }
         }
         $entity->save();
       }
