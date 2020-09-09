@@ -189,41 +189,57 @@ JSON;
   /**
    * {@inheritdoc}
    */
-  public function executeMultiple(array $entities) {
-    /** @var \Drupal\Core\Entity\EntityInterface[] $entities */
-    $selection = [];
-    $this->patchArray = !empty($this->patchArray) ? $this->patchArray : json_decode($this->configuration['jsonpatch']);
-    foreach ($entities as $entity) {
+  public function executeMultiple(array $objects) {
+    $results = [];
+    foreach ($objects as $entity) {
+      $results[] = $this->execute($entity);
+    }
+
+    return $results;
+  }
+
+
+  /**
+   * {@inheritdoc}
+   */
+  public function execute($entity = NULL) {
+    /** @var \Drupal\Core\Entity\EntityInterface $entity */
+    $patched = FALSE;
+    if ($entity) {
       if ($sbf_fields = $this->strawberryfieldUtility->bearsStrawberryfield(
         $entity
       )) {
+        $this->patchArray = json_decode($this->configuration['jsonpatch']);
         foreach ($sbf_fields as $field_name) {
           /* @var $field \Drupal\Core\Field\FieldItemInterface */
           $field = $entity->get($field_name);
           /* @var \Drupal\strawberryfield\Field\StrawberryFieldItemList $field */
           $entity = $field->getEntity();
           /** @var $field \Drupal\Core\Field\FieldItemList */
+          $patched = FALSE;
           foreach ($field->getIterator() as $delta => $itemfield) {
             /** @var $itemfield \Drupal\strawberryfield\Plugin\Field\FieldType\StrawberryFieldItem */
             $fullvalues = $itemfield->provideDecoded(FALSE);
-            dpm($fullvalues);
             $patch = JsonPatch::import($this->patchArray);
             try {
-              $patch->apply($fullvalues,TRUE);
-              if (!$itemfield->setMainValueFromArray((array) $fullvalues)) {
+              $patch->apply($fullvalues, TRUE);
+              if (!$field[$delta]->setMainValueFromArray((array) $fullvalues)) {
                 $this->messenger()->addError(
                   $this->t(
-                    'We could not persist patched metadata for @entity. Please contact the site admin.', [
+                    'We could not persist patched metadata for @entity. Please contact the site admin.',
+                    [
                       '@entity' => $entity->label()
                     ]
                   )
                 );
               };
-
+              $patched = TRUE;
             } catch (JsonDiffException $exception) {
+              $patched = FALSE;
               $this->messenger()->addWarning(
                 $this->t(
-                  'Patch could not be applied for @entity', [
+                  'Patch could not be applied for @entity',
+                  [
                     '@entity' => $entity->label()
                   ]
                 )
@@ -231,20 +247,16 @@ JSON;
             }
           }
         }
-        $entity->save();
+        if ($patched) {
+          $entity->save();
+        }
       }
     }
-    // @TODO check if we should add via a deriver a confirmation form of some sort or not?
-    //$this->tempStore->set($this->currentUser->id() . ':' . $this->getPluginDefinition()['type'], $selection);
   }
 
-  /**
-   * {@inheritdoc}
-   */
-  public function execute($object = NULL) {
-    // If using VBO executeMultiple is not needed...
-    $this->executeMultiple([$object]);
-  }
+
+
+
 
   /**
    * {@inheritdoc}
@@ -273,7 +285,7 @@ JSON;
    */
   public function buildConfigurationForm(array $form, FormStateInterface $form_state) {
     // Don't want to make this a dependency, but if its there, let's use it
-    if (\Drupal::moduleHandler()->moduleExists('codemirror')) {
+    if (\Drupal::moduleHandler()->moduleExists('codemirror_editor')) {
       $form['jsonpatch'] = [
         '#type' => 'codemirror',
         '#title' => t('JSON Patch commands'),
