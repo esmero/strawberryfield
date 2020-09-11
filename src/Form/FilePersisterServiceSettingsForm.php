@@ -102,6 +102,45 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
         'event' => 'change'
       ]
     ];
+    $form['identify_exec_path'] = [
+      '#type' => 'textfield',
+      '#title' => $this->t('Absolute path to the Identify tool binary inside your server'),
+      '#description' => $this->t('Identify will run against any file associated to an Archipelago Digital Object and resulting characterization will be appended to the strawberryfield JSON. This is specially useful when dealing with PDFs that have different page dimensions.'),
+      '#default_value' => !empty($config->get('identify_exec_path')) ? $config->get('identify_exec_path'): '/usr/bin/identify',
+      '#states' => [
+        'visible' => [
+          ':input[name="extractmetadata"]' => ['checked' => TRUE],
+        ],
+      ],
+      '#prefix' => '<span class="identify-exec-path-validation"></span>',
+      '#ajax' => [
+        'callback' => [$this, 'validateIdentify'],
+        'effect' => 'fade',
+        'wrapper' => 'identify-exec-path-validation',
+        'method' => 'replace',
+        'event' => 'change'
+      ]
+    ];
+
+    $form['pdfinfo_exec_path'] = [
+      '#type' => 'textfield',
+      '#title' => $this->t('Absolute path to the PDFInfo tool binary inside your server'),
+      '#description' => $this->t('PDFInfo will run against any PDF or PS file associated to an Archipelago Digital Object and resulting Mediabox and page numbers will be appended to the strawberryfield JSON. This is specially useful when dealing with PDFs that have different page dimensions and complements Identify.'),
+      '#default_value' => !empty($config->get('pdfinfo_exec_path')) ? $config->get('pdfinfo_exec_path'): '/usr/bin/pdfinfo',
+      '#states' => [
+        'visible' => [
+          ':input[name="extractmetadata"]' => ['checked' => TRUE],
+        ],
+      ],
+      '#prefix' => '<span class="pdfinfo-exec-path-validation"></span>',
+      '#ajax' => [
+        'callback' => [$this, 'validatePdfinfo'],
+        'effect' => 'fade',
+        'wrapper' => 'pdfinfo-exec-path-validation',
+        'method' => 'replace',
+        'event' => 'change'
+      ]
+    ];
 
     return parent::buildForm($form, $form_state);
   }
@@ -155,6 +194,53 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
   }
 
   /**
+   * Validate Identify Exec Path
+   * @param array $form
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *
+   * @return \Drupal\Core\Ajax\AjaxResponse
+   */
+  public function validateIdentify(array $form, FormStateInterface $form_state) {
+    $response = new AjaxResponse();
+    $canrun = \Drupal::service('strawberryfield.utility')->verifyCommand($form_state->getValue('identify_exec_path'));
+    if (!$canrun) {
+      $response->addCommand(new InvokeCommand('#edit-identify-exec-path', 'addClass', ['error']));
+      $response->addCommand(new InvokeCommand('#edit-identify-exec-path', 'removeClass', ['ok']));
+      $response->addCommand(new MessageCommand('Identify path is not valid.', NULL, ['type' => 'error', 'announce' => 'Identify path is not valid.']));
+
+    } else {
+      $response->addCommand(new InvokeCommand('#edit-identify-exec-path', 'removeClass', ['error']));
+      $response->addCommand(new InvokeCommand('#edit-identify-exec-path', 'addClass', ['ok']));
+      $response->addCommand(new MessageCommand('Identify path is valid!', NULL, ['type' => 'status', 'announce' => 'Identify path is valid!']));
+
+    }
+    return $response;
+  }
+
+  /**
+   * Validate Identify Exec Path
+   * @param array $form
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *
+   * @return \Drupal\Core\Ajax\AjaxResponse
+   */
+  public function validatePdfinfo(array $form, FormStateInterface $form_state) {
+    $response = new AjaxResponse();
+    $canrun = \Drupal::service('strawberryfield.utility')->verifyCommand($form_state->getValue('pdfinfo_exec_path'));
+    if (!$canrun) {
+      $response->addCommand(new InvokeCommand('#edit-pdfinfo-exec-path', 'addClass', ['error']));
+      $response->addCommand(new InvokeCommand('#edit-pdfinfo-exec-path', 'removeClass', ['ok']));
+      $response->addCommand(new MessageCommand('PDFInfo path is not valid.', NULL, ['type' => 'error', 'announce' => 'PDFInfo path is not valid.']));
+
+    } else {
+      $response->addCommand(new InvokeCommand('#edit-pdfinfo-exec-path', 'removeClass', ['error']));
+      $response->addCommand(new InvokeCommand('#edit-pdfinfo-exec-path', 'addClass', ['ok']));
+      $response->addCommand(new MessageCommand('PDFInfo path is valid!', NULL, ['type' => 'status', 'announce' => 'PDFInfo path is valid!']));
+
+    }
+    return $response;
+  }
+  /**
    * @param array $form
    * @param \Drupal\Core\Form\FormStateInterface $form_state
    */
@@ -180,6 +266,24 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
           $this->t('Please correct. fido path is not valid.')
         );
       }
+      $canrun_identify = \Drupal::service('strawberryfield.utility')->verifyCommand(
+        $form_state->getValue('identify_exec_path')
+      );
+      if (!$canrun_identify) {
+        $form_state->setErrorByName(
+          'identify_exec_path',
+          $this->t('Please correct. Identify path is not valid.')
+        );
+      }
+      $canrun_pdfinfo = \Drupal::service('strawberryfield.utility')->verifyCommand(
+        $form_state->getValue('pdfinfo_exec_path')
+      );
+      if (!$canrun_pdfinfo) {
+        $form_state->setErrorByName(
+          'pdfinfo_exec_path',
+          $this->t('Please correct. PDFInfo path is not valid.')
+        );
+      }
     }
 
     parent::validateForm(
@@ -197,6 +301,8 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
       ->set('extractmetadata', (bool) $form_state->getValue('extractmetadata'))
       ->set('exif_exec_path', trim($form_state->getValue('exif_exec_path')))
       ->set('fido_exec_path', trim($form_state->getValue('fido_exec_path')))
+      ->set('identify_exec_path', trim($form_state->getValue('identify_exec_path')))
+      ->set('pdfinfo_exec_path', trim($form_state->getValue('pdfinfo_exec_path')))
       ->save();
     $this->config('strawberryfield.storage_settings')
       ->set('file_scheme', $form_state->getValue('file_scheme'))

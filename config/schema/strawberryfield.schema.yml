@@ -148,6 +148,12 @@ strawberryfield.filepersister_service_settings:
     fido_exec_path:
       type: string
       label: 'FIDO binary full executable path'
+    identify_exec_path:
+      type: string
+      label: 'Identify binary full executable path (graphics magic or Imagemagick)'
+    pdfinfo_exec_path:
+      type: string
+      label: 'pdfinfo binary full executable path (poppler utils)'
 
 strawberryfield.general:
   type: config_object

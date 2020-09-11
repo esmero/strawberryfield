@@ -231,7 +231,7 @@ class StrawberryfieldFilePersisterService {
       $file_parts['destination_scheme'] =  $this->streamWrapperManager
         ->getScheme($current_uri);
 
-      list($file_parts['destination_filetype'],) = explode(
+      [$file_parts['destination_filetype'],] = explode(
         '/',
         $file->getMimeType()
       );
@@ -433,7 +433,7 @@ class StrawberryfieldFilePersisterService {
         // @TODO Fills up the md5 for all files and updates a single node at a time
         // @TODO evaluate Node locking while this happens.
         $md5 = md5_file($uri);
-        $filemetadata = $this->getBaseFileMetadata($file);
+        $filemetadata = $this->getBaseFileMetadata($file, $askey);
         $relativefolder = substr($md5, 0, 3);
         $uuid = $file->uuid();
         // again, i know!
@@ -939,11 +939,15 @@ class StrawberryfieldFilePersisterService {
    * Also deals with the fact that it can be local v/s remote.
    *
    * @param \Drupal\file\FileInterface $file
+   *  A file
+   * @param string $askey
+   *   How the file was classified according to the as:key format
+   *   Can be: document, image, model, text, application, movie, sound etc.
    *
    * @return array
    *    Metadata extracted for the image in array format if any
    */
-  public function getBaseFileMetadata(FileInterface $file) {
+  public function getBaseFileMetadata(FileInterface $file, $askey = 'document') {
 
     // These are the 2 basic binaries we want eventually be able to run
     // For each referenced Files
@@ -970,7 +974,8 @@ class StrawberryfieldFilePersisterService {
     $exif_exec_path = trim($this->config->get(
       'exif_exec_path'));
     $fido_exec_path = trim($this->config->get('fido_exec_path'));
-
+    $identify_exec_path = trim($this->config->get('identify_exec_path'));
+    $pdf_info_exec_path = trim($this->config->get('pdfinfo_exec_path'));
 
     $uri = $file->getFileUri();
 
@@ -1023,67 +1028,137 @@ class StrawberryfieldFilePersisterService {
       // @TODO MOVE CHECKSUM here
       $output_exif = '';
       $output_fido = '';
-      $result_exif = exec(
-        $exif_exec_path . ' -json -q -a -gps:all -Common "-gps*" -xmp:all  -ImageWidth -ImageHeight -Canon -Nikon-AllDates -pdf:all -ee -MIMEType ' . escapeshellarg($templocation),
-        $output_exif,
-        $status_exif
-      );
-
-      $result_fido = exec(
-        $fido_exec_path . ' ' . escapeshellarg($templocation),
-        $output_fido,
-        $status_fido
-      );
-
-      // First EXIF
-      if ($status_exif != 0) {
-        // Means exiftool did not work
-        $this->loggerFactory->get('strawberryfield')->warning(
-          'Could not process EXIF on @templocation for @fileurl',
-          [
-            '@fileurl' => $file->getFileUri(),
-            '@templocation' => $templocation,
-          ]
+      $output_identify = '';
+      $output_pdfinfo = '';
+      // Silly really. This needs to be tighter but then unix allows any alias to exist.
+      if (strlen($exif_exec_path) > 0) {
+        $result_exif = exec(
+          $exif_exec_path . ' -json -q -a -gps:all -Common "-gps*" -xmp:all -XMP-tiff:Orientation -ImageWidth -ImageHeight -Canon -Nikon-AllDates -pdf:all -ee -MIMEType ' . escapeshellarg(
+            $templocation
+          ),
+          $output_exif,
+          $status_exif
         );
-      }
-      else {
-        // JSON-ify EXIF data
-        // remove RW Properties?
-        $output_exif = implode('', $output_exif);
-        $exif_full = json_decode($output_exif, TRUE);
-        $json_error = json_last_error();
-        if ($json_error == JSON_ERROR_NONE && isset($exif_full[0])) {
-          $exif = $exif_full[0];
-          unset($exif['FileName']);
-          unset($exif['SourceFile']);
-          unset($exif['Directory']);
-          unset($exif['FilePermissions']);
-          unset($exif['ThumbnailImage']);
-          $metadata['flv:exif'] = $exif;
+
+
+        // First EXIF
+        if ($status_exif != 0) {
+          // Means exiftool did not work
+          $this->loggerFactory->get('strawberryfield')->warning(
+            'Could not process EXIF on @templocation for @fileurl',
+            [
+              '@fileurl' => $file->getFileUri(),
+              '@templocation' => $templocation,
+            ]
+          );
+        }
+        else {
+          // JSON-ify EXIF data
+          // remove RW Properties?
+          $output_exif = implode('', $output_exif);
+          $exif_full = json_decode($output_exif, TRUE);
+          $json_error = json_last_error();
+          if ($json_error == JSON_ERROR_NONE && isset($exif_full[0])) {
+            $exif = $exif_full[0];
+            unset($exif['FileName']);
+            unset($exif['SourceFile']);
+            unset($exif['Directory']);
+            unset($exif['FilePermissions']);
+            unset($exif['ThumbnailImage']);
+            foreach ($exif as &$exifitem) {
+              $exifitem = is_array($exifitem) ? array_unique(
+                $exifitem
+              ) : $exifitem;
+            }
+            $metadata['flv:exif'] = $exif;
+          }
         }
       }
-      // Second FIDO
-      if ($status_fido != 0) {
-        // Means Fido did not work
-        $this->loggerFactory->get('strawberryfield')->warning(
-          'Could not process FIDO on @templocation for @fileurl',
-          [
-            '@fileurl' => $file->getFileUri(),
-            '@templocation' => $templocation,
-          ]
+      if (strlen($fido_exec_path) > 0) {
+        $result_fido = exec(
+          $fido_exec_path . ' ' . escapeshellarg($templocation),
+          $output_fido,
+          $status_fido
         );
+
+        // Second FIDO
+        if ($status_fido != 0) {
+          // Means Fido did not work
+          $this->loggerFactory->get('strawberryfield')->warning(
+            'Could not process FIDO on @templocation for @fileurl',
+            [
+              '@fileurl' => $file->getFileUri(),
+              '@templocation' => $templocation,
+            ]
+          );
+        }
+        else {
+          // JSON-ify EXIF data
+          // remove RW Properties?
+          $output_fido = explode(',', str_replace('"', '', $result_fido));
+          if (count($output_fido) && $output_fido[0] == 'OK') {
+            // Means FIDO could do its JOB
+            $pronom['pronom_id'] = isset($output_fido[2]) ? 'info:pronom/' . $output_fido[2] : NULL;
+            $pronom['label'] = $output_fido[3] ?: NULL;
+            $pronom['mimetype'] = $output_fido[7] ?: NULL;
+            $pronom['detection_type'] = $output_fido[8] ?: NULL;
+            $metadata['flv:pronom'] = $pronom;
+          }
+        }
       }
-      else {
-        // JSON-ify EXIF data
-        // remove RW Properties?
-        $output_fido = explode(',', str_replace('"', '', $result_fido));
-        if (count($output_fido) && $output_fido[0] == 'OK') {
-          // Means FIDO could do its JOB
-          $pronom['pronom_id'] = isset($output_fido[2]) ? 'info:pronom/' . $output_fido[2] : NULL;
-          $pronom['label'] = $output_fido[3] ?: NULL;
-          $pronom['mimetype'] = $output_fido[7] ?: NULL;
-          $pronom['detection_type'] = $output_fido[8] ?: NULL;
-          $metadata['flv:pronom'] = $pronom;
+
+      // Only run identify on Images/Documents?
+      // Do we need an exact list?
+      if (strlen($identify_exec_path) > 0) {
+        if (in_array($askey, ['document', 'image', 'video', 'audio'])) {
+          $result_identify = exec(
+            $identify_exec_path . " -format 'format:%m|width:%w|height:%h|orientation:%[orientation]@' -quiet " . escapeshellarg(
+              $templocation
+            ),
+            $output_identify,
+            $status_identify
+          );
+
+          if ($status_identify != 0) {
+            // Means Identify did not work
+            $this->loggerFactory->get('strawberryfield')->warning(
+              'Could not process Identify on @templocation for @fileurl',
+              [
+                '@fileurl' => $file->getFileUri(),
+                '@templocation' => $templocation,
+              ]
+            );
+          }
+          else {
+            // JSON-ify Identify data
+            $identify_meta = [];
+            if (count($output_identify) && isset($output_identify[0])) {
+              $output_identify = array_filter(
+                explode(
+                  '@',
+                  $output_identify[0]
+                )
+              );
+              foreach ($output_identify as $sequencenumber => $pageinfo) {
+                if (is_string($pageinfo)) {
+                  $pageinfo_array = array_filter(explode('|', $pageinfo));
+                  $identify = [];
+                  if (count($pageinfo_array)) {
+                    foreach ($pageinfo_array as $value) {
+                      if (is_string($value) && (strlen($value) > 1)) {
+                        $pair = array_filter(explode(':', $value));
+                        if (count($pair)) {
+                          $identify[$pair[0]] = isset($pair[1]) ? $pair[1] : NULL;
+                        }
+                      }
+                    }
+                  }
+                  $identify_meta[$sequencenumber + 1] = $identify;
+                }
+              }
+              $metadata['flv:identify'] = $identify_meta;
+            }
+          }
         }
       }
     }
