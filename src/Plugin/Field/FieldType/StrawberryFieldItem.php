@@ -1,10 +1,12 @@
 <?php
 namespace Drupal\strawberryfield\Plugin\Field\FieldType;
 
+use Drupal\Core\Entity\TypedData\EntityDataDefinition;
 use Drupal\Core\Field\FieldItemBase;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\TypedData\DataDefinition;
+use Drupal\Core\TypedData\DataReferenceDefinition;
 use Drupal\strawberryfield\Entity\keyNameProviderEntity;
 use Drupal\Component\Utility\Random;
 use Drupal\Core\TypedData\ListDataDefinition;
@@ -83,7 +85,7 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
     */
    public static function propertyDefinitions(FieldStorageDefinitionInterface $field_definition) {
 
-     $reserverd_keys = [
+     $reserved_keys = [
        'value',
        'str_flatten_keys',
      ];
@@ -140,23 +142,54 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
          }
        }
      }
-
      foreach ($keynamelist as $processor_class => $plugin_info) {
        if (is_array($plugin_info)) {
          foreach ($plugin_info as $property => $keyname) {
-           if (isset($reserverd_keys[$property])) {
+           if (isset($reserved_keys[$property])) {
              // Avoid internal reserved keys
              continue;
            }
-           $properties[$property] = ListDataDefinition::create($item_types[$processor_class])
-             ->setLabel($property)
-             ->setComputed(TRUE)
-             ->setClass(
-               $processor_class
+           // @TODO discuss with @giancarlobi
+           // This is a Hack and it does the job of allowing
+           // Search API's fieldHelper class to find the actual
+           // Elements. Since this is a property and we can not
+           // add Entity References Field Lists only base DataTypes
+           // We define this as a single Element (escaping the problem with the fact
+           // that each of our SBF in fact! can refer to MANY things. So delta
+           // Is included. But to allow functioning code to do the rest
+           // We override the class ($processor_class) to actually use a ListInterface
+           // data Type that pushes EntityAdapter objects.
+           // Quite clever to be honest.
+           if  ($item_types[$processor_class] == 'entity_reference') {
+             $properties[$property] = DataReferenceDefinition::create(
+               'entity'
              )
-             ->setInternal(TRUE)
-             ->setSetting('jsonkey', $keyname)
-             ->setReadOnly(TRUE);
+               ->setLabel('entity_'.$property)
+               ->setComputed(TRUE)
+               ->setClass(
+                 $processor_class
+               )
+               ->setInternal(TRUE)
+               ->setSetting('jsonkey', $keyname)
+               ->setReadOnly(TRUE)
+               ->setTargetDefinition(EntityDataDefinition::create('node'))
+               ->addConstraint('EntityType', 'node');
+
+           }
+           else {
+
+             $properties[$property] = ListDataDefinition::create(
+               $item_types[$processor_class]
+             )
+               ->setLabel($property)
+               ->setComputed(TRUE)
+               ->setClass(
+                 $processor_class
+               )
+               ->setInternal(TRUE)
+               ->setSetting('jsonkey', $keyname)
+               ->setReadOnly(TRUE);
+           }
          }
        }
      }
@@ -197,15 +230,14 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
     * @return array|\stdClass
     */
    public function provideDecoded($assoc = TRUE) {
+     $jsonArray = [];
      if ($this->isEmpty()) {
        $this->flattenjson = [];
        $jsonArray = [];
      }
      elseif ($this->validate()->count() == 0) {
        $mainproperty = $this->mainPropertyName();
-       $jsonArray = [];
        $jsonArray = json_decode($this->{$mainproperty}, $assoc, 50);
-
      }
      return $jsonArray;
    }
