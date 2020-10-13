@@ -147,7 +147,7 @@ class StrawberryfieldEventInsertSubscriberDepositDO extends StrawberryfieldEvent
 
       $sbf_data[] = '"datemodified": "' . $datetime->format('c') . '"';
       $sbf_data[] = '"unixdatemodified": ' . $timestamp;
-      $sbf_data[] = '"username": "'  . $entity->get('uid')->entity->getUsername(). '"';
+      $sbf_data[] = '"username": "'  . $entity->get('uid')->entity->getAccountName(). '"';
       $sbf_data_string = '{' . implode(",", $sbf_data) . '}';
 
       $success = $this->strawberryfilepersister->persistMetadataToDisk(

@@ -13,6 +13,7 @@ use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\StreamWrapper\StreamWrapperInterface;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\strawberryfield\Field\StrawberryFieldFileComputedItemList;
+use Drupal\strawberryfield\Field\StrawberryFieldEntityComputedItemList;
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Session\AccountInterface;
@@ -220,7 +221,7 @@ function strawberryfield_entity_base_field_info(EntityTypeInterface $entity_type
     // Which makes adding new bundles and attaching automagically super complex
 
     // @TODO future work on exposing other JSON properties as other REAL field types
-    // Dymanically can be archieved by creating a new Class extending BaseFieldDefinition
+    // Dynamically can be achieved by creating a new Class extending BaseFieldDefinition
     // That manages without hickups the 'Bundle' option
     // \Drupal\Core\Field\BaseFieldDefinition::setTargetBundle
 
@@ -243,6 +244,21 @@ function strawberryfield_entity_base_field_info(EntityTypeInterface $entity_type
       ->setClass(StrawberryFieldFileComputedItemList::class)
       ->setDisplayConfigurable('view', FALSE)
       ->setDisplayConfigurable('form', FALSE);
+
+
+    // A computed field to store customly detected Node references from a SBF.
+    $fields['field_sbf_nodetonode'] = BaseFieldDefinition::create('entity_reference')
+      ->setName('field_sbf_nodetonode')
+      ->setLabel('Related ADOs')
+      ->setSetting('target_type', 'node')
+      ->setTargetEntityTypeId('node')
+      ->setDescription(t('Computed Node to Node relationships'))
+      ->setComputed(TRUE)
+      ->setCardinality(FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED)
+      ->setRevisionable(FALSE)
+      ->setReadOnly(TRUE)
+      ->setTranslatable(FALSE)
+      ->setClass(StrawberryFieldEntityComputedItemList::class);
     return $fields;
   }
 }
@@ -282,6 +298,24 @@ function strawberryfield_entity_bundle_field_info(
       $base_field_definitions['field_file_drop']->setTargetBundle($bundle);
       return [
         'field_file_drop' => $base_field_definitions['field_file_drop'],
+      ];
+    }
+  }
+  // ASk around. Do we need to expose this virtual creature the same way
+  // Given that is its read only?
+  if (($entity_type->id() == 'node') && isset($base_field_definitions['field_sbf_nodetonode'])) {
+    if (\Drupal::service('strawberryfield.utility')
+      ->bundleHasStrawberryfield($bundle)) {
+
+      // Add the target bundle to the field_file_drop base field
+      // only if it carries a Strawberryfield
+      // In practice this will allow Bundle specific create access permissions
+      // to work and force anything not Strawberryfield to either have the node
+      // access override or simply not work.
+
+      $base_field_definitions['field_sbf_nodetonode']->setTargetBundle($bundle);
+      return [
+        'field_sbf_nodetonode' => $base_field_definitions['field_sbf_nodetonode'],
       ];
     }
   }
