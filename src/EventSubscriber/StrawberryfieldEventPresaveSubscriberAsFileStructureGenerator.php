@@ -169,7 +169,7 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
               }
             }
             // WE should be able to load also UUIDs here.
-           // Now assign back al as:structures
+            // Now assign back al as:structures
             // Distribute all processed AS values for each field into its final JSON
             // Structure, e.g as:image, as:application, as:documents, etc.\
 
@@ -227,12 +227,15 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
       // We can not have an array of arrays.
 
       foreach ($entityMapping as $entity_type_key => &$jsonkeys_with_fileids) {
-        $jsonkeys_with_fileids = array_filter(
+        $jsonkeys_with_fileids_clean = [];
+        $jsonkeys_with_fileids_clean = array_filter(
           $jsonkeys_with_fileids,
           [$this,'isNotArray']
         );
-        if (is_array($jsonkeys_with_fileids)) {
-          foreach ($jsonkeys_with_fileids as $json_key) {
+        // Clean again in case we have an empty mapping, like entity:node?
+        $jsonkeys_with_fileids_clean = array_filter($jsonkeys_with_fileids_clean);
+        if (is_array($jsonkeys_with_fileids_clean)) {
+          foreach ($jsonkeys_with_fileids_clean as $json_key) {
             // If not present simply create
             if (!isset($fullvalues[$json_key])) {
               $fullvalues[$json_key] = [];

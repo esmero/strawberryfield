@@ -27,3 +27,10 @@ strawberryfield.file_persister_settings_form:
     _permission: 'access administration pages'
   options:
     _admin_route: TRUE
+
+strawberryfield.multiple_patch_confirm:
+  path: '/admin/config/archipelago/actions/jsonpatch'
+  defaults:
+    _form: '\Drupal\strawberryfield\Form\JsonPatchMultiple'
+  requirements:
+    _permission: 'JSON Patch Strawberryfield'

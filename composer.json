@@ -16,7 +16,8 @@
         "drupal/core": "^8.8 || ^9",
         "ml/json-ld": "^1.1",
         "mtdowling/jmespath.php":"^2.5",
-        "swaggest/json-schema":"^0.12.25",
+        "swaggest/json-schema":"^0.12.29",
+        "swaggest/json-diff":"^3.7.5",
         "frictionlessdata/datapackage": "dev-master",
         "drupal/search_api": "~1.14"
     },

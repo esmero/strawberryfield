@@ -2,16 +2,19 @@
 
 namespace Drupal\strawberryfield\Plugin\search_api\datasource;
 
+use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Entity\EntityDisplayRepositoryInterface;
 use Drupal\Core\TypedData\ComplexDataInterface;
 use Drupal\search_api\Datasource\DatasourcePluginBase;
+use Drupal\search_api\Entity\Index;
 use Drupal\strawberryfield\TypedData\StrawberryfieldFlavorDataDefinition;
 use Drupal\Core\Language\LanguageInterface;
 use Drupal\search_api\Utility\Utility;
 use Drupal\search_api\Plugin\PluginFormTrait;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Plugin\PluginFormInterface;
-use Drupal\Core\Entity\Plugin\DataType\EntityAdapter;
 use Symfony\Component\DependencyInjection\ContainerInterface;
+
 
 
 /**
@@ -68,6 +71,19 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
    */
   protected $entityTypeBundleInfo;
 
+  /**
+   * Key value service.
+   *
+   * @var \Drupal\Core\KeyValueStore\KeyValueFactoryInterface
+   */
+  protected $keyValue;
+
+  /**
+   * The entity display repository manager.
+   *
+   * @var \Drupal\Core\Entity\EntityDisplayRepositoryInterface|null
+   */
+  protected $entityDisplayRepository;
 
   /**
    * {@inheritdoc}
@@ -81,6 +97,7 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
     $datasource->entityTypeBundleInfo = $container->get('entity_type.bundle.info');
     $datasource->typedDataManager = $container->get('typed_data_manager');
     $datasource->languageManager = $container->get('language_manager');
+    $datasource->keyValue = $container->get('keyvalue');
 
     return $datasource;
   }
@@ -158,14 +175,15 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
    *   found.
    */
   protected function getEntity(ComplexDataInterface $item) {
+    error_log('getEntity called');
     $value = $item->get('target_id')->getValue();
+    error_log(get_class($value));
     return $value instanceof EntityInterface ? $value : NULL;
   }
   /**
    * {@inheritdoc}
    */
   public function getItemIds($page = NULL) {
-
     return $this->getPartialItemIds($page);
   }
 
@@ -247,15 +265,21 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
         && (!$bundles || !in_array($entity->bundle(), $bundles))) {
         $translations = array_intersect($translations, $languages);
       }
+      // Well, well well. Happens that we may have gotten this wrong?
+      // Flavours can be also file based. One ADO manny files?
+      // Many times files flavors...
+      // Also should we track here who provides the data
+      // SB_runners config ID?
+
+      // We will throw the service invoke event here
+      // And fetch back which ones to be indexed?
+
       foreach ($translations as $langcode) {
         $sequence_id = 1;
         $item_ids[] = "$entity_id:$sequence_id:$langcode";
-        $sequence_id = 2;
-        $item_ids[] = "$entity_id:$sequence_id:$langcode";
-        $sequence_id = 3;
-        $item_ids[] = "$entity_id:$sequence_id:$langcode";
-        $sequence_id = 4;
-        $item_ids[] = "$entity_id:$sequence_id:$langcode";
+        // WE probably don't want anything here at all
+        // since this is pushed really by a queue
+        // and should never run if there is no real data source!
       }
     }
 
@@ -266,7 +290,7 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
       $this->getEntityStorage()->resetCache($entity_ids);
     }
 
-    return $item_ids;
+    return [];
   }
 
   /**
@@ -532,7 +556,6 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
     foreach ($this->getLanguageManager()->getLanguages() as $language) {
       $options[$language->getId()] = $language->getName();
     }
-
     return $options;
   }
 
@@ -545,20 +568,160 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
     $documents = [];
     $sbfflavordata_definition = StrawberryfieldFlavorDataDefinition::create('strawberryfield_flavor_data');
 
-    foreach($ids as $id){
-      $splitted_id = explode(':',$id);
-      $data = [
-        'item_id' => $id,
-        'sequence_id' => $splitted_id[1],
-        'target_id' => $splitted_id[0],
-        'parent_id' => $splitted_id[0],
-        'fulltext' => 'Start ' . $splitted_id[1] . ' End',
-      ];
-      $documents[$id] = $this->typedDataManager->create($sbfflavordata_definition);
-      $documents[$id]->setValue($data);
+    $entity_ids = [];
 
+    foreach($ids as $id) {
+      $splitted_id = explode(':', $id);
+      if (isset($splitted_id[0])) {
+        $entity_ids[$splitted_id[0]] = $splitted_id[0];
+        $entity_ids_complete[$splitted_id[0]] = $splitted_id;
+      }
     }
+    $entity_ids = array_values( $entity_ids);
+    // IMPORTANT KIDS!
+    // This is the structure of one of our ids
+    // Means one $entity_ids_complete will contain this splitted
+    // $id = $entity->id() . ':'.$sequence .':'.$translation_id.':'.$file->uuid().':'.$data->plugin_config_entity_id;
 
+    foreach ($this->getEntityStorage()->loadMultiple($entity_ids) as $entity_id => $entity) {
+
+      $fid_uuid = isset($entity_ids_complete[$entity_id][3]) ? $entity_ids_complete[$entity_id][3] : NULL;
+      $plugin_id = isset($entity_ids_complete[$entity_id][4]) ? $entity_ids_complete[$entity_id][4] : NULL;
+      // probably we will want to add the module/class namespace for the plugin id?
+
+      if ($fid_uuid !== NULL && $plugin_id !== NULL) {
+        $keyvalue_collection = 'Strawberryfield_flavor_datasource_temp';
+
+      $key = $keyvalue_collection . ':' . $fid_uuid . ':' . $plugin_id;
+      // Skip file if element is found in key_value collection.
+      $processed_data = $this->keyValue->get($keyvalue_collection)->get($key);
+
+
+        $data = [
+          'item_id' => $id,
+          'sequence_id' => $splitted_id[1],
+          'target_id' => $splitted_id[0],
+          'parent_id' => $splitted_id[0],
+          'fulltext' => ''
+        ];
+        // This will then always create a new Index document, even if empty.
+        // Needed if we e.g are gonna use this for Book search/IIIF search
+        // to make sure it at least exists!
+        if (!empty(trim($processed_data))) {
+          $data['fulltext'] = trim($processed_data);
+        }
+        $documents[$id] = $this->typedDataManager->create(
+          $sbfflavordata_definition
+        );
+        $documents[$id]->setValue($data);
+    } else {
+        error_log('passed Data Source ID for Strawberryfield_flavor_datasource had NULL elements in its path');
+      }
+    }
     return $documents;
   }
+  /**
+   * {@inheritdoc}
+   */
+  public static function getValidIndexes() {
+    $datasource_id = 'strawberryfield_flavor_datasource';
+
+
+    /** @var \Drupal\search_api\IndexInterface[] $indexes */
+    $indexes = Index::loadMultiple();
+
+    foreach ($indexes as $index_id => $index) {
+      // Filter out indexes that don't contain the datasource in question.
+      if (!$index->isValidDatasource($datasource_id)) {
+        unset($indexes[$index_id]);
+      }
+
+      return $indexes;
+    }
+  }
+
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getViewModes($bundle = NULL) {
+    return [];
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function viewItem(ComplexDataInterface $item, $view_mode, $langcode = NULL) {
+
+    return [];
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function viewMultipleItems(array $items, $view_mode, $langcode = NULL) {
+    try {
+      $view_builder = $this->getEntityTypeManager()
+        ->getViewBuilder($this->getEntityTypeId());
+      // Langcode passed, use that for viewing.
+      if (isset($langcode)) {
+        $entities = [];
+        foreach ($items as $i => $item) {
+          if ($entity = $this->getEntity($item)) {
+            $entities[$i] = $entity;
+          }
+        }
+        if ($entities) {
+          return $view_builder->viewMultiple($entities, $view_mode, $langcode);
+        }
+        return [];
+      }
+      // Otherwise, separate the items by language, keeping the keys.
+      $items_by_language = [];
+      foreach ($items as $i => $item) {
+        if ($entity = $this->getEntity($item)) {
+          $items_by_language[$entity->language()->getId()][$i] = $entity;
+        }
+      }
+      // Then build the items for each language. We initialize $build beforehand
+      // and use array_replace() to add to it so the order stays the same.
+      $build = array_fill_keys(array_keys($items), []);
+      foreach ($items_by_language as $langcode => $language_items) {
+        $build = array_replace($build, $view_builder->viewMultiple($language_items, $view_mode, $langcode));
+      }
+      return $build;
+    }
+    catch (\Exception $e) {
+      // The most common reason for this would be a
+      // \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException in
+      // getViewBuilder(), because the entity type definition doesn't specify a
+      // view_builder class.
+      return [];
+    }
+  }
+
+  /**
+   * Retrieves the entity display repository.
+   *
+   * @return \Drupal\Core\Entity\EntityDisplayRepositoryInterface
+   *   The entity entity display repository.
+   */
+  public function getEntityDisplayRepository() {
+    return $this->entityDisplayRepository ?: \Drupal::service('entity_display.repository');
+  }
+
+  /**
+   * Sets the entity display repository.
+   *
+   * @param \Drupal\Core\Entity\EntityDisplayRepositoryInterface $entity_display_repository
+   *   The new entity display repository.
+   *
+   * @return $this
+   */
+  public function setEntityDisplayRepository(EntityDisplayRepositoryInterface $entity_display_repository) {
+    $this->entityDisplayRepository = $entity_display_repository;
+    return $this;
+  }
+
+
 }

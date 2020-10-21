@@ -55,6 +55,17 @@ strawberryfield.strawberry_keynameprovider.jmespath:
       type: string
       label: 'The field property we expose for the Strawberryfield'
 
+strawberryfield.strawberry_keynameprovider.entityjmespath:
+  type: config_object
+  label: 'Strawberry Key Name Provider Entity JMesPath specific config'
+  mapping:
+    source_key:
+      type: string
+      label: 'A Comma separated string containing one or more JMESPaths pointing to JSON key with NODE ids.'
+    exposed_key:
+      type: string
+      label: 'The field property we expose for the Strawberryfield'
+
 strawberryfield.storage_settings:
   type: config_object
   label: 'Strawberry Storage specific config'
@@ -148,6 +159,12 @@ strawberryfield.filepersister_service_settings:
     fido_exec_path:
       type: string
       label: 'FIDO binary full executable path'
+    identify_exec_path:
+      type: string
+      label: 'Identify binary full executable path (graphics magic or Imagemagick)'
+    pdfinfo_exec_path:
+      type: string
+      label: 'pdfinfo binary full executable path (poppler utils)'
 
 strawberryfield.general:
   type: config_object

@@ -8,7 +8,10 @@
 
 namespace Drupal\strawberryfield\Tools;
 
+use Drupal\Core\Messenger\MessengerTrait;
 use JmesPath\Env as JmesPath;
+use Swaggest\JsonSchema\Exception as JsonSchemaException;
+use Swaggest\JsonSchema\Schema as JsonSchema;
 
 
 /**
@@ -20,6 +23,7 @@ class StrawberryfieldJsonHelper {
   /**
    * Defines all types of keys we generated based on file types.
    */
+  use MessengerTrait;
   const AS_FILE_TYPE = [
     'as:image',
     'as:document',
@@ -465,8 +469,39 @@ class StrawberryfieldJsonHelper {
    * @return boolean 
    */
   public static function isJsonString($input) {
-    
     return is_string($input) && is_array(json_decode($input, true)) && (json_last_error() == JSON_ERROR_NONE);
   }
+
+  /**
+   * Validates a JSON String against a JSON SCHEMA
+   * @param string $jsonstring
+   * @param string $acceptedjsonschema
+   *
+   * @return bool|array
+   * @throws \Exception
+   */
+  public static function isValidJsonSchema(string $jsonstring, string $acceptedjsonschema) {
+    $jsonarray = json_decode(trim($jsonstring));
+    $json_error = json_last_error();
+
+    if ($json_error == JSON_ERROR_NONE) {
+    try {
+      $schema = JsonSchema::import(
+        json_decode($acceptedjsonschema)
+      );
+
+      $schema->in($jsonarray);
+      return $jsonarray;
+    }
+    catch (JsonSchemaException $exception) {
+      static::messenger()->addWarning($exception->getMessage());
+      return FALSE;
+    }
+    }
+    else {
+      return FALSE;
+    }
+  }
+
   
 }

@@ -7,3 +7,6 @@
 'view own Raw Strawberryfield':
   title: 'View own raw JSON in a Strawberryfield when showed through the provided Formatter'
   description: 'Allows viewing <em>own</em> Strawberryfield RAW JSON when a "Strawberry Default Formatter" is rendered.'
+'JSON Patch Strawberryfield':
+  title: 'JSON Patch Archipelago Digital Objects'
+  description: 'Allows JSON Patch actions to be executed against a "Strawberryfield" bearing Entity. Still on Patch time, individual permissions may apply and/or override this permission'
