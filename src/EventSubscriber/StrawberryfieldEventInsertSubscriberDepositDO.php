@@ -10,6 +10,7 @@ use Drupal\Core\Messenger\MessengerInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\strawberryfield\StrawberryfieldFilePersisterService;
+use Drupal\Core\Session\AccountInterface;
 use Datetime;
 
 /**
@@ -58,6 +59,13 @@ class StrawberryfieldEventInsertSubscriberDepositDO extends StrawberryfieldEvent
   protected $loggerFactory;
 
   /**
+   * The current user.
+   *
+   * @var \Drupal\Core\Session\AccountInterface
+   */
+  protected $account;
+
+  /**
    * StrawberryfieldEventInsertSubscriberDepositDO constructor.
    *
    * @param \Drupal\Core\StringTranslation\TranslationInterface $string_translation
@@ -65,6 +73,8 @@ class StrawberryfieldEventInsertSubscriberDepositDO extends StrawberryfieldEvent
    * @param \Symfony\Component\Serializer\SerializerInterface $serializer
    * @param \Drupal\Core\Config\ConfigFactoryInterface $config_factory
    * @param \Drupal\Core\Logger\LoggerChannelFactoryInterface $logger_factory
+   * @param \Drupal\strawberryfield\StrawberryfieldFilePersisterService $strawberry_filepersister
+   * @param \Drupal\Core\Session\AccountInterface $account
    */
   public function __construct(
     TranslationInterface $string_translation,
@@ -72,7 +82,8 @@ class StrawberryfieldEventInsertSubscriberDepositDO extends StrawberryfieldEvent
     SerializerInterface $serializer,
     ConfigFactoryInterface $config_factory,
     LoggerChannelFactoryInterface $logger_factory,
-    StrawberryfieldFilePersisterService $strawberry_filepersister
+    StrawberryfieldFilePersisterService $strawberry_filepersister,
+    AccountInterface $account
   ) {
     $this->stringTranslation = $string_translation;
     $this->messenger = $messenger;
@@ -82,6 +93,7 @@ class StrawberryfieldEventInsertSubscriberDepositDO extends StrawberryfieldEvent
     )->get('object_file_scheme');
     $this->loggerFactory = $logger_factory;
     $this->strawberryfilepersister = $strawberry_filepersister;
+    $this->account = $account;
   }
 
   /**
@@ -160,7 +172,7 @@ class StrawberryfieldEventInsertSubscriberDepositDO extends StrawberryfieldEvent
     }
     $event->setProcessedBy($current_class, $success);
     // Entity is "assigned by reference" so any change on the entity here will persist.
-    if ($success) {
+    if ($success && $this->account->hasPermission('display strawberry messages')) {
       $this->messenger->addStatus(
         t('Digital Object persisted to Filesystem.')
       );
@@ -169,10 +181,11 @@ class StrawberryfieldEventInsertSubscriberDepositDO extends StrawberryfieldEvent
         ['Entity ID' => $entity->id(), 'Entity Title' => $entity->label()]
       );
     }
+    // Errors need to be shown always. We do not disable this
     if (!$success) {
       $this->messenger->addError(
         t(
-          'Digital Object Serialization failed? We could not persist to Filesystem. Please check your logs.'
+          'Digital Object Serialization failed? We could not persist to Filesystem. Please contact your site admin.'
         )
       );
       $this->loggerFactory->get('archipelago')->critical(

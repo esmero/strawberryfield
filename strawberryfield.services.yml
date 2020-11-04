@@ -19,41 +19,39 @@ services:
     class: Drupal\strawberryfield\EventSubscriber\StrawberryfieldEventPresaveSubscriberVocabCreator
     tags:
       - {name: event_subscriber}
-    arguments: ['@string_translation', '@messenger']
+    arguments: ['@string_translation', '@messenger', '@current_user']
   strawberryfield.presave_as_filestructure_subscriber:
       class: Drupal\strawberryfield\EventSubscriber\StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator
       tags:
         - {name: event_subscriber}
-      arguments: ['@string_translation', '@messenger','@logger.factory','@strawberryfield.file_persister']
+      arguments: ['@string_translation', '@messenger','@logger.factory','@strawberryfield.file_persister','@current_user']
   strawberryfield.presavefilepersister_subscriber:
     class: Drupal\strawberryfield\EventSubscriber\StrawberryfieldEventPresaveSubscriberFilePersister
     tags:
       - {name: event_subscriber}
-    arguments: ['@string_translation', '@messenger','@logger.factory','@strawberryfield.file_persister']
+    arguments: ['@string_translation', '@messenger','@logger.factory','@strawberryfield.file_persister','@current_user']
   strawberryfield.presavesetlabelfrommetadata_subscriber:
      class: Drupal\strawberryfield\EventSubscriber\StrawberryfieldEventPresaveSubscriberSetTitlefromMetadata
      tags:
        - {name: event_subscriber}
-     arguments: ['@string_translation', '@messenger','@logger.factory']
+     arguments: ['@string_translation', '@messenger','@logger.factory','@current_user']
   strawberryfield.insertdeposit_subscriber:
     class: Drupal\strawberryfield\EventSubscriber\StrawberryfieldEventInsertSubscriberDepositDO
     tags:
       - {name: event_subscriber}
-    arguments: ['@string_translation', '@messenger', '@serializer','@config.factory','@logger.factory','@strawberryfield.file_persister']
+    arguments: ['@string_translation', '@messenger', '@serializer','@config.factory','@logger.factory','@strawberryfield.file_persister','@current_user']
   strawberryfield.insertfileusage_subscriber:
     class: Drupal\strawberryfield\EventSubscriber\StrawberryfieldEventInsertFileUsageUpdater
     tags:
       - {name: event_subscriber}
-    arguments: ['@string_translation', '@messenger','@logger.factory','@strawberryfield.file_persister']
+    arguments: ['@string_translation', '@messenger','@logger.factory','@strawberryfield.file_persister','@current_user']
   strawberryfield.deletefileusage_subscriber:
     class: Drupal\strawberryfield\EventSubscriber\StrawberryfieldEventDeleteFileUsageDeleter
     tags:
       - {name: event_subscriber}
-    arguments: ['@string_translation', '@messenger','@logger.factory','@strawberryfield.file_persister']
+    arguments: ['@string_translation', '@messenger','@logger.factory','@strawberryfield.file_persister','@current_user']
   strawberryfield.paramconverter.entity:
     class: Drupal\strawberryfield\ParamConverter\UuidEntityConverter
     tags:
       - { name: paramconverter , priority: 10 }
-    arguments:
-      - '@entity_type.manager'
-      - '@entity.repository'
+    arguments: ['@entity_type.manager','@entity.repository']
