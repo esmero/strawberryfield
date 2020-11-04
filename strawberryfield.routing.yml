@@ -8,16 +8,6 @@ system.admin_config_strawberryfield:
   options:
     _admin_route: TRUE
 
-strawberryfield.storage_settings_form:
-  path: '/admin/config/archipelago/storage'
-  defaults:
-    _form: '\Drupal\strawberryfield\Form\StorageSettingsForm'
-    _title: 'Storage Settings'
-  requirements:
-    _permission: 'access administration pages'
-  options:
-    _admin_route: TRUE
-
 strawberryfield.important_solr_settings_form:
   path: '/admin/config/archipelago/important-solr-settings'
   defaults:
@@ -27,6 +17,23 @@ strawberryfield.important_solr_settings_form:
     _permission: 'access administration pages'
   options:
     _admin_route: TRUE
+
+strawberryfield.file_persister_settings_form:
+  path: '/admin/config/archipelago/filepersisting'
+  defaults:
+    _form: '\Drupal\strawberryfield\Form\FilePersisterServiceSettingsForm'
+    _title: 'File Persister Service Settings'
+  requirements:
+    _permission: 'access administration pages'
+  options:
+    _admin_route: TRUE
+
+strawberryfield.multiple_patch_confirm:
+  path: '/admin/config/archipelago/actions/jsonpatch'
+  defaults:
+    _form: '\Drupal\strawberryfield\Form\JsonPatchMultiple'
+  requirements:
+    _permission: 'JSON Patch Strawberryfield'
 
 # The access check below has a soft dependency on Form Mode Manager module
 # We get a list of all form modes, then check if user has permissions "use <formmode> form mode"
@@ -43,4 +50,4 @@ strawberryfield.custom_node_edit:
       node:
         type: entity:node
       user:
-        type: entity:user  
+        type: entity:user

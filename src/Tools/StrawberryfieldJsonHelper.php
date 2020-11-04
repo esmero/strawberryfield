@@ -8,7 +8,10 @@
 
 namespace Drupal\strawberryfield\Tools;
 
+use Drupal\Core\Messenger\MessengerTrait;
 use JmesPath\Env as JmesPath;
+use Swaggest\JsonSchema\Exception as JsonSchemaException;
+use Swaggest\JsonSchema\Schema as JsonSchema;
 
 
 /**
@@ -20,6 +23,7 @@ class StrawberryfieldJsonHelper {
   /**
    * Defines all types of keys we generated based on file types.
    */
+  use MessengerTrait;
   const AS_FILE_TYPE = [
     'as:image',
     'as:document',
@@ -169,6 +173,9 @@ class StrawberryfieldJsonHelper {
     ^(?&uri)$
     /x';
 
+  /**
+   * Regular expression to catch an URI/URL/URN
+   */
   CONST URN_REGEXP = '/^urn:[a-z0-9][a-z0-9-]{0,31}:[a-z0-9()+,\-.:=@;$_!*\'%\/?#]+$/x';
 
   /**
@@ -178,15 +185,22 @@ class StrawberryfieldJsonHelper {
    *    An Associative array coming, maybe, from a JSON string.
    * @param string $propertypath;
    *   Use to accumulate the propertypath between recursive calls.
-
+   *
+   * @return array
    */
-  public static function arrayToFlatPropertypaths(array $sourcearray = [], $propertypath = '')
+  public static function arrayToFlatPropertypaths(array $sourcearray = [], $propertypath = '', $excludepaths = [])
   {
     $flat = array();
+
+    // Blacklist paths. Strip the last dot in case this was called recursively.
+    if (!empty($excludepaths) && in_array(rtrim($propertypath,'.'), $excludepaths)) {
+      return $flat;
+    }
+
     foreach ($sourcearray as $key => $values) {
 
       if (is_array($values)) {
-        $flat = $flat + static::arrayToFlatPropertypaths($values,  $propertypath.$key.'.');
+        $flat = $flat + static::arrayToFlatPropertypaths($values,  $propertypath.$key.'.', $excludepaths);
       }
       else {
         $flat[$propertypath.$key] = $values;
@@ -206,11 +220,20 @@ class StrawberryfieldJsonHelper {
    *    An Associative array coming, maybe, from a JSON string.
    * @param string $propertypath;
    *   Use to accumulate the propertypath between recursive calls.
-
+   * @param array $excludepaths;
+   *   Use to pass a list of blacklisted paths
+   *
+   * @return array
    */
-  public static function arrayToFlatJsonPropertypaths(array $sourcearray = [], $propertypath = '')
+  public static function arrayToFlatJsonPropertypaths(array $sourcearray = [], $propertypath = '', $excludepaths = [])
   {
     $flat = array();
+
+    // Blacklist paths. Strip the last dot in case this was called recursively.
+    if (!empty($excludepaths) && in_array(rtrim($propertypath,'.'), $excludepaths)) {
+      return $flat;
+    }
+
     foreach ($sourcearray as $key => $values) {
       // If a Key is an URL chances are we are dealing with many different ones
       // Also we want to build JSON Paths here, so replace with *
@@ -224,7 +247,7 @@ class StrawberryfieldJsonHelper {
       // I could break here instead of iterating further, but that could exclude sub properties not present
       // In the first element
       if (is_array($values)) {
-        $flat = $flat + static::arrayToFlatJsonPropertypaths($values,  $propertypath.$key.'.');
+        $flat = $flat + static::arrayToFlatJsonPropertypaths($values,$propertypath.$key.'.', $excludepaths);
       }
       else {
         $flat[$propertypath.$key] = $values;
@@ -438,4 +461,47 @@ class StrawberryfieldJsonHelper {
       }
     );
   }
+  
+  /** Test if an input is a valid JSON string.
+   * 
+   * @param $input
+   *
+   * @return boolean 
+   */
+  public static function isJsonString($input) {
+    return is_string($input) && is_array(json_decode($input, true)) && (json_last_error() == JSON_ERROR_NONE);
+  }
+
+  /**
+   * Validates a JSON String against a JSON SCHEMA
+   * @param string $jsonstring
+   * @param string $acceptedjsonschema
+   *
+   * @return bool|array
+   * @throws \Exception
+   */
+  public static function isValidJsonSchema(string $jsonstring, string $acceptedjsonschema) {
+    $jsonarray = json_decode(trim($jsonstring));
+    $json_error = json_last_error();
+
+    if ($json_error == JSON_ERROR_NONE) {
+    try {
+      $schema = JsonSchema::import(
+        json_decode($acceptedjsonschema)
+      );
+
+      $schema->in($jsonarray);
+      return $jsonarray;
+    }
+    catch (JsonSchemaException $exception) {
+      static::messenger()->addWarning($exception->getMessage());
+      return FALSE;
+    }
+    }
+    else {
+      return FALSE;
+    }
+  }
+
+  
 }

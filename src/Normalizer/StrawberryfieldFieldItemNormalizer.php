@@ -3,10 +3,13 @@
 namespace Drupal\strawberryfield\Normalizer;
 use Drupal\Core\Field\FieldItemInterface;
 use Drupal\Core\Entity\EntityRepositoryInterface;
+use Drupal\Core\TypedData\DataDefinition;
 use Drupal\serialization\Normalizer\FieldItemNormalizer;
 use Drupal\strawberryfield\Plugin\Field\FieldType\StrawberryFieldItem;
 use Drupal\serialization\Normalizer\EntityReferenceFieldItemNormalizerTrait;
 use Drupal\Core\TypedData\TypedDataInternalPropertiesHelper;
+use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
+
 
 /**
  * Normalizes StrawberryfieldFieldItem values and expands to full JSON
@@ -45,14 +48,15 @@ class StrawberryfieldFieldItemNormalizer extends FieldItemNormalizer {
   public function normalize($field_item, $format = NULL, array $context = []) {
     //@TODO check what options we can get from $context
     //@TODO allow per Field instance to limit which prop is internal or external
-    //@TODO do the inverse, a denormalizer for 'value' to allow API ingests
     // Only do this because parent implementation can change.
     $values = parent::normalize($field_item, $format , $context);
+
+    //  Get the main property and decode
     $mainproperty = $field_item->mainPropertyName();
-    // Now get the mainPropertyName and decode
     if ((isset($values[$mainproperty])) && (!empty($values[$mainproperty])) || $values[$mainproperty]!='') {
       $values[$mainproperty] = $this->serializer->decode($values[$mainproperty], 'json');
     }
+    
     return $values;
   }
 
@@ -69,17 +73,47 @@ class StrawberryfieldFieldItemNormalizer extends FieldItemNormalizer {
     $field_item = $context['target_instance'];
     $this->checkForSerializedStrings($data, $class, $field_item);
 
-    $field_item->setValue($this->constructValue($data, $context));
+    // Set each key in the field_item with its constructed value
+    // At this point all values will be encoded JSON strings
+    $constructedValue = $this->constructValue($data, $context);
+    foreach ($constructedValue as $key => $value) {
+      $field_item->set($key, $value);
+    }
+    
     return $field_item;
   }
 
-
-/**
-   * {@inheritdoc}
-   */
+  /**
+   * Encodes the $data items that aren't already strings or computed/readOnly properties
+   * 
+   * @param mixed $data
+   * @param array $context
+   * 
+   * @return array|mixed
+   */  
   protected function constructValue($data, $context) {
-    //$data = $this->serializer->encode($data, 'json');
-    return parent::constructValue($data, $context);
+    // Encode individually, otherwise 'value' gets nested and breaks the SBF
+    $individualEncodedValues = [];
+    
+    $data_definition = $context['target_instance']->getDataDefinition();
+
+    foreach ($data as $key => $value ) {
+      // Don't bother with properties that were defined computed or readOnly in StrawberryFieldItem data definition
+      // These values won't be returned to denormalize() and won't be set
+      if ($data_definition->getPropertyDefinition($key)->isComputed() || $data_definition->getPropertyDefinition($key)->isReadOnly()) {
+        continue;
+      }
+      
+      $isJsonString = StrawberryfieldJsonHelper::isJsonString($value);
+      if ($isJsonString) {
+        $encoded = $value;
+      } else {
+        $encoded = $this->serializer->encode($value, 'json');
+      }
+      $individualEncodedValues[$key] = $encoded;
+    }
+    
+    return $individualEncodedValues;
   }
 
 }

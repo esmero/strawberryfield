@@ -49,6 +49,11 @@ class StrawberryfieldEventPresaveSubscriberFilePersister extends Strawberryfield
    */
   protected $strawberryfilepersister;
 
+  /**
+   * The logger factory.
+   * @var \Drupal\Core\Logger\LoggerChannelFactoryInterface
+   */
+  protected $loggerFactory;
 
   /**
    * StrawberryfieldEventPresaveSubscriberFilePersister constructor.

@@ -52,7 +52,9 @@ final class StrawberryfieldEventType {
    * Name of the event fired when updating a node with a SBF attached.
    *
    * This event allows modules to perform an action whenever a node
-   * with a SBF(Strawberry Field) is updated.
+   * with a SBF(Strawberry Field) is updated. This is after storage
+   * was updated (SQL INSERT or UPDATE) so no JSON can be modified via this
+   * one.
    * The event listener method receives a
    * \Drupal\strawberryfield\Event\StrawberryfieldCrudEvent instance.
    *

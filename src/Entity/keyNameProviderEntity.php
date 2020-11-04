@@ -35,6 +35,14 @@ use Drupal\Core\Config\Entity\ConfigEntityBase;
  *     "edit-form" = "/admin/structure/strawberry_keynameprovider/{strawberry_keynameprovider}/edit",
  *     "delete-form" = "/admin/structure/strawberry_keynameprovider/{strawberry_keynameprovider}/delete",
  *     "collection" = "/admin/structure/strawberry_keynameprovider"
+ *   },
+ *   config_export = {
+ *     "id",
+ *     "label",
+ *     "uuid",
+ *     "pluginid",
+ *     "pluginconfig",
+ *     "active"
  *   }
  * )
  */
