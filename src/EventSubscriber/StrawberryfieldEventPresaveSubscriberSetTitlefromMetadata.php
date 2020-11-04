@@ -6,9 +6,9 @@ use Drupal\strawberryfield\Event\StrawberryfieldCrudEvent;
 use Drupal\Core\Messenger\MessengerInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\StringTranslation\TranslationInterface;
-use Drupal\strawberryfield\StrawberryfieldFilePersisterService;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\Component\Utility\Unicode;
+use Drupal\Core\Session\AccountInterface;
 
 
 /**
@@ -44,6 +44,12 @@ class StrawberryfieldEventPresaveSubscriberSetTitlefromMetadata extends Strawber
    */
   protected $loggerFactory;
 
+  /**
+   * The current user.
+   *
+   * @var \Drupal\Core\Session\AccountInterface
+   */
+  protected $account;
 
   /**
    * StrawberryfieldEventPresaveSubscriberFilePersister constructor.
@@ -55,12 +61,14 @@ class StrawberryfieldEventPresaveSubscriberSetTitlefromMetadata extends Strawber
   public function __construct(
     TranslationInterface $string_translation,
     MessengerInterface $messenger,
-    LoggerChannelFactoryInterface $logger_factory
+    LoggerChannelFactoryInterface $logger_factory,
+    AccountInterface $account
 
   ) {
     $this->stringTranslation = $string_translation;
     $this->messenger = $messenger;
     $this->loggerFactory = $logger_factory;
+    $this->account = $account;
   }
 
 

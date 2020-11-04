@@ -10,3 +10,6 @@
 'JSON Patch Strawberryfield':
   title: 'JSON Patch Archipelago Digital Objects'
   description: 'Allows JSON Patch actions to be executed against a "Strawberryfield" bearing Entity. Still on Patch time, individual permissions may apply and/or override this permission'
+'display strawberry messages':
+ title: 'Display Strawberryfield generetaded Event Messages during Digital Object operations'
+ description: 'Shows UI/UX messages like file persistence, Vocabulary generation, etc that happen during Event driven processing. This may be annoying for not admin users so this permission may only be given to Admin users if needed.'

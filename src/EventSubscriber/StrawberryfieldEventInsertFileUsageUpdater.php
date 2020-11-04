@@ -8,6 +8,7 @@ use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\StringTranslation\TranslationInterface;
 use Drupal\strawberryfield\StrawberryfieldFilePersisterService;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
+use Drupal\Core\Session\AccountInterface;
 
 
 /**
@@ -48,6 +49,12 @@ class StrawberryfieldEventInsertFileUsageUpdater extends StrawberryfieldEventIns
    */
   protected $strawberryfilepersister;
 
+  /**
+   * The current user.
+   *
+   * @var \Drupal\Core\Session\AccountInterface
+   */
+  protected $account;
 
   /**
    * StrawberryfieldEventInsertFileUsageUpdater constructor.
@@ -56,18 +63,22 @@ class StrawberryfieldEventInsertFileUsageUpdater extends StrawberryfieldEventIns
    * @param \Drupal\Core\Messenger\MessengerInterface $messenger
    * @param \Drupal\Core\Logger\LoggerChannelFactoryInterface $logger_factory
    * @param \Drupal\strawberryfield\StrawberryfieldFilePersisterService $strawberry_filepersister
+   * @param \Drupal\Core\Session\AccountInterface $account
    */
   public function __construct(
     TranslationInterface $string_translation,
     MessengerInterface $messenger,
     LoggerChannelFactoryInterface $logger_factory,
-    StrawberryfieldFilePersisterService $strawberry_filepersister
+    StrawberryfieldFilePersisterService $strawberry_filepersister,
+    AccountInterface $account
+
 
   ) {
     $this->stringTranslation = $string_translation;
     $this->messenger = $messenger;
     $this->loggerFactory = $logger_factory;
     $this->strawberryfilepersister = $strawberry_filepersister;
+    $this->account = $account;
   }
 
 
@@ -88,8 +99,8 @@ class StrawberryfieldEventInsertFileUsageUpdater extends StrawberryfieldEventIns
       $field = $entity->get($field_name);
       $updatedfiles = $updatedfiles + $this->strawberryfilepersister->updateUsageFilesInJson($field);
     }
-
-    if ($updatedfiles > 0) {
+    // Only generate UI messages if the user has this permission.
+    if (($updatedfiles > 0) &&  ($this->account->hasPermission('display strawberry messages'))) {
       $this->messenger->addStatus($this->stringTranslation->formatPlural($updatedfiles, 'One file usage tracked for this digital Object.', '@count files usage tracked for this digital Object.'));
     }
     $current_class = get_called_class();

@@ -2,6 +2,8 @@
 
 namespace Drupal\strawberryfield\Plugin\Action;
 
+use Drupal\Component\Diff\Diff;
+use Drupal\Component\Diff\DiffFormatter;
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Action\Plugin\Action\EntityActionBase;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
@@ -11,11 +13,13 @@ use Drupal\Core\Action\ConfigurableActionBase;
 use Drupal\Component\Plugin\DependentPluginInterface;
 use Drupal\Core\TempStore\PrivateTempStoreFactory;
 use Drupal\strawberryfield\StrawberryfieldUtilityService;
+use Psr\Log\LoggerInterface;
 use Swaggest\JsonDiff\Exception as JsonDiffException;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
 use Swaggest\JsonDiff\JsonPatch;
+use Swaggest\JsonDiff\JsonDiff;
 
 /**
  * Provides an action that can Modify Entity attached SBFs via JSON Patch.
@@ -148,27 +152,29 @@ JSON;
 
 
   /**
-   * Constructs a new DeleteAction object.
+   * @var \Psr\Log\LoggerInterface
+   */
+  protected $logger;
+
+  /**
+   * StrawberryfieldJsonPatch constructor.
    *
    * @param array $configuration
-   *   A configuration array containing information about the plugin instance.
-   * @param string $plugin_id
-   *   The plugin ID for the plugin instance.
-   * @param mixed $plugin_definition
-   *   The plugin implementation definition.
+   * @param $plugin_id
+   * @param $plugin_definition
    * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entity_type_manager
-   *   The entity type manager.
    * @param \Drupal\Core\TempStore\PrivateTempStoreFactory $temp_store_factory
-   *   The tempstore factory.
    * @param \Drupal\Core\Session\AccountInterface $current_user
-   *   Current user.
+   * @param \Drupal\strawberryfield\StrawberryfieldUtilityService $strawberryfield_utility_service
+   * @param \Psr\Log\LoggerInterface $logger
    */
-  public function __construct(array $configuration, $plugin_id, $plugin_definition, EntityTypeManagerInterface $entity_type_manager, PrivateTempStoreFactory $temp_store_factory, AccountInterface $current_user, StrawberryfieldUtilityService $strawberryfield_utility_service) {
+  public function __construct(array $configuration, $plugin_id, $plugin_definition, EntityTypeManagerInterface $entity_type_manager, PrivateTempStoreFactory $temp_store_factory, AccountInterface $current_user, StrawberryfieldUtilityService $strawberryfield_utility_service, LoggerInterface $logger) {
     parent::__construct($configuration, $plugin_id, $plugin_definition);
     $this->entityTypeManager = $entity_type_manager;
     $this->currentUser = $current_user;
-    $this->tempStore = $temp_store_factory->get('entity_delete_multiple_confirm');
+    $this->tempStore = $temp_store_factory->get('sbf_json_patch');
     $this->strawberryfieldUtility = $strawberryfield_utility_service;
+    $this->logger = $logger;
   }
 
   /**
@@ -182,7 +188,8 @@ JSON;
       $container->get('entity_type.manager'),
       $container->get('tempstore.private'),
       $container->get('current_user'),
-      $container->get('strawberryfield.utility')
+      $container->get('strawberryfield.utility'),
+      $container->get('logger.factory')->get('action')
     );
   }
 
@@ -209,6 +216,7 @@ JSON;
       if ($sbf_fields = $this->strawberryfieldUtility->bearsStrawberryfield(
         $entity
       )) {
+        $this->messenger()->addMessage($this->configuration['simulate']);
         $this->patchArray = json_decode($this->configuration['jsonpatch']);
         foreach ($sbf_fields as $field_name) {
           /* @var $field \Drupal\Core\Field\FieldItemInterface */
@@ -220,6 +228,7 @@ JSON;
           foreach ($field->getIterator() as $delta => $itemfield) {
             /** @var $itemfield \Drupal\strawberryfield\Plugin\Field\FieldType\StrawberryFieldItem */
             $fullvalues = $itemfield->provideDecoded(FALSE);
+            $fullvaluesoriginal = clone $fullvalues;
             $patch = JsonPatch::import($this->patchArray);
             try {
               $patch->apply($fullvalues, TRUE);
@@ -233,6 +242,25 @@ JSON;
                   )
                 );
               };
+              if ($this->configuration['simulate']) {
+                $r = new JsonDiff(
+                  $fullvaluesoriginal,
+                  $fullvalues,
+                  JsonDiff::REARRANGE_ARRAYS + JsonDiff::SKIP_JSON_MERGE_PATCH
+                );
+                // We just keep track of the changes. If none! Then we do not set
+                // the formstate flag.
+                  $message = $this->formatPlural($r->getDiffCnt(),
+                    'Simulated patch: Digital Object @label would one modification',
+                    'Simulated patch: Digital Object @label would @count modifications',
+                    ['@label' => $entity->label()]);
+                 // This is not as accurate as the JSON Patch but is a good hint
+                $visualjsondiff = new Diff(explode(PHP_EOL,json_encode($fullvaluesoriginal,JSON_PRETTY_PRINT)), explode(PHP_EOL,json_encode($fullvalues, JSON_PRETTY_PRINT)));
+                $formatter = new DiffFormatter();
+                $output = $formatter->format($visualjsondiff);
+                $this->messenger()->addMessage($message);
+                $this->messenger()->addMessage($output);
+               }
               $patched = TRUE;
             } catch (JsonDiffException $exception) {
               $patched = FALSE;
@@ -248,14 +276,18 @@ JSON;
           }
         }
         if ($patched) {
-          $entity->save();
+          $this->logger->notice('%label had the following JSON Patch applied: @jsonpatch', [
+            '%label' => $entity->label(),
+            '@jsonpatch' => '<pre><code>'.$this->configuration['jsonpatch'].'</code></pre>'
+
+          ]);
+          if (!$this->configuration['simulate']) {
+            $entity->save();
+          }
         }
       }
     }
   }
-
-
-
 
 
   /**
@@ -324,13 +356,8 @@ JSON;
   public function validateConfigurationForm(array &$form, FormStateInterface $form_state) {
 
     if (!StrawberryfieldJsonHelper::isValidJsonSchema($form_state->getValue('jsonpatch'), $this::acceptedjsonschema)) {
-      $form_state->setErrorByName('jsonpatch', t('The JSON Patch provided is correctly formed'));
+      $form_state->setErrorByName('jsonpatch', t('The JSON Patch provided is not correctly formed'));
     }
-
-    /*if (!$this->emailValidator->isValid($form_state->getValue('recipient')) && strpos($form_state->getValue('recipient'), ':mail') === FALSE) {
-      // We want the literal %author placeholder to be emphasized in the error message.
-      $form_state->setErrorByName('recipient', t('Enter a valid email address or use a token email address such as %author.', ['%author' => '[node:author:mail]']));
-    } */
   }
 
   /**
@@ -346,6 +373,7 @@ JSON;
   public function defaultConfiguration() {
     return [
       'jsonpatch' => '',
+      'simulate' => FALSE,
     ];
   }
 
