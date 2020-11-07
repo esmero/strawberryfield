@@ -429,7 +429,6 @@ JSON;
           )) {
           $field_name = $options['fieldname'];
         }
-
       }
 
     }
