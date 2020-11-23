@@ -639,8 +639,8 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
             $keyvaluekey
           );
 
-          $fulltext = isset($processed_data->fulltext) ? $processed_data->fulltext : '';
-          $checksum = isset($processed_data->checksum) ? $processed_data->checksum : NULL;
+          $fulltext = isset($processed_data->fulltext) ? (string) $processed_data->fulltext : '';
+          $checksum = isset($processed_data->checksum) ? (string) $processed_data->checksum : NULL;
           if ($checksum) {
             $data = [
               'item_id' => $item_id,
@@ -656,7 +656,7 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
             // This will then always create a new Index document, even if empty.
             // Needed if we e.g are gonna use this for Book search/IIIF search
             // to make sure it at least exists!
-            if (!empty(trim($processed_data))) {
+            if (!empty(trim($fulltext))) {
               $data['fulltext'] = trim($fulltext);
             }
             $documents[$item_id] = $this->typedDataManager->create(
