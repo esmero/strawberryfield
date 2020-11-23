@@ -638,28 +638,31 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
           $processed_data = $this->keyValue->get($keyvalue_collection)->get(
             $keyvaluekey
           );
-
-          $data = [
-            'item_id' => $item_id,
-            'sequence_id' => $splitted_id_for_node[1],
-            'target_id' => $splitted_id_for_node[0],
-            'parent_id' => $splitted_id_for_node[0],
-            'file_uuid' => $fid_uuid,
-            'target_fileid' => $file->id(),
-            'processor_id' => $plugin_id,
-            'fulltext' => '',
-            'checksum' => '',
-          ];
-          // This will then always create a new Index document, even if empty.
-          // Needed if we e.g are gonna use this for Book search/IIIF search
-          // to make sure it at least exists!
-          if (!empty(trim($processed_data))) {
-            $data['fulltext'] = trim($processed_data);
+          $fulltext = isset($processed_data->fulltext) ? $processed_data->fulltext : '';
+          $checksum = isset($processed_data->checksum) ? $processed_data->checksum : NULL;
+          if ($checksum) {
+            $data = [
+              'item_id' => $item_id,
+              'sequence_id' => $splitted_id_for_node[1],
+              'target_id' => $splitted_id_for_node[0],
+              'parent_id' => $splitted_id_for_node[0],
+              'file_uuid' => $fid_uuid,
+              'target_fileid' => $file->id(),
+              'processor_id' => $plugin_id,
+              'fulltext' => '',
+              'checksum' => $checksum,
+            ];
+            // This will then always create a new Index document, even if empty.
+            // Needed if we e.g are gonna use this for Book search/IIIF search
+            // to make sure it at least exists!
+            if (!empty(trim($processed_data))) {
+              $data['fulltext'] = trim($fulltext);
+            }
+            $documents[$item_id] = $this->typedDataManager->create(
+              $sbfflavordata_definition
+            );
+            $documents[$item_id]->setValue($data);
           }
-          $documents[$item_id] = $this->typedDataManager->create(
-            $sbfflavordata_definition
-          );
-          $documents[$item_id]->setValue($data);
         }
         else {
           //@TODO replace with an actual verbose Logger Entry
