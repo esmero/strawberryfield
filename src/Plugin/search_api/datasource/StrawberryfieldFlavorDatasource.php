@@ -638,6 +638,7 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
           $processed_data = $this->keyValue->get($keyvalue_collection)->get(
             $keyvaluekey
           );
+
           $fulltext = isset($processed_data->fulltext) ? $processed_data->fulltext : '';
           $checksum = isset($processed_data->checksum) ? $processed_data->checksum : NULL;
           if ($checksum) {
