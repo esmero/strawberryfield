@@ -634,11 +634,10 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
         $file = $files ? reset($files) : NULL;
 
         if ($file && $plugin_id !== NULL) {
-          $keyvaluekey = $keyvalue_collection . ':' . $fid_uuid . ':' . $plugin_id;
           $processed_data = $this->keyValue->get($keyvalue_collection)->get(
-            $keyvaluekey
+            $item_id
           );
-
+          // Put the package File ID / Package.
           $fulltext = isset($processed_data->fulltext) ? (string) $processed_data->fulltext : '';
           $checksum = isset($processed_data->checksum) ? (string) $processed_data->checksum : NULL;
           if ($checksum) {
