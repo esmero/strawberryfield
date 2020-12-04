@@ -356,6 +356,9 @@ function strawberryfield_file_mimetype_mapping_alter(&$mapping) {
   $mapping['extensions']['stl'] = 'stl_model_mimetype';
   // @see https://www.iana.org/assignments/media-types/media-types.xhtml
   $mapping['mimetypes']['stl_model_mimetype'] = 'model/stl';
+  //@ WACZ WIP
+  $mapping['mimetypes']['wacz_mimetype'] = 'application/vnd.datapackage+zip';
+  $mapping['extensions']['wacz'] = 'wacz_mimetype';
 }
 
 function strawberryfield_s3fs_url_settings_alter(array &$url_settings, $s3_file_path) {
