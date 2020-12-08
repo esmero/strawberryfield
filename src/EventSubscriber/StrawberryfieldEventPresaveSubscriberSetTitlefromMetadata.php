@@ -104,15 +104,16 @@ class StrawberryfieldEventPresaveSubscriberSetTitlefromMetadata extends Strawber
         /* @var \Drupal\strawberryfield\Field\StrawberryFieldItemList $field */
         // This will try with any possible match.
         foreach ($field->getIterator() as $delta => $itemfield) {
-          $flat = $itemfield->provideFlatten();
+          $full = $itemfield->provideDecoded(TRUE);
+          $labelsource = isset($full['label']) ? $full : $itemfield->provideFlatten();
           // @TODO Should we allow which JSON key sets the label a setting?
-          if (isset($flat['label'])) {
+          if (isset($labelsource['label'])) {
             // Flattener should always give me an array?
-            if (is_array($flat['label'])) {
-              $title = reset($flat['label']);
+            if (is_array($labelsource['label'])) {
+              $title = reset($labelsource['label']);
             }
             else {
-              $title = $flat['label'];
+              $title = $labelsource['label'];
             }
             if (strlen(trim($title)) > 0) {
               $title = Unicode::truncate($title, 128, TRUE, TRUE, 24);
