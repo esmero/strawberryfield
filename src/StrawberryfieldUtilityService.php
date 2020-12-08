@@ -16,7 +16,7 @@ use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\file\FileInterface;
 use Drupal\Core\Entity\ContentEntityInterface;
-use Drupal\search_api\Entity\Index; 
+use Drupal\search_api\Entity\Index;
 /**
  * Provides a SBF utility class.
  */
@@ -132,7 +132,7 @@ class StrawberryfieldUtilityService {
         $sbf_field_names[] = $field_definition->getName();
       }
     }
-    
+
     return $sbf_field_names;
   }
 
@@ -203,6 +203,31 @@ class StrawberryfieldUtilityService {
   }
 
   /**
+   * Given a Bundle returns the SBF field definition Objects
+   *
+   * This include Code generated, overrides, etc. For just the directly created via the UI
+   * Which are FieldConfig Instances use:
+   * \Drupal\strawberryfield\StrawberryfieldUtilityService::getStrawberryfieldConfigFromStorage
+   *
+   * @param $bundle
+   *    A Node Bundle
+   *
+   * @return \Drupal\Core\Field\FieldDefinitionInterface[]|array
+   *  Returns array of SBF names
+   */
+  public function getStrawberryfieldDefinitionsForBundle($bundle = 'digital_object') {
+    // @WARNING Never call this function inside any field based hook
+    // Chances are the hook will be called invoked inside ::getFieldDefinitions
+    // All you will find yourself inside a SUPER ETERNAL LOOP. You are adviced.
+    $fieldefinitions = [];
+    $all_bundled_fields = $this->entityFieldManager->getFieldDefinitions('node', $bundle);
+    $all_sbf_fields = $this->getStrawberryfieldMachineNames();
+    $all_sbf_fields = array_flip($all_sbf_fields);
+    return array_intersect_key($all_bundled_fields, $all_sbf_fields);
+  }
+
+
+  /**
    * Returns the Solr Fields in a Solr Index are from SBFs
    **
    * @param \Drupal\search_api\Entity\Index $index_entity
@@ -213,9 +238,9 @@ class StrawberryfieldUtilityService {
   public function getStrawberryfieldSolrFields(Index $index_entity) {
     $solr_fields = $index_entity->get('field_settings');
     $property_path_is_sbf = array();
-    
+
     $sbf_solr_fields = array();
-    
+
     foreach ($solr_fields as $id => $field) {
       $property_path = explode(":", $field['property_path']);
       // use the first part of the property path (this will be the field machine name)
@@ -232,7 +257,7 @@ class StrawberryfieldUtilityService {
         $sbf_solr_fields[$id] = $field;
       }
     }
-    
+
     return $sbf_solr_fields;
   }
 
