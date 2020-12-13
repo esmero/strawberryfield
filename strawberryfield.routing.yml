@@ -51,3 +51,21 @@ strawberryfield.custom_node_edit:
         type: entity:node
       user:
         type: entity:user
+
+# Direct access to Metadata display processed json using Metadata Expose Config Entity.
+strawberryfield.flavor_datasource_search:
+  path: '/do/{node}/flavorsearch/{fileuuid}/{processor}/{term}'
+  methods: [GET]
+  defaults:
+    _controller: '\Drupal\strawberryfield\Controller\StrawberryfieldFlavorDatasourceSearchController::search'
+  options:
+    parameters:
+      node:
+        type: 'entity:node'
+      resource_type:
+        type: 'ado'
+  requirements:
+    fileuuid: "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+    processor: .+
+    term: .+
+    _entity_access: 'node.view'

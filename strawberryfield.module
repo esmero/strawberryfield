@@ -372,3 +372,40 @@ function strawberryfield_s3fs_url_settings_alter(array &$url_settings, $s3_file_
   //$account = Drupal::currentUser();
   //$url_settings['custom_GET_args']['x-user'] = $account->getAccountName();
 }
+
+
+/**
+ * Lets modules alter the Solarium select query before executing it.
+ *
+ * After this hook, the select query will be finally converted into an
+ * expression that will be processed by the lucene query parser. Therefore you
+ * can't modify the 'q' parameter here, because it gets overwritten by that
+ * conversion. If you need to modify the 'q' parameter you should implement an
+ * event listener instead of this hook that handles the solarium events (our
+ * connector injects the drupal event handler into solarium) or implement
+ * hook_search_api_solr_converted_query() instead. If you want to force a
+ * different parser like edismax you must set the 'defType' parameter
+ * accordingly.
+ *
+ * @param \Solarium\Core\Query\QueryInterface $solarium_query
+ *   The Solarium query object, as generated from the Search API query.
+ * @param \Drupal\search_api\Query\QueryInterface $query
+ *   The Search API query object representing the executed search query.
+ */
+function strawberryfield_search_api_solr_query_alter(\Solarium\Core\Query\QueryInterface $solarium_query, \Drupal\search_api\Query\QueryInterface $query) {
+  // To get a list of solrium events:
+  // @see http://solarium.readthedocs.io/en/stable/customizing-solarium/#plugin-system
+  // If the Search API query has a 'my_custom_boost' option, use the edsimax
+  // query handler and add some boost queries.
+  if ($query->getOption('ocr_highlight')) {
+    // $solr_field_names maps search_api field names to real field names in
+    // the Solr index.
+    $solr_field_names = $query->getIndex()->getServerInstance()->getBackend()->getSolrFieldNames($query->getIndex());
+    if (isset($solr_field_names['ocr_text'])) {
+      dpm('allfields_translated_to_solr');
+      $solarium_query->addParam('hl.ocr.fl', $solr_field_names['ocr_text']);
+      $solarium_query->addParam('hl.ocr.absoluteHighlights', 'on');
+      dpm($solarium_query);
+    }
+  }
+}
