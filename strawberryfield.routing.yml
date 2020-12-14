@@ -59,6 +59,7 @@ strawberryfield.flavor_datasource_search:
   defaults:
     _controller: '\Drupal\strawberryfield\Controller\StrawberryfieldFlavorDatasourceSearchController::search'
   options:
+    no_cache: 'TRUE'
     parameters:
       node:
         type: 'entity:node'
