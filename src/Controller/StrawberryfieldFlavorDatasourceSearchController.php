@@ -183,7 +183,6 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
         $query->setOption('ocr_highlight','on');
       }
 
-
       // If we allow Extra processing here Drupal adds Content Access Check
       // That does not match our Data Source \Drupal\search_api\Plugin\search_api\processor\ContentAccess
       // we get this filter (see 2nd)
@@ -197,8 +196,7 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
       ),
        */
 
-
-      $page_prefix = 'sequence_';
+      $page_prefix = 'sequence_'; // Optional. XML id=1 is really invalid but if someone wants to use that, OK.
       $page_prefix_len = strlen($page_prefix);
       $query->setProcessingLevel(QueryInterface::PROCESSING_BASIC);
       $results = $query->execute();
@@ -216,10 +214,10 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
                 $result_snippets_base = [
                   'par' => [
                     [
-                      'page' => substr(
+                      'page' => strpos($snippet['pages'][0]['id'], $page_prefix) === 0 ? substr(
                         $snippet['pages'][0]['id'],
                         $page_prefix_len
-                      ),
+                      ) : $snippet['pages'][0]['id'],
                       'boxes' => [],
                     ]
                   ]
