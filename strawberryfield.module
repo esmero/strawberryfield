@@ -406,6 +406,7 @@ function strawberryfield_search_api_solr_query_alter(\Solarium\Core\Query\QueryI
     if (isset($solr_field_names['ocr_text'])) {
       $solarium_query->addParam('hl.ocr.fl', $solr_field_names['ocr_text']);
       $solarium_query->addParam('hl.ocr.absoluteHighlights', 'on');
+      $solarium_query->addParam('hl.method', 'fastVector');
     }
   }
 }
