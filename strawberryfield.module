@@ -404,9 +404,15 @@ function strawberryfield_search_api_solr_query_alter(\Solarium\Core\Query\QueryI
     // the Solr index.
     $solr_field_names = $query->getIndex()->getServerInstance()->getBackend()->getSolrFieldNames($query->getIndex());
     if (isset($solr_field_names['ocr_text'])) {
+      /* @var \Solarium\Component\Highlighting\Highlighting $hl */
+      $hl = $solarium_query->getHighlighting();
+      // hl.fl has issues if ocr_text is in that list (Token Offset big error, bad, bad)
+      // By removing any highlight returns in this case we can focus on what we need.
+      $hl->clearFields();
+
       $solarium_query->addParam('hl.ocr.fl', $solr_field_names['ocr_text']);
       $solarium_query->addParam('hl.ocr.absoluteHighlights', 'on');
-      $solarium_query->addParam('hl.method', 'fastVector');
+      $solarium_query->addParam('hl.method', 'UnifiedHighlighter');
     }
   }
 }

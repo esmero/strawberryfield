@@ -151,7 +151,7 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
       // Create the query.
       // How many?
       $query = $search_api_index->query([
-        'limit' => 10,
+        'limit' => 20,
         'offset' => 0,
       ]);
 
@@ -184,7 +184,7 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
         // Will be used by \strawberryfield_search_api_solr_query_alter
         $query->setOption('ocr_highlight','on');
       }
-
+      $query->setOption('search_api_retrieved_field_values',['id']);
       // If we allow Extra processing here Drupal adds Content Access Check
       // That does not match our Data Source \Drupal\search_api\Plugin\search_api\processor\ContentAccess
       // we get this filter (see 2nd)
@@ -205,7 +205,6 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
       $extradata = $results->getAllExtraData();
       // Just in case something goes wrong with the returning region text
       $region_text = $term;
-      dpm($extradata);
 
       if ($results->getResultCount() >= 1) {
         if (isset($extradata['search_api_solr_response']['ocrHighlighting']) && count(
@@ -242,8 +241,10 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
                   ];
                 }
               }
+              $result_snippets_base["text"] = $region_text;
             }
-            $result_snippets_base["text"] = $region_text;
+
+
             $result_snippets[] = $result_snippets_base;
           }
         }
