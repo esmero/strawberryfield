@@ -183,6 +183,8 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
       if (isset($allfields_translated_to_solr['ocr_text'])) {
         // Will be used by \strawberryfield_search_api_solr_query_alter
         $query->setOption('ocr_highlight','on');
+        // We are already checking if the Node can be viewed. Custom Datasources can not depend on Solr node access policies.
+        $query->setOption('search_api_bypass_access', TRUE);
       }
       $query->setOption('search_api_retrieved_field_values',['id']);
       // If we allow Extra processing here Drupal adds Content Access Check
