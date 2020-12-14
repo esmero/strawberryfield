@@ -151,7 +151,7 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
       // Create the query.
       // How many?
       $query = $search_api_index->query([
-        'limit' => 100,
+        'limit' => 10,
         'offset' => 0,
       ]);
 
@@ -159,7 +159,9 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
       $query->setParseMode($parse_mode);
       $query->sort('search_api_relevance', 'DESC');
       $query->keys($term);
+
       $query->setFulltextFields(['ocr_text']);
+
       $query->addCondition('parent_id', $nodeid)
         ->addCondition('search_api_datasource', 'strawberryfield_flavor_datasource')
         ->addCondition('processor_id', $processor);
@@ -203,6 +205,8 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
       $extradata = $results->getAllExtraData();
       // Just in case something goes wrong with the returning region text
       $region_text = $term;
+      dpm($extradata);
+
       if ($results->getResultCount() >= 1) {
         if (isset($extradata['search_api_solr_response']['ocrHighlighting']) && count(
             $extradata['search_api_solr_response']['ocrHighlighting']
