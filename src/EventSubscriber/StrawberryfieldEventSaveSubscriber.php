@@ -12,12 +12,17 @@ use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 abstract class StrawberryfieldEventSaveSubscriber implements EventSubscriberInterface {
 
   /**
+   * @var int
+   */
+  protected static $priority = 100;
+
+  /**
    * {@inheritdoc}
    */
   public static function getSubscribedEvents() {
 
     // @TODO check event priority and adapt to future D9 needs.
-    $events[StrawberryfieldEventType::SAVE][] = ['onEntitySave', 100];
+    $events[StrawberryfieldEventType::SAVE][] = ['onEntitySave', static::$priority];
     return $events;
   }
 

@@ -173,3 +173,11 @@ strawberryfield.general:
     benchmark:
       type: boolean
       label: Benchmark time and memory usage of Event Subscribers
+
+field.formatter.settings.strawberry_default_formatter:
+  type: mapping
+  label: 'Specific Config for strawberry_map_formatter'
+  mapping:
+    limit_access:
+      type: string
+      label: 'Access level the user needs on a bundle to be able to see it rendered, defaults to "edit"'
