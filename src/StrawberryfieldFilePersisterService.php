@@ -1148,6 +1148,9 @@ class StrawberryfieldFilePersisterService {
 
 
     if ($templocation) {
+      $templocation_for_exec = escapeshellarg($templocation);
+      // In case i need to replace values/cleanup the name but we control the name
+      // So it should not be an issue?
       // @TODO MOVE CHECKSUM here
       $output_exif = '';
       $output_fido = '';
@@ -1156,13 +1159,10 @@ class StrawberryfieldFilePersisterService {
       // Silly really. This needs to be tighter but then unix allows any alias to exist.
       if (strlen($exif_exec_path) > 0) {
         $result_exif = exec(
-          $exif_exec_path . ' -json -q -a -gps:all -Common "-gps*" -xmp:all -XMP-tiff:Orientation -ImageWidth -ImageHeight -Canon -Nikon-AllDates -pdf:all -ee -MIMEType ' . "'". escapeshellarg(
-            $templocation
-          ). "'",
+          $exif_exec_path . ' -json -q -a -gps:all -Common "-gps*" -xmp:all -XMP-tiff:Orientation -ImageWidth -ImageHeight -Canon -Nikon-AllDates -pdf:all -ee -MIMEType ' . $templocation_for_exec,
           $output_exif,
           $status_exif
         );
-
 
         // First EXIF
         if ($status_exif != 0) {
@@ -1209,7 +1209,7 @@ class StrawberryfieldFilePersisterService {
 
       if (strlen($fido_exec_path) > 0) {
         $result_fido = exec(
-          $fido_exec_path . ' ' . "'". escapeshellarg($templocation). "'",
+          $fido_exec_path . ' ' . $templocation_for_exec,
           $output_fido,
           $status_fido
         );
@@ -1252,9 +1252,7 @@ class StrawberryfieldFilePersisterService {
       if (strlen($identify_exec_path) > 0) {
         if (in_array($askey, ['document', 'image', 'video', 'audio'])) {
           $result_identify = exec(
-            $identify_exec_path . " -format 'format:%m|width:%w|height:%h|orientation:%[orientation]@' -quiet " . "'". escapeshellarg(
-              $templocation
-            ). "'",
+            $identify_exec_path . " -format 'format:%m|width:%w|height:%h|orientation:%[orientation]@' -quiet " . $templocation_for_exec,
             $output_identify,
             $status_identify
           );
