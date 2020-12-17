@@ -9,6 +9,7 @@ use Drupal\Core\StringTranslation\TranslationInterface;
 use Drupal\strawberryfield\StrawberryfieldFilePersisterService;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\Core\Session\AccountInterface;
+use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
 
 
 /**
@@ -125,30 +126,49 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
     /* @var $entity \Drupal\Core\Entity\ContentEntityInterface */
     $entity = $event->getEntity();
     $sbf_fields = $event->getFields();
-    $newlysavedcount = 0;
+
     foreach ($sbf_fields as $field_name) {
       /* @var $field \Drupal\Core\Field\FieldItemInterface */
       $field = $entity->get($field_name);
       /* @var \Drupal\strawberryfield\Field\StrawberryFieldItemList $field */
 
-      $newlyprocessed = 0;
       if (!$field->isEmpty()) {
         $entity = $field->getEntity();
         $entity_type_id = $entity->getEntityTypeId();
         /** @var $field \Drupal\Core\Field\FieldItemList */
         foreach ($field->getIterator() as $delta => $itemfield) {
-          $allprocessedAsValues = [];
           /** @var $itemfield \Drupal\strawberryfield\Plugin\Field\FieldType\StrawberryFieldItem */
           $fullvalues = $itemfield->provideDecoded(TRUE);
+
           // SBF needs to have the entity mapping key
           // helper structure to keep elements that map to entities around
           if (!is_array($fullvalues)) {
             break;
           }
+          $original_fids = [];
+          // We will use the original data to compare if any files existing before were removed by the user
+          if (!$entity->isNew() && !empty($entity->original)) {
+            try {
+              $original_fullvalues = $entity->original->get(
+                $field_name
+              )[$delta]->provideFlatten();
+              $original_fids = isset($original_fullvalues['dr:fid']) ? $original_fullvalues['dr:fid'] : [];
+              $original_fids = is_array($original_fids) ? $original_fids: [$original_fids];
+              // To save some memory
+              unset($original_fullvalues);
+            }
+            catch (\Exception $exception) {
+              $this->messenger->addError($this->t('We could not retrieve your original data to clean up any changes in attached files. Please contact the site admin.'));
+            }
+          }
+
+
           $fullvalues = $this->cleanUpEntityMappingStructure($fullvalues);
           // 'ap:entitymapping' will always exists of ::cleanUpEntityMappingStructure
           $entity_mapping_structure = $fullvalues['ap:entitymapping'];
           $allprocessedAsValues = [];
+          // All fids we have in this doc.
+          $all_fids = [];
           if (isset($entity_mapping_structure['entity:file'])) {
             foreach ($entity_mapping_structure['entity:file'] as $jsonkey_with_filenumids) {
               // Here each $jsonkey_with_filenumids is a json key that holds file ids
@@ -157,13 +177,17 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
               $processedAsValuesForKey = [];
               $fullvalues[$jsonkey_with_filenumids] = isset($fullvalues[$jsonkey_with_filenumids]) ? $fullvalues[$jsonkey_with_filenumids] : [];
               // make even single files an array
-              $fids = [];
               $fids = (is_array($fullvalues[$jsonkey_with_filenumids])) ? $fullvalues[$jsonkey_with_filenumids] : [$fullvalues[$jsonkey_with_filenumids]];
               // Only keep ids that can be actually entity ids or uuids
               $fids = array_filter(
                 $fids,
                 [$this, 'isEntityId']
               );
+              // NOTE. If no files are passed no processing will be done
+              // Does not mean we actually cleaned left overs from a previous
+              // Revision and we are not handling that here!
+              // So we will just accumulate file IDS and then remove all the difference at the end
+
               if (is_array($fids) && !empty($fids)) {
                 $fids = array_unique($fids);
                 // @TODO. If UUID the loader needs to be different.
@@ -177,19 +201,42 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
                   $allprocessedAsValues,
                   $processedAsValuesForKey
                 );
+                // With the returned data, let's keep the list of processed ones around
+                $all_fids = array_merge($all_fids, $fids) ;
               }
             }
+
+            // Calculate the array_diff between OLD files and new ones
+            $all_fids = array_unique($all_fids);
+            $original_fids = array_unique($original_fids);
+            $to_be_removed_files = array_diff($original_fids, $all_fids);
+            if (is_array($to_be_removed_files) && count($to_be_removed_files) > 0) {
+              // We remove from the fullvalues any file that was removed
+              // This will also decrease the Usage Count for that file
+              $fullvalues = $this->strawberryfilepersister->removefromAsFileStructure(
+                $to_be_removed_files, $fullvalues, $entity->id());
+            }
+
             // WE should be able to load also UUIDs here.
             // Now assign back al as:structures
             // Distribute all processed AS values for each field into its final JSON
             // Structure, e.g as:image, as:application, as:documents, etc.\
 
-            foreach ($allprocessedAsValues as $askey => $info) {
-              // @TODO ensure non managed files inside structure are preserved.
+            foreach (StrawberryfieldJsonHelper::AS_FILE_TYPE as $askey) {
+              // We get for AS_FILE_TYPE the existing values
+              $previous_info = isset($fullvalues[$askey]) && is_array($fullvalues[$askey]) ? $fullvalues[$askey] : [];
+              // We Check if we got for AS_FILE_TYPE new values
+              $info = isset($allprocessedAsValues[$askey]) && is_array($allprocessedAsValues[$askey]) ? $allprocessedAsValues[$askey] : [];
+              // Ensures non managed files inside structure are preserved!
               // Could come from another URL only field or added manually by some
-              // Advanced user.
-              $newlyprocessed = $newlyprocessed + count($info);
-              $fullvalues[$askey] = $info;
+              // Advanced user. New INFO will always win, old entries only added if they did not exist.
+              $new_info = $info + $previous_info;
+              if (count($new_info) > 0) {
+                $fullvalues[$askey] = $new_info;
+              } else {
+                // Do not leave empty keys around
+                unset($fullvalues[$askey]);
+              }
             }
             if (!$itemfield->setMainValueFromArray((array) $fullvalues)) {
               $this->messenger->addError($this->t('We could not persist file classification. Please contact the site admin.'));
@@ -197,7 +244,6 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
           }
         }
       }
-
     }
     $current_class = get_called_class();
     $event->setProcessedBy($current_class, TRUE);
