@@ -1,3 +1,4 @@
+uuid: 80f74499-df92-46fb-8146-cf894502da97
 langcode: en
 status: true
 dependencies:
@@ -7,9 +8,9 @@ dependencies:
 id: text_ocr_und_7_0_0
 label: 'Language Undefined Text OCR Field with Coordinate highlight'
 minimum_solr_version: 7.0.0
-custom_code: 'ocr_highlight'
+custom_code: ocr_highlight
 field_type_language_code: und
-domains: {}
+domains: {  }
 field_type:
   name: text_ocr_stored
   class: solr.TextField
@@ -43,8 +44,12 @@ field_type:
           class: solr.StopFilterFactory
         -
           class: solr.PorterStemFilterFactory
+unstemmed_field_type: null
+spellcheck_field_type: null
+collated_field_type: null
 solr_configs:
   searchComponents:
     -
       name: ocrHighlight
       class: de.digitalcollections.solrocr.solr.OcrHighlightComponent
+text_files: {  }
