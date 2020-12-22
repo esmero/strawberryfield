@@ -216,13 +216,17 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
             $result_snippets_base = [];
             if (isset($field[$allfields_translated_to_solr['ocr_text']]['snippets'])) {
               foreach ($field[$allfields_translated_to_solr['ocr_text']]['snippets'] as $snippet) {
+                // IABR uses 0 to N-1. We may want to reprocess this for other endpoints.
+                $page_number = strpos($snippet['pages'][0]['id'], $page_prefix) === 0 ? (int) substr(
+                  $snippet['pages'][0]['id'],
+                  $page_prefix_len
+                ) : (int) $snippet['pages'][0]['id'];
+                // Just some check in case something goes wrong and page number is 0 or negative?
+                $page_number = ($page_number > 0) ? (int) ($page_number - 1) : 0;
                 $result_snippets_base = [
                   'par' => [
                     [
-                      'page' => strpos($snippet['pages'][0]['id'], $page_prefix) === 0 ? substr(
-                        $snippet['pages'][0]['id'],
-                        $page_prefix_len
-                      ) : $snippet['pages'][0]['id'],
+                      'page' => $page_number,
                       'boxes' => [],
                     ]
                   ]
@@ -232,20 +236,19 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
                   $region_text = str_replace(
                     ['<em>', '</em>'],
                     ['{{{', '}}}'],
-                    $snippet['regions'][$highlight[0]['parentRegionIdx']]["text"]
+                    $snippet['regions'][$highlight[0]['parentRegionIdx']]['text']
                   );
                   $result_snippets_base['par'][0]['boxes'][] = [
-                    "l" => $highlight[0]['ulx'],
-                    "t" => $highlight[0]['uly'],
-                    "r" => $highlight[0]['lrx'],
-                    "b" => $highlight[0]['lry'],
-                    "page" => $result_snippets_base['par'][0]['page']
+                    'l' => $highlight[0]['ulx'],
+                    't' => $highlight[0]['uly'],
+                    'r' => $highlight[0]['lrx'],
+                    'b' => $highlight[0]['lry'],
+                    'page' => $page_number
                   ];
                 }
               }
-              $result_snippets_base["text"] = $region_text;
+              $result_snippets_base['text'] = $region_text;
             }
-
 
             $result_snippets[] = $result_snippets_base;
           }

@@ -33,12 +33,16 @@ use Drupal\Core\Config\ImmutableConfig;
 use Drupal\strawberryfield\StrawberryfieldEventType;
 use Symfony\Component\Process\Exception\ProcessFailedException;
 use Symfony\Component\Process\Process;
+use Drupal\Core\Url;
 
 
 /**
  * Provides a SBF File persisting class.
  */
 class StrawberryfieldFilePersisterService {
+
+  const FILE_IRI_PREFIX = 'urn:uuid:';
+  const AS_TYPE_PREFIX = 'as:';
 
   use StringTranslationTrait;
   use MessengerTrait;
@@ -369,6 +373,14 @@ class StrawberryfieldFilePersisterService {
     return trim($basename, ' -');
   }
 
+  public function calculateAsKeyFromFile(FileInterface $file) {
+    // Calculate the destination json key
+      $as_file_type = explode('/', $file->getMimeType());
+      $as_file_type = count($as_file_type) == 2 ? $as_file_type[0] : 'document';
+      $as_file_type = ($as_file_type != 'application') ? $as_file_type : 'document';
+      return $as_file_type;
+  }
+
   /**
    *  Generates the full AS metadata structure to keep track of SBF files.
    *
@@ -451,11 +463,8 @@ class StrawberryfieldFilePersisterService {
       }
 
       // Calculate the destination json key
-      $as_file_type = explode('/', $file->getMimeType());
-      $as_file_type = count($as_file_type) == 2 ? $as_file_type[0] : 'document';
-      $as_file_type = ($as_file_type != 'application') ? $as_file_type : 'document';
-
-      $files_bytype_many[$as_file_type]['urn:uuid:' . $file->uuid()] = $file;
+      $as_file_type = $this->calculateAsKeyFromFile($file);
+      $files_bytype_many[$as_file_type][self::FILE_IRI_PREFIX . $file->uuid()] = $file;
       // Simpler structure to iterate over
       $file_list[$as_file_type][] = $file->id();
     }
@@ -465,11 +474,11 @@ class StrawberryfieldFilePersisterService {
 
     $to_process = [];
     foreach ($file_list as $askey => $fileids) {
-      $fileinfo_bytype_many['as:' . $askey] = [];
-      if (isset($cleanjson['as:' . $askey])) {
+      $fileinfo_bytype_many[self::AS_TYPE_PREFIX . $askey] = [];
+      if (isset($cleanjson[self::AS_TYPE_PREFIX . $askey])) {
         // Gets us structures in place with checksum applied
-        $fileinfo_bytype_many['as:' . $askey] = $this->retrieve_filestructure_from_metadata(
-          $cleanjson['as:' . $askey],
+        $fileinfo_bytype_many[self::AS_TYPE_PREFIX . $askey] = $this->retrieve_filestructure_from_metadata(
+          $cleanjson[self::AS_TYPE_PREFIX . $askey],
           array_values($fileids),
           $file_source_key
         );
@@ -480,7 +489,7 @@ class StrawberryfieldFilePersisterService {
 
       $to_process[$askey] = array_diff_key(
         $files_bytype_many[$askey],
-        $fileinfo_bytype_many['as:' . $askey]
+        $fileinfo_bytype_many[self::AS_TYPE_PREFIX . $askey]
       );
     }
     // Final iteration
@@ -542,7 +551,7 @@ class StrawberryfieldFilePersisterService {
 
         //The node save hook will deal with moving data.
         // We don't need the key here but makes cleaning easier
-        $fileinfo_bytype_many['as:' . $askey]['urn:uuid:' . $uuid] = $fileinfo;
+        $fileinfo_bytype_many[self::AS_TYPE_PREFIX . $askey][self::FILE_IRI_PREFIX . $uuid] = $fileinfo;
         $newforsorting = TRUE;
         // Side effect of this is that if the same file id is referenced twice
         // by different fields, as:something will contain it once only.
@@ -559,10 +568,10 @@ class StrawberryfieldFilePersisterService {
       // with one exception. If the sequence matches the new order, which basically means
       // we are good.
 
-      uasort($fileinfo_bytype_many['as:' . $askey], array($this,'sortByFileName'));
+      uasort($fileinfo_bytype_many[self::AS_TYPE_PREFIX . $askey], array($this,'sortByFileName'));
       $max_sequence = 0;
       // Let's get the max sequence first.
-      $max_sequence = array_reduce($fileinfo_bytype_many['as:' . $askey], function($a, $b) {
+      $max_sequence = array_reduce($fileinfo_bytype_many[self::AS_TYPE_PREFIX . $askey], function($a, $b) {
        if (isset($b['sequence'])) {
          return max($a, (int) $b['sequence']);
           } else {
@@ -573,7 +582,7 @@ class StrawberryfieldFilePersisterService {
       // For each always wins over array_walk
       $i=0;
       $j=0;
-      foreach ($fileinfo_bytype_many['as:' . $askey] as &$item) {
+      foreach ($fileinfo_bytype_many[self::AS_TYPE_PREFIX . $askey] as &$item) {
         $i++;
        //Order is already given by uasort but not trustable in JSON
        //So we set sequence number but let's check first what we got
@@ -621,7 +630,7 @@ class StrawberryfieldFilePersisterService {
             $file_id_list
           )) && isset($info['checksum']) && (isset($info['dr:for']) && $info['dr:for'] == $file_source_key)) {
         // If present means it was persisted so 'url' and $file->getFileUri() will be the same.
-        $found['urn:uuid:' . $info['dr:uuid']] = $info;
+        $found[self::FILE_IRI_PREFIX . $info['dr:uuid']] = $info;
       }
     }
     return $found;
@@ -656,7 +665,7 @@ class StrawberryfieldFilePersisterService {
               // Allowing users to renamed/move files
               // Now only if it is temporary
               // Because all not temporaries are already persisted.
-              // This this clashes with the fact that the file structure
+              // This clashes with the fact that the file structure
               // Naming service will always try to name things in a certain
               // way. So either we allow both to act everytime or we
               // have a other 'move your files' service?
@@ -666,15 +675,15 @@ class StrawberryfieldFilePersisterService {
                 $uuid = $file->uuid();
                 $current_uri = $file->getFileUri();
                 // Get the info structure from flatten:
-                if (isset($flatvalues['urn:uuid:' . $uuid]) &&
-                  isset($flatvalues['urn:uuid:' . $uuid]['dr:fid']) &&
-                  ($flatvalues['urn:uuid:' . $uuid]['dr:fid'] = $fid) &&
-                    isset($flatvalues['urn:uuid:' . $uuid]['url']) &&
-                    !empty($flatvalues['urn:uuid:' . $uuid]['url'])) {
+                if (isset($flatvalues[self::FILE_IRI_PREFIX . $uuid]) &&
+                  isset($flatvalues[self::FILE_IRI_PREFIX . $uuid]['dr:fid']) &&
+                  ($flatvalues[self::FILE_IRI_PREFIX . $uuid]['dr:fid'] = $fid) &&
+                    isset($flatvalues[self::FILE_IRI_PREFIX . $uuid]['url']) &&
+                    !empty($flatvalues[self::FILE_IRI_PREFIX . $uuid]['url'])) {
                   // Weird egde case:
                   // What if same urn:uuid:uuid has multiple info structures?
                   // Flattener could end being double nested?
-                  $destination_uri = $flatvalues['urn:uuid:' . $uuid]['url'];
+                  $destination_uri = $flatvalues[self::FILE_IRI_PREFIX . $uuid]['url'];
                   // Only deal with expensive process if destination uri is
                   // different to the known one.
                   if ($destination_uri != $current_uri) {
@@ -735,6 +744,57 @@ class StrawberryfieldFilePersisterService {
     return $persisted;
   }
 
+
+  /**
+   * Removes a list of Files from the as:structure and decreases its Usage count.
+   *
+   * @param array $file_id_list
+   * @param array $originaljson
+   *
+   * @param int $nodeid
+   *
+   * @return array
+   * @throws \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException
+   * @throws \Drupal\Component\Plugin\Exception\PluginNotFoundException
+   * @throws \Drupal\Core\Entity\EntityStorageException
+   */
+  public function removefromAsFileStructure(
+    array $file_id_list = [],
+    array $originaljson,
+    int $nodeid
+  ) {
+
+    /** @var \Drupal\file\FileInterface[] $files */
+    try {
+      $files = $this->entityTypeManager->getStorage('file')->loadMultiple(
+        $file_id_list
+      );
+    } catch (InvalidPluginDefinitionException $e) {
+      $this->messenger()->addError(
+        $this->t('Sorry, we had real issues loading your files during cleanup/removal. Invalid Plugin File Definition.')
+      );
+      return $originaljson;
+    } catch (PluginNotFoundException $e) {
+      $this->messenger()->addError(
+        $this->t('Sorry, we had real issues loading your files during cleanup/removal. File Plugin not Found')
+      );
+      return $originaljson;
+    }
+    // Iterate and classify by as: type
+    foreach ($files as $file) {
+      $as_file_type = $this->calculateAsKeyFromFile($file);
+      $uuid = $file->uuid();
+      if (isset($originaljson[self::AS_TYPE_PREFIX.$as_file_type][self::FILE_IRI_PREFIX.$uuid])) {
+        // Double check, may be silly but hey!
+        if (isset($originaljson[self::AS_TYPE_PREFIX.$as_file_type][self::FILE_IRI_PREFIX.$uuid]['dr:fid']) &&
+          $originaljson[self::AS_TYPE_PREFIX.$as_file_type][self::FILE_IRI_PREFIX.$uuid]['dr:fid'] == $file->id()) {
+          unset($originaljson[self::AS_TYPE_PREFIX.$as_file_type][self::FILE_IRI_PREFIX.$uuid]);
+          $this->remove_file_usage($file, $nodeid, 'node', 1);
+        }
+      }
+    }
+    return $originaljson;
+  }
   /**
    * Deals with tracking file usage inside a strawberryfield.
    *
@@ -1023,8 +1083,6 @@ class StrawberryfieldFilePersisterService {
     // Reasons why we can not are:
     // - Wrong path settings.
     // - Disabled.
-    // Should we notify the user if processing is enabled and binaries can not
-    // be found? and or can not run?
 
     if (!$this->extractFileMetadata) {
       // early return if not allowed.
@@ -1038,6 +1096,7 @@ class StrawberryfieldFilePersisterService {
       'exif_exec_path'));
     $fido_exec_path = trim($this->config->get('fido_exec_path'));
     $identify_exec_path = trim($this->config->get('identify_exec_path'));
+    // @TODO NOT USED. SHOULD BE REMOVED IN RC2
     $pdf_info_exec_path = trim($this->config->get('pdfinfo_exec_path'));
 
     $uri = $file->getFileUri();
@@ -1054,15 +1113,16 @@ class StrawberryfieldFilePersisterService {
     )) {
       // Local stream.
       $cache_key = md5($uri);
+      $ext = pathinfo($uri, PATHINFO_EXTENSION);
       // Check first if the file is already around in temp?
       // @TODO can be sure its the same one? Ideas?
-      if (is_readable($this->fileSystem->realpath('temporary://sbr_' . $cache_key . '_' . basename($uri)))) {
-        $templocation = $this->fileSystem->realpath('temporary://sbr_' . $cache_key . '_' . basename($uri));
+      if (is_readable($this->fileSystem->realpath('temporary://sbr_' . $cache_key . '.' . $ext))) {
+        $templocation = $this->fileSystem->realpath('temporary://sbr_' . $cache_key . '.' . $ext);
       }
       else {
         $templocation = $this->fileSystem->copy(
           $uri,
-          'temporary://sbr_' . $cache_key . '_' . basename($uri),
+          'temporary://sbr_' . $cache_key . '.' . $ext,
           FileSystemInterface::EXISTS_REPLACE
         );
         $templocation = $this->fileSystem->realpath(
@@ -1078,7 +1138,7 @@ class StrawberryfieldFilePersisterService {
 
     if (!$templocation) {
       $this->loggerFactory->get('strawberryfield')->warning(
-        'Could not adquire a local accesible location for metadata extraction for file with URL @fileurl',
+        'Could not adquire a local accessible location for metadata extraction for file with URL @fileurl. Aborted processing. Please check you have space in your temporary storage location.',
         [
           '@fileurl' => $file->getFileUri(),
         ]
@@ -1088,6 +1148,9 @@ class StrawberryfieldFilePersisterService {
 
 
     if ($templocation) {
+      $templocation_for_exec = escapeshellarg($templocation);
+      // In case i need to replace values/cleanup the name but we control the name
+      // So it should not be an issue?
       // @TODO MOVE CHECKSUM here
       $output_exif = '';
       $output_fido = '';
@@ -1096,13 +1159,10 @@ class StrawberryfieldFilePersisterService {
       // Silly really. This needs to be tighter but then unix allows any alias to exist.
       if (strlen($exif_exec_path) > 0) {
         $result_exif = exec(
-          $exif_exec_path . ' -json -q -a -gps:all -Common "-gps*" -xmp:all -XMP-tiff:Orientation -ImageWidth -ImageHeight -Canon -Nikon-AllDates -pdf:all -ee -MIMEType ' . escapeshellarg(
-            $templocation
-          ),
+          $exif_exec_path . ' -json -q -a -gps:all -Common "-gps*" -xmp:all -XMP-tiff:Orientation -ImageWidth -ImageHeight -Canon -Nikon-AllDates -pdf:all -ee -MIMEType ' . $templocation_for_exec,
           $output_exif,
           $status_exif
         );
-
 
         // First EXIF
         if ($status_exif != 0) {
@@ -1137,9 +1197,19 @@ class StrawberryfieldFilePersisterService {
           }
         }
       }
+      else {
+        $this->loggerFactory->get('strawberryfield')->warning(
+          '@fileurl was not processed using EXIF extraction because the path is not set. <a href="@url">Please configure it here</a>',
+          [
+            '@fileurl' => $file->getFileUri(),
+            '@url' => Url::fromRoute('strawberryfield.file_persister_settings_form')->toString()
+          ]
+        );
+      }
+
       if (strlen($fido_exec_path) > 0) {
         $result_fido = exec(
-          $fido_exec_path . ' ' . escapeshellarg($templocation),
+          $fido_exec_path . ' ' . $templocation_for_exec,
           $output_fido,
           $status_fido
         );
@@ -1168,16 +1238,21 @@ class StrawberryfieldFilePersisterService {
             $metadata['flv:pronom'] = $pronom;
           }
         }
+      } else {
+        $this->loggerFactory->get('strawberryfield')->warning(
+          '@fileurl was not processed using FIDO (Pronom) because the path is not set. <a href="@url">Please configure it here</a>',
+          [
+            '@fileurl' => $file->getFileUri(),
+            '@url' => Url::fromRoute('strawberryfield.file_persister_settings_form')->toString()
+          ]
+        );
       }
-
       // Only run identify on Images/Documents?
       // Do we need an exact list?
       if (strlen($identify_exec_path) > 0) {
         if (in_array($askey, ['document', 'image', 'video', 'audio'])) {
           $result_identify = exec(
-            $identify_exec_path . " -format 'format:%m|width:%w|height:%h|orientation:%[orientation]@' -quiet " . escapeshellarg(
-              $templocation
-            ),
+            $identify_exec_path . " -format 'format:%m|width:%w|height:%h|orientation:%[orientation]@' -quiet " . $templocation_for_exec,
             $output_identify,
             $status_identify
           );
@@ -1223,6 +1298,15 @@ class StrawberryfieldFilePersisterService {
             }
           }
         }
+      }
+      else {
+        $this->loggerFactory->get('strawberryfield')->warning(
+          '@fileurl was not processed using Identify (Media characterization) because the path is not set. <a href="@url">Please configure it here</a>',
+          [
+            '@fileurl' => $file->getFileUri(),
+            '@url' => Url::fromRoute('strawberryfield.file_persister_settings_form')->toString()
+          ]
+        );
       }
     }
     return $metadata;
