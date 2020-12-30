@@ -55,3 +55,9 @@ services:
     tags:
       - { name: paramconverter , priority: 10 }
     arguments: ['@entity_type.manager','@entity.repository']
+  strawberryfield.mime_type.guesser.mime:
+    class: Drupal\strawberryfield\StrawberryfieldMimeService
+    arguments: [ '@module_handler' ]
+    tags:
+      - { name: mime_type_guesser }
+    lazy: true
