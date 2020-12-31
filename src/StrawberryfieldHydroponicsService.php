@@ -85,20 +85,24 @@ class StrawberryfieldHydroponicsService {
     $this->queueFactory = $queue_factory;
   }
 
+
   /**
    * Processes cron queues.
+   *
+   * @param $name
+   * @param int $time
+   *
+   * @return int
+   * @throws \Drupal\Component\Plugin\Exception\PluginException
+   * @throws \Drupal\Component\Plugin\Exception\PluginNotFoundException
    */
   public function processQueue($name, $time = 120) {
     // Grab the defined cron queues.
-    error_log($name);
     $info = $this->queueManager->getDefinition($name);
-    error_log(var_export($info, true));
     if ($info) {
         // Make sure every queue exists. There is no harm in trying to recreate
         // an existing queue.
-
         $this->queueFactory->get($name)->createQueue();
-
         $queue_worker = $this->queueManager->createInstance($name);
         $end = time() + $time;
         $queue = $this->queueFactory->get($name, TRUE);
@@ -125,7 +129,11 @@ class StrawberryfieldHydroponicsService {
             watchdog_exception('cron', $e);
           }
         }
-      }
+    return $queue->numberOfItems();
+    }
+  else {
+    return 0;
+  }
   }
 
 
