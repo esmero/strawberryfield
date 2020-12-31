@@ -27,3 +27,10 @@ strawberryfield.important_solr_settings_form:
   description: 'Configure which Solr field is used in ADO Type Mapping'
   parent: strawberryfield.group.admin
   weight: 99
+
+strawberryfield.hydroponics_settings_form:
+  title: 'Queue Manager for Hydroponics Service'
+  route_name: strawberryfield.hydroponics_settings_form
+  description: 'Configure which Queues will run as Background Services'
+  parent: strawberryfield.group.admin
+  weight: 101
