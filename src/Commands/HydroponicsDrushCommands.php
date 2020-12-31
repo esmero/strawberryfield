@@ -40,33 +40,40 @@ class HydroponicsDrushCommands extends DrushCommands {
     $timer_ping = $loop->addPeriodicTimer(3.0, function () {
       // store a heartbeat every 3 seconds.
       $currenttime = \Drupal::time()->getCurrentTime();
+      error_log('pinging');
       \Drupal::state()->set('hydroponics.heartbeat', $currenttime);
     });
+    $active_queues = \Drupal::config('strawberryfield.hydroponics_settings')->get('queues');
+    $done = [];
+
 
     // Get which queues we should run:
-    $active_queues = \Drupal::config('strawberryfield.hydroponics_settings')->get('queues');
+
     foreach($active_queues as $queue) {
-      $done[$queue] = 0;
-      $loop->addTimer(0.001, function ($timer) use ($queue, &$done) {
+      $done[$queue] = $loop->addPeriodicTimer(1.0, function ($timer) use ($loop, $queue) {
         error_log("Starting to process $queue");
-        \Drupal::getContainer()
+        $number = \Drupal::getContainer()
           ->get('strawberryfield.hydroponics')
-          ->processQueue($queue, 360);
+          ->processQueue($queue, 60);
         error_log("Finished processing $queue");
-        $done[$queue] = 1;
+        if ($number == 0) {
+          error_log("No items left for $queue");
+          $loop->cancelTimer($timer);
+        }
       });
     }
 
-
-
-    $timer2 = $loop->addPeriodicTimer(0.1, function ($timer) use ($loop, $done, $timer_ping) {
-      if (!empty($done) && (array_sum($done)) == count($done)) {
-        error_log("All Done, clearing the timers");
-        $loop->cancelTimer($timer_ping);
-        $loop->cancelTimer($timer);
-        \Drupal::state()->set('hydroponics.queurunner_last_pid.heartbeat', 0);
+    $loop->addTimer(720.0, function ($timer) use ($loop, $timer_ping, &$done) {
+      // Finish all if 360 seconds are reached
+      error_log("All Done, 720 Seconds past, clearing the timers");
+      $loop->cancelTimer($timer_ping);
+        foreach($done as $queue_timer) {
+          $loop->cancelTimer($queue_timer);
+        }
+        \Drupal::state()->set('hydroponics.queurunner_last_pid', 0);
       }
-    });
+    );
+
 
     $loop->run();
     Runtime::setCompleted();
