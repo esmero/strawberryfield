@@ -100,43 +100,47 @@ class StrawberryfieldHydroponicsService {
     // Grab the defined cron queues.
     $info = $this->queueManager->getDefinition($name);
     if ($info) {
-        // Make sure every queue exists. There is no harm in trying to recreate
-        // an existing queue.
-        $this->queueFactory->get($name)->createQueue();
-        $queue_worker = $this->queueManager->createInstance($name);
-        $end = time() + $time;
-        $queue = $this->queueFactory->get($name, TRUE);
-        $lease_time = $time;
-        while (time() < $end && ($item = $queue->claimItem($lease_time))) {
-          try {
-            error_log('--- processing one time for '.$name);
-            $queue_worker->processItem($item->data);
-            $queue->deleteItem($item);
-          }
-          catch (RequeueException $e) {
-            // The worker requested the task be immediately requeued.
-            $queue->releaseItem($item);
-          }
-          catch (SuspendQueueException $e) {
-            // If the worker indicates there is a problem with the whole queue,
-            $queue->releaseItem($item);
-            watchdog_exception('cron', $e);
-
-          }
-          catch (\Exception $e) {
-            // In case of any other kind of exception, log it and leave the item
-            // in the queue to be processed again later.
-            watchdog_exception('cron', $e);
-          }
+      // Make sure every queue exists. There is no harm in trying to recreate
+      // an existing queue.
+      $this->queueFactory->get($name)->createQueue();
+      $queue_worker = $this->queueManager->createInstance($name);
+      $end = time() + $time;
+      $queue = $this->queueFactory->get($name, TRUE);
+      $lease_time = $time;
+      while (time() < $end && ($item = $queue->claimItem($lease_time))) {
+        try {
+          error_log('--- processing one item for '.$name);
+          $queue_worker->processItem($item->data);
+          $queue->deleteItem($item);
         }
-    return $queue->numberOfItems();
+        catch (RequeueException $e) {
+          // The worker requested the task be immediately requeued.
+          $queue->releaseItem($item);
+        }
+        catch (SuspendQueueException $e) {
+          // If the worker indicates there is a problem with the whole queue,
+          $queue->releaseItem($item);
+          watchdog_exception('cron', $e);
+
+        }
+        catch (\Exception $e) {
+          // In case of any other kind of exception, log it and leave the item
+          // in the queue to be processed again later.
+          watchdog_exception('cron', $e);
+        }
+      }
+      error_log('--- Lease time is out for '.$name);
+      return $queue->numberOfItems();
     }
-  else {
-    return 0;
-  }
+    else {
+      return 0;
+    }
   }
 
 
+  /**
+   * Checks if Background Drush can run, and if so, sends it away.
+   */
   public function run() {
     $config = $this->configFactory->get('strawberryfield.hydroponics_settings');
     if ($config->get('active')) {
@@ -145,12 +149,8 @@ class StrawberryfieldHydroponicsService {
       $site_path = explode('/', $site_path);
       $site_name = $site_path[1];
       $queuerunner_pid = (int) \Drupal::state()->get('hydroponics.queurunner_last_pid', 0);
-
       $lastRunTime = intval(\Drupal::state()->get('hydroponics.heartbeat'));
-      error_log($lastRunTime);
       $currentTime = intval(\Drupal::time()->getRequestTime());
-      error_log('Saved PID' . $queuerunner_pid);
-      error_log(var_export(posix_kill($queuerunner_pid, 0), TRUE));
       $running_posix = posix_kill($queuerunner_pid, 0);
       if (!$running_posix || !$queuerunner_pid) {
         error_log('Hydroponics Service Not running, starting');
