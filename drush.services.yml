@@ -3,3 +3,7 @@ services:
     class: Drupal\strawberryfield\Commands\JsonApiDrushCommands
     tags:
        - { name: drush.command }
+  hydroponics.commands:
+    class: Drupal\strawberryfield\Commands\HydroponicsDrushCommands
+    tags:
+      - { name: drush.command }

@@ -181,3 +181,18 @@ field.formatter.settings.strawberry_default_formatter:
     limit_access:
       type: string
       label: 'Access level the user needs on a bundle to be able to see it rendered, defaults to "edit"'
+
+# Multiple JSON type / View Mode Mappings
+strawberryfield.hydroponics_settings:
+  type: config_object
+  label: 'Queues enabled to be processed by the Hydroponics Service'
+  mapping:
+    active:
+      type: boolean
+      label: If Hydroponics Service is enabled or not
+    queues:
+      type: sequence
+      label: 'Queues marked as to be run by the Hydroponics Service'
+      sequence:
+        type: string
+        label: 'Queue Names'

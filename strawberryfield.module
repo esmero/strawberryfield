@@ -416,3 +416,14 @@ function strawberryfield_search_api_solr_query_alter(\Solarium\Core\Query\QueryI
     }
   }
 }
+
+function strawberryfield_cron() {
+  // @TODO: Drush calls to CRON do not release the background process? Wait
+  // For ever for the exec() to return, even if calling with nohup.
+  // @Giancarlobi.. not sure why. So this will only run if normal CRON/web based
+  // Is invoked but never with `drush cron`
+  if (PHP_SAPI != 'cli') {
+    \Drupal::getContainer()->get('strawberryfield.hydroponics')->run();
+  }
+}
+
