@@ -110,6 +110,7 @@ class HydroponicsDrushCommands extends DrushCommands {
       }
       \Drupal::state()->set('hydroponics.queurunner_last_pid', 0);
       $loop->cancelTimer($idle_timer);
+      $loop->stop();
       }
     );
 
