@@ -59,18 +59,14 @@ class HydroponicsDrushCommands extends DrushCommands {
 //      $done[$queue] = $loop->addPeriodicTimer(1.0, function ($timer) use ($loop, $queue) {
       $done[$queue] = $loop->addPeriodicTimer(1.0, function ($timer) use ($loop, $queue, &$idle) {
         error_log("Starting to process $queue");
-        \Drupal::logger('hydroponics')->debug("Starting to process $queue");
 
         $number = \Drupal::getContainer()
           ->get('strawberryfield.hydroponics')
           ->processQueue($queue, 60);
         error_log("Finished processing $queue");
-        \Drupal::logger('hydroponics')->debug("Finished processing $queue");
-
 
         if ($number == 0) {
           error_log("No items left for $queue");
-          \Drupal::logger('hydroponics')->debug("No items left for $queue");
 
           // decrement idle counter
           $idle[$queue] -= 1;
@@ -105,7 +101,6 @@ class HydroponicsDrushCommands extends DrushCommands {
           }
           \Drupal::state()->set('hydroponics.queurunner_last_pid', 0);
         }
-        \Drupal::logger('hydroponics')->debug("No items left for all queues so stop loop");
 
       }
 
