@@ -299,6 +299,34 @@ class StrawberryfieldUtilityService {
   }
 
 
+  /**
+   * Checks if a given command exists and is executable.
+   *
+   * @param $command
+   *
+   * @return bool
+   */
+  public function verifyDrush($execpath) :bool {
+    $site_path = \Drupal::service('site.path'); // e.g.: 'sites/default'
+    $site_path = explode('/', $site_path);
+    $site_name = $site_path[1];
+    $execpath = $execpath.' --uri='.$site_name;
+    $iswindows = strpos(PHP_OS, 'WIN') === 0;
+    $canexecute = FALSE;
+    $execpath = trim(escapeshellcmd($execpath));
+    $test = $iswindows ? 'where' : 'command -v';
+    $output = shell_exec("$test $execpath");
+    if ($output) {
+      $output = shell_exec($execpath);
+      if ($output) {
+        if (strpos($output, 'Drush Commandline Tool') === 0) {
+          $canexecute = TRUE;
+        }
+      }
+    }
+    return $canexecute;
+  }
+
 
 
 
