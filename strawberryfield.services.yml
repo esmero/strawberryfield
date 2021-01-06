@@ -61,6 +61,10 @@ services:
     tags:
       - { name: mime_type_guesser }
     lazy: true
+  logger.channel.hydroponics:
+    parent: logger.channel_base
+    arguments: [ 'hydroponics' ]
   strawberryfield.hydroponics:
     class: Drupal\strawberryfield\StrawberryfieldHydroponicsService
-    arguments: ['@entity_type.manager', '@config.factory', '@module_handler', '@plugin.manager.queue_worker', '@queue']
+    arguments: ['@entity_type.manager', '@config.factory', '@module_handler', '@plugin.manager.queue_worker', '@queue', '@logger.channel.hydroponics']
+
