@@ -199,6 +199,51 @@ class StrawberryfieldHydroponicsService {
     }
   }
 
+  public function checkRunning() {
+    $queuerunner_pid = (int) \Drupal::state()->get('hydroponics.queurunner_last_pid', 0);
+    $lastRunTime = intval(\Drupal::state()->get('hydroponics.heartbeat'));
+    $currentTime = intval(\Drupal::time()->getRequestTime());
+    $running_posix = posix_kill($queuerunner_pid, 0);
+
+    if (!$running_posix || !$queuerunner_pid) {
+     $return = [
+       'running' => FALSE,
+       'message' =>  $this->t('Hydroponics Service Not running, time passed since last seen @time', [
+        '@time' => ($currentTime - $lastRunTime)]),
+        'PID' => $queuerunner_pid
+     ];
+    } else {
+      $return = [
+       'running' => TRUE,
+       'message' =>  $this->t('Hydroponics Service Is Running on PID @pid, time passed since last seen @time', [
+        '@time' => ($currentTime - $lastRunTime),
+        '@pid' => $queuerunner_pid,
+       ]),
+       'PID' => $queuerunner_pid
+     ];
+    }
+    return $return;
+  }
+
+  public function stop() {
+    $queuerunner_pid = (int) \Drupal::state()->get('hydroponics.queurunner_last_pid', 0);
+    $lastRunTime = intval(\Drupal::state()->get('hydroponics.heartbeat'));
+    $currentTime = intval(\Drupal::time()->getRequestTime());
+    $running_posix = posix_kill($queuerunner_pid, 0);
+    if (!$running_posix || !$queuerunner_pid) {
+      return NULL;
+    } else {
+      $running_posix = posix_kill($queuerunner_pid, SIGINT);
+      sleep(2);
+      if (!$running_posix) {
+        $errorcode = posix_get_last_error();
+        return posix_strerror($errorcode);
+      } else {
+        return "Successfully Stopped. Thanks";
+      }
+    }
+  }
+
 
 
 }
