@@ -192,10 +192,10 @@ strawberryfield.hydroponics_settings:
       label: If Hydroponics Service is enabled or not
     drush_path:
       type: string
-      label: Full system path to the /vendor composer Drush installation
+      label: 'Full system path to the /vendor composer Drush installation including drush script'
     home_path:
       type: string
-      label: Full system path to a folder we can use as webserver user home for Drush
+      label: 'Full system path to a folder we can use as webserver user home for Drush'
     queues:
       type: sequence
       label: 'Queues marked as to be run by the Hydroponics Service'

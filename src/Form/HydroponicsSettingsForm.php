@@ -4,7 +4,6 @@ namespace Drupal\strawberryfield\Form;
 
 use Drupal\Core\Ajax\AjaxResponse;
 use Drupal\Core\Config\ConfigFactoryInterface;
-use Drupal\Core\Database\Database;
 use Drupal\Core\Extension\ModuleHandler;
 use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
@@ -14,10 +13,6 @@ use Drupal\Core\Queue\QueueInterface;
 use Drupal\Core\Queue\QueueWorkerManager;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\State\StateInterface;
-use Drupal\Core\TempStore\PrivateTempStoreFactory;
-use Drupal\queue_ui\Form\OverviewForm;
-use Drupal\queue_ui\QueueUIManager;
-use Drupal\strawberryfield\Tools\Ocfl\OcflHelper;
 use Drupal\Core\Ajax\InvokeCommand;
 use Drupal\Core\Ajax\MessageCommand;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -131,7 +126,7 @@ class HydroponicsSettingsForm extends ConfigFormBase {
 
     $active =  $config->get('active') ? $config->get('active') : FALSE;
     $drush_path = $config->get('drush_path') ?  $config->get('drush_path') : NULL;
-    $drush_path = $config->get('home_path') ?  $config->get('home_path') : NULL;
+    $home_path = $config->get('home_path') ?  $config->get('home_path') : NULL;
     $enabled_queues =  !empty($config->get('queues')) ? array_flip($config->get('queues')) : [];
 
     $form['active'] =  [
@@ -146,26 +141,26 @@ class HydroponicsSettingsForm extends ConfigFormBase {
       '#description' => 'If you are not running under under the esmero-php:7.x docker containers you need to provide the following settings'
     ];
     $form['advanced']['drush_path'] =  [
-      '#title' => 'The full system path to your composer vendor folder containing Drush.',
+      '#title' => 'The full system path to your composer vendor drush installation (including the actual drush php script).',
       '#description' => 'For a standard archipelago-deployment docker the right path is "/var/www/html/vendor/drush/drush"',
       '#type' => 'textfield',
-      '#required' => true,
+      '#required' => TRUE,
       '#default_value' => !empty($drush_path) ? $drush_path : '/var/www/html/vendor/drush/drush',
       '#prefix' => '<span class="drush_path-validation"></span>',
       '#ajax' => [
-      'callback' => [$this, 'validateDrush'],
-      'effect' => 'fade',
-      'wrapper' => 'drush_path-validation',
-      'method' => 'replace',
-      'event' => 'change'
-    ]
+        'callback' => [$this, 'validateDrush'],
+        'effect' => 'fade',
+        'wrapper' => 'drush_path-validation',
+        'method' => 'replace',
+        'event' => 'change'
+      ]
     ];
 
     $form['advanced']['home_path'] =  [
       '#title' => 'A full system path we can use as $HOME directory for your webserver user.',
       '#description' => 'For a standard archipelago-deployment via Docker this is not needed. For others the webserver user (e.g www-data) may need at least read permissions',
       '#type' => 'textfield',
-      '#required' => true,
+      '#required' => FALSE,
       '#default_value' => !empty($home_path) ? $home_path : NULL
     ];
 
@@ -203,7 +198,7 @@ class HydroponicsSettingsForm extends ConfigFormBase {
 
     }
 
-      return parent::buildForm($form, $form_state);
+    return parent::buildForm($form, $form_state);
   }
 
 
