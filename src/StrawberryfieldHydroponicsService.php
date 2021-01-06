@@ -171,9 +171,11 @@ class StrawberryfieldHydroponicsService {
         if (empty($path)) {
           $path = '/var/www/html/vendor/drush/drush/drush';
         }
+        $path = escapeshellcmd($path);
         $cmd = $path.' archipelago:hydroponics --quiet --uri=' . $base_url;
         $home = $config->get('home_path');
         if (!empty($home)) {
+          $home = escapeshellcmd($home);
           $cmd = "export HOME='".$home."'; ".$cmd;
         }
 
