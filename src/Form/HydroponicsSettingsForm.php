@@ -142,10 +142,10 @@ class HydroponicsSettingsForm extends ConfigFormBase {
     ];
     $form['advanced']['drush_path'] =  [
       '#title' => 'The full system path to your composer vendor drush installation (including the actual drush php script).',
-      '#description' => 'For a standard archipelago-deployment docker the right path is "/var/www/html/vendor/drush/drush"',
+      '#description' => 'For a standard archipelago-deployment docker the right path is "/var/www/html/vendor/drush/drush/drush"',
       '#type' => 'textfield',
       '#required' => TRUE,
-      '#default_value' => !empty($drush_path) ? $drush_path : '/var/www/html/vendor/drush/drush',
+      '#default_value' => !empty($drush_path) ? $drush_path : '/var/www/html/vendor/drush/drush/drush',
       '#prefix' => '<span class="drush_path-validation"></span>',
       '#ajax' => [
         'callback' => [$this, 'validateDrush'],
@@ -219,7 +219,7 @@ class HydroponicsSettingsForm extends ConfigFormBase {
     $response = new AjaxResponse();
     $command = rtrim($form_state->getValue('drush_path'), '/');
     $command = $command.' --version';
-    $canrun = \Drupal::service('strawberryfield.utility')->verifyCommand($command);
+    $canrun = \Drupal::service('strawberryfield.utility')->verifyDrush($command);
     if (!$canrun) {
       $response->addCommand(new InvokeCommand('#edit-drush-path', 'addClass', ['error']));
       $response->addCommand(new InvokeCommand('#edit-drush-path', 'removeClass', ['ok']));
