@@ -229,16 +229,29 @@ class StrawberryfieldHydroponicsService {
     $queuerunner_pid = (int) \Drupal::state()->get('hydroponics.queurunner_last_pid', 0);
     $lastRunTime = intval(\Drupal::state()->get('hydroponics.heartbeat'));
     $currentTime = intval(\Drupal::time()->getRequestTime());
+    error_log($queuerunner_pid);
     $running_posix = posix_kill($queuerunner_pid, 0);
     if (!$running_posix || !$queuerunner_pid) {
       return NULL;
     } else {
-      $running_posix = posix_kill($queuerunner_pid, SIGINT);
+      if (extension_loaded('pcntl')) {
+        $running_posix = posix_kill($queuerunner_pid, SIGTERM);
+      }
+      else {
+        $running_posix = posix_kill($queuerunner_pid, 15);
+      }
+      error_log($running_posix);
       sleep(2);
       if (!$running_posix) {
         $errorcode = posix_get_last_error();
+        $this->logger->info('Hydroponics Service could not stop because of @code', [
+            '@code' => posix_strerror($errorcode)]
+        );
+
         return posix_strerror($errorcode);
       } else {
+        \Drupal::state()->set('hydroponics.queurunner_last_pid', 0);
+        sleep(1);
         return "Successfully Stopped. Thanks";
       }
     }
