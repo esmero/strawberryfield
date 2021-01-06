@@ -8,19 +8,16 @@
 
 namespace Drupal\strawberryfield;
 
-use Drupal\Core\File\FileSystemInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
-use Drupal\Core\Entity\EntityFieldManagerInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Queue\QueueFactory;
 use Drupal\Core\Queue\QueueWorkerManagerInterface;
 use Drupal\Core\Queue\RequeueException;
 use Drupal\Core\Queue\SuspendQueueException;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
-use Drupal\file\FileInterface;
-use Drupal\Core\Entity\ContentEntityInterface;
-use Drupal\search_api\Entity\Index;
+use Psr\Log\LoggerInterface;
+
 /**
  * Provides a SBF utility class.
  */
@@ -64,25 +61,35 @@ class StrawberryfieldHydroponicsService {
 
 
   /**
+   * The logger service.
+   *
+   * @var \Psr\Log\LoggerInterface
+   */
+  protected $logger;
+
+  /**
    * StrawberryfieldHydroponicsService constructor.
    *
    * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entity_type_manager
    * @param \Drupal\Core\Config\ConfigFactoryInterface $config_factory
    * @param \Drupal\Core\Extension\ModuleHandlerInterface $module_handler
    * @param \Drupal\Core\Queue\QueueWorkerManagerInterface $queue_manager
+   * @param \Psr\Log\LoggerInterface $hydroponics_logger
    */
   public function __construct(
     EntityTypeManagerInterface $entity_type_manager,
     ConfigFactoryInterface $config_factory,
     ModuleHandlerInterface $module_handler,
     QueueWorkerManagerInterface $queue_manager,
-    QueueFactory $queue_factory
+    QueueFactory $queue_factory,
+    LoggerInterface $hydroponics_logger
   ) {
     $this->entityTypeManager = $entity_type_manager;
     $this->configFactory = $config_factory;
     $this->moduleHandler = $module_handler;
     $this->queueManager = $queue_manager;
     $this->queueFactory = $queue_factory;
+    $this->logger = $hydroponics_logger;
   }
 
 
@@ -109,7 +116,9 @@ class StrawberryfieldHydroponicsService {
       $lease_time = $time;
       while (time() < $end && ($item = $queue->claimItem($lease_time))) {
         try {
-          error_log('--- processing one item for '.$name);
+          $this->logger->info('--- processing one item for @queue', [
+            '@queue' => $name]
+          );
           $queue_worker->processItem($item->data);
           $queue->deleteItem($item);
         }
@@ -129,7 +138,9 @@ class StrawberryfieldHydroponicsService {
           watchdog_exception('cron', $e);
         }
       }
-      error_log('--- Lease time is out for '.$name);
+      $this->logger->info('--- --- Lease time is out for  @queue', [
+          '@queue' => $name]
+      );
       return $queue->numberOfItems();
     }
     else {
@@ -153,26 +164,96 @@ class StrawberryfieldHydroponicsService {
       $currentTime = intval(\Drupal::time()->getRequestTime());
       $running_posix = posix_kill($queuerunner_pid, 0);
       if (!$running_posix || !$queuerunner_pid) {
-        error_log('Hydroponics Service Not running, starting');
-        error_log('Current Time:'.$currentTime);
-        error_log('last time seen was:'.$lastRunTime);
-        error_log('Time passed:'.($currentTime -$lastRunTime));
-        $cmd = 'drush archipelago:hydroponics --uri=' . $base_url;
+        $this->logger->info('Hydroponics Service Not running, starting, time passed since last seen @time', [
+          '@time' => ($currentTime - $lastRunTime)]
+        );
+        $path = $config->get('drush_path');
+        if (empty($path)) {
+          $path = '/var/www/html/vendor/drush/drush/drush';
+        }
+        $path = escapeshellcmd($path);
+        $cmd = $path.' archipelago:hydroponics --quiet --uri=' . $base_url;
+        $home = $config->get('home_path');
+        if (!empty($home)) {
+          $home = escapeshellcmd($home);
+          $cmd = "export HOME='".$home."'; ".$cmd;
+        }
+
         $pid = exec(
-          sprintf("nohup %s > /tmp/hydroponics.log 2>&1 & echo $!", $cmd)
+          sprintf("%s > /dev/null 2>&1 & echo $!", $cmd)
         );
         \Drupal::state()->set('hydroponics.queurunner_last_pid', $pid);
-        error_log('New PID'. $pid);
+        $this->logger->info('PID for Hydroponics Service: @pid', [
+            '@pid' => $pid]
+        );
       } else {
-        error_log('is already running');
-        error_log('Hydroponics Service Running with:'. $queuerunner_pid);
-        error_log('Current Time:'.$currentTime);
-        error_log('last time seen was:'.$lastRunTime);
-        error_log('Time passed:'.($currentTime -$lastRunTime));
+        $this->logger->info('Hydroponics Service already running with PID @pid, time passed since last seen @time', [
+            '@time' => ($currentTime - $lastRunTime),
+            '@pid' => $queuerunner_pid
+          ]
+        );
       }
     }
     else {
       return;
+    }
+  }
+
+  public function checkRunning() {
+    $queuerunner_pid = (int) \Drupal::state()->get('hydroponics.queurunner_last_pid', 0);
+    $lastRunTime = intval(\Drupal::state()->get('hydroponics.heartbeat'));
+    $currentTime = intval(\Drupal::time()->getRequestTime());
+    $running_posix = posix_kill($queuerunner_pid, 0);
+
+    if (!$running_posix || !$queuerunner_pid) {
+     $return = [
+       'running' => FALSE,
+       'message' =>  $this->t('Hydroponics Service Not running, time passed since last seen @time', [
+        '@time' => ($currentTime - $lastRunTime)]),
+        'PID' => $queuerunner_pid
+     ];
+    } else {
+      $return = [
+       'running' => TRUE,
+       'message' =>  $this->t('Hydroponics Service Is Running on PID @pid, time passed since last seen @time', [
+        '@time' => ($currentTime - $lastRunTime),
+        '@pid' => $queuerunner_pid,
+       ]),
+       'PID' => $queuerunner_pid
+     ];
+    }
+    return $return;
+  }
+
+  public function stop() {
+    $queuerunner_pid = (int) \Drupal::state()->get('hydroponics.queurunner_last_pid', 0);
+    $lastRunTime = intval(\Drupal::state()->get('hydroponics.heartbeat'));
+    $currentTime = intval(\Drupal::time()->getRequestTime());
+    error_log($queuerunner_pid);
+    $running_posix = posix_kill($queuerunner_pid, 0);
+    if (!$running_posix || !$queuerunner_pid) {
+      return NULL;
+    } else {
+      if (extension_loaded('pcntl')) {
+        $running_posix = posix_kill($queuerunner_pid, SIGTERM);
+      }
+      else {
+        $running_posix = posix_kill($queuerunner_pid, 15);
+      }
+      error_log($running_posix);
+      sleep(2);
+      if (!$running_posix) {
+        $errorcode = posix_get_last_error();
+        $this->logger->info('Hydroponics Service could not stop because of @code', [
+            '@code' => posix_strerror($errorcode)]
+        );
+
+        return posix_strerror($errorcode);
+      } else {
+        \Drupal::state()->set('hydroponics.queurunner_last_pid', 0);
+        sleep(1);
+        return "Successfully Stopped. Thanks";
+      }
     }
   }
 

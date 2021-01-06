@@ -36,11 +36,11 @@ class HydroponicsDrushCommands extends DrushCommands {
    */
   public function hydroponics(
   ) {
+
     $loop = Factory::create();
     $timer_ping = $loop->addPeriodicTimer(3.0, function () {
       // store a heartbeat every 3 seconds.
       $currenttime = \Drupal::time()->getCurrentTime();
-      error_log('pinging');
       \Drupal::state()->set('hydroponics.heartbeat', $currenttime);
     });
     $active_queues = \Drupal::config('strawberryfield.hydroponics_settings')->get('queues');
@@ -58,19 +58,26 @@ class HydroponicsDrushCommands extends DrushCommands {
 
 //      $done[$queue] = $loop->addPeriodicTimer(1.0, function ($timer) use ($loop, $queue) {
       $done[$queue] = $loop->addPeriodicTimer(1.0, function ($timer) use ($loop, $queue, &$idle) {
-        error_log("Starting to process $queue");
+        \Drupal::logger('hydroponics')->info("Starting to process queue @queue", [
+          '@queue' => $queue
+        ]);
 
         $number = \Drupal::getContainer()
           ->get('strawberryfield.hydroponics')
           ->processQueue($queue, 60);
-        error_log("Finished processing $queue");
+          \Drupal::logger('hydroponics')->info("Finished processing queue @queue", [
+          '@queue' => $queue
+        ]);
+
 
         if ($number == 0) {
-          error_log("No items left for $queue");
+          \Drupal::logger('hydroponics')->info("No items left on queue @queue", [
+            '@queue' => $queue
+          ]);
+
 
           // decrement idle counter
           $idle[$queue] -= 1;
-//          $loop->cancelTimer($timer);
         }
 
         else {
@@ -80,7 +87,7 @@ class HydroponicsDrushCommands extends DrushCommands {
 
       });
     }
-    
+
     $idle_timer = $loop->addPeriodicTimer(60.0, function ($timer) use ($loop, $timer_ping, &$done, &$idle) {
       // Finish all if all queues return 0 elements for at least 3 cycles
       // Check this every 60 s
@@ -96,6 +103,8 @@ class HydroponicsDrushCommands extends DrushCommands {
           $loop->cancelTimer($queue_timer);
         }
         \Drupal::state()->set('hydroponics.queurunner_last_pid', 0);
+        \Drupal::logger('hydroponics')->info("All queues are idle, closing timers");
+
         $loop->cancelTimer($timer);
         }
       }
@@ -103,7 +112,7 @@ class HydroponicsDrushCommands extends DrushCommands {
 
     $securitytimer = $loop->addTimer(720.0, function ($timer) use ($loop, $timer_ping, $idle_timer, &$done) {
       // Finish all if 720 seconds are reached
-      error_log("All Done, 720 Seconds past, clearing the timers");
+      \Drupal::logger('hydroponics')->info("720 seconds passed closing Hydroponics Service");
       $loop->cancelTimer($timer_ping);
       foreach($done as $queue_timer) {
         $loop->cancelTimer($queue_timer);
@@ -114,8 +123,16 @@ class HydroponicsDrushCommands extends DrushCommands {
       }
     );
 
+    /* TODO recompile with PCNTL enabled
+    \pcntl_signal(SIGINT, 'signalhandler');
+    \pcntl_signal_dispatch();
+    $signalhandler = function ($signal) use ($loop) {
+      error_log('We got a signal, breaking');
+      $loop->stop();
+    };
+    */
+
     $loop->run();
     Runtime::setCompleted();
-    //We're now in the child process.
   }
 }
