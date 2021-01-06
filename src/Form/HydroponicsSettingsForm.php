@@ -147,10 +147,10 @@ class HydroponicsSettingsForm extends ConfigFormBase {
     ];
     $form['advanced']['drush_path'] =  [
       '#title' => 'The full system path to your composer vendor folder containing Drush.',
-      '#description' => 'For a standard archipelago-deployment docker the right path is "/var/www/html/web/vendor/drush/drush"',
+      '#description' => 'For a standard archipelago-deployment docker the right path is "/var/www/html/vendor/drush/drush"',
       '#type' => 'textfield',
       '#required' => true,
-      '#default_value' => !empty($drush_path) ? $drush_path : '/var/www/html/web/vendor/drush/drush',
+      '#default_value' => !empty($drush_path) ? $drush_path : '/var/www/html/vendor/drush/drush',
       '#prefix' => '<span class="drush_path-validation"></span>',
       '#ajax' => [
       'callback' => [$this, 'validateDrush'],
