@@ -3,6 +3,7 @@
 namespace Drupal\strawberryfield\Form;
 
 use Drupal\Core\Ajax\AjaxResponse;
+use Drupal\Core\Ajax\HtmlCommand;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Extension\ModuleHandler;
 use Drupal\Core\Form\ConfigFormBase;
@@ -16,11 +17,13 @@ use Drupal\Core\State\StateInterface;
 use Drupal\Core\Ajax\InvokeCommand;
 use Drupal\Core\Ajax\MessageCommand;
 use Symfony\Component\DependencyInjection\ContainerInterface;
+use Drupal\strawberryfield\StrawberryfieldHydroponicsService;
+use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
 
 /**
  * ConfigurationForm for Queue Worker Selection to be run by Hydroponics Service.
  */
-class HydroponicsSettingsForm extends ConfigFormBase {
+class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjectionInterface{
 
 
   /**
@@ -54,27 +57,30 @@ class HydroponicsSettingsForm extends ConfigFormBase {
   /**
    * @var \Drupal\Core\Queue\QueueWorkerManager
    */
-  private $queueWorkerManager;
+  protected $queueWorkerManager;
 
   /**
    * @var array|NULL
    */
-  private $queues = [];
+  protected $queues = [];
 
+  /**
+   * @var \Drupal\strawberryfield\StrawberryfieldHydroponicsService
+   */
+  protected $hydroponicsService;
   /**
    * OverviewForm constructor.
    *
    * @param \Drupal\Core\Config\ConfigFactoryInterface $config_factory
    * @param \Drupal\Core\Queue\QueueFactory $queue_factory
-   * @param \Drupal\Core\TempStore\PrivateTempStoreFactory $temp_store_factory
    * @param \Drupal\Core\Session\AccountInterface $current_user
    * @param \Drupal\Core\State\StateInterface $state
    * @param \Drupal\Core\Extension\ModuleHandler $module_handler
    * @param \Drupal\Core\Queue\QueueWorkerManagerInterface $queueWorkerManager
-   * @param \Drupal\queue_ui\QueueUIManager $queueUIManager
    * @param \Drupal\Core\Messenger\Messenger $messenger
+   * @param \Drupal\strawberryfield\StrawberryfieldHydroponicsService $hydroponics_service
    */
-  public function __construct(ConfigFactoryInterface $config_factory, QueueFactory $queue_factory, AccountInterface $current_user, StateInterface $state, ModuleHandler $module_handler, QueueWorkerManagerInterface $queueWorkerManager, Messenger $messenger) {
+  public function __construct(ConfigFactoryInterface $config_factory, QueueFactory $queue_factory, AccountInterface $current_user, StateInterface $state, ModuleHandler $module_handler, QueueWorkerManagerInterface $queueWorkerManager, Messenger $messenger, StrawberryfieldHydroponicsService $hydroponics_service) {
     parent::__construct($config_factory);
     $this->queueFactory = $queue_factory;
     $this->currentUser = $current_user;
@@ -83,6 +89,7 @@ class HydroponicsSettingsForm extends ConfigFormBase {
     $this->queueWorkerManager = $queueWorkerManager;
     $this->messenger = $messenger;
     $this->queues = $this->queueWorkerManager->getDefinitions();
+    $this->hydroponicsService = $hydroponics_service;
   }
 
   /**
@@ -113,7 +120,8 @@ class HydroponicsSettingsForm extends ConfigFormBase {
       $container->get('state'),
       $container->get('module_handler'),
       $container->get('plugin.manager.queue_worker'),
-      $container->get('messenger')
+      $container->get('messenger'),
+      $container->get('strawberryfield.hydroponics')
     );
   }
 
@@ -128,6 +136,28 @@ class HydroponicsSettingsForm extends ConfigFormBase {
     $drush_path = $config->get('drush_path') ?  $config->get('drush_path') : NULL;
     $home_path = $config->get('home_path') ?  $config->get('home_path') : NULL;
     $enabled_queues =  !empty($config->get('queues')) ? array_flip($config->get('queues')) : [];
+
+    $current_status = $this->hydroponicsService->checkRunning();
+
+    $form['status'] =  [
+      '#id' => 'hydroponics-status',
+      '#type' => 'details',
+      '#title' => 'Current Hydroponics Service Status',
+      '#open' => TRUE,
+      '#prefix' => '<span class="hydroponics-status"></span>',
+      '#description' =>  $current_status['message']
+    ];
+
+    $form['status']['refresh'] = [
+      '#type' => 'button',
+      '#value' => $this->t('Refresh'),
+      '#ajax' => [
+        'callback' => [$this, 'ajaxRefreshStatusCallback'],
+        'effect' => 'fade',
+        'wrapper' => 'hydroponics-status',
+        'method' => 'replace',
+        ]
+    ];
 
     $form['active'] =  [
       '#title' => 'Check to enabled Hydroponics Queue Background processing service wakeup during Drupal Cron.',
@@ -210,7 +240,12 @@ class HydroponicsSettingsForm extends ConfigFormBase {
   }
 
 
-
+  /**
+   * AJAX callback.
+   */
+  public function ajaxRefreshStatusCallback($form, FormStateInterface $form_state) {
+   return $form['status'];
+  }
   /**
    * @param array $form
    * @param \Drupal\Core\Form\FormStateInterface $form_state
