@@ -10,7 +10,7 @@ use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Messenger\Messenger;
 use Drupal\Core\Queue\QueueFactory;
 use Drupal\Core\Queue\QueueInterface;
-use Drupal\Core\Queue\QueueWorkerManager;
+use Drupal\Core\Queue\QueueWorkerManagerInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\State\StateInterface;
 use Drupal\Core\Ajax\InvokeCommand;
@@ -57,10 +57,9 @@ class HydroponicsSettingsForm extends ConfigFormBase {
   private $queueWorkerManager;
 
   /**
-   * @var \Drupal\queue_ui\QueueUIManager
+   * @var array|NULL
    */
-  private $queueUIManager;
-
+  private $queues = [];
 
   /**
    * OverviewForm constructor.
@@ -71,11 +70,11 @@ class HydroponicsSettingsForm extends ConfigFormBase {
    * @param \Drupal\Core\Session\AccountInterface $current_user
    * @param \Drupal\Core\State\StateInterface $state
    * @param \Drupal\Core\Extension\ModuleHandler $module_handler
-   * @param \Drupal\Core\Queue\QueueWorkerManager $queueWorkerManager
+   * @param \Drupal\Core\Queue\QueueWorkerManagerInterface $queueWorkerManager
    * @param \Drupal\queue_ui\QueueUIManager $queueUIManager
    * @param \Drupal\Core\Messenger\Messenger $messenger
    */
-  public function __construct(ConfigFactoryInterface $config_factory, QueueFactory $queue_factory, AccountInterface $current_user, StateInterface $state, ModuleHandler $module_handler, QueueWorkerManager $queueWorkerManager, Messenger $messenger) {
+  public function __construct(ConfigFactoryInterface $config_factory, QueueFactory $queue_factory, AccountInterface $current_user, StateInterface $state, ModuleHandler $module_handler, QueueWorkerManagerInterface $queueWorkerManager, Messenger $messenger) {
     parent::__construct($config_factory);
     $this->queueFactory = $queue_factory;
     $this->currentUser = $current_user;
@@ -83,6 +82,7 @@ class HydroponicsSettingsForm extends ConfigFormBase {
     $this->moduleHandler = $module_handler;
     $this->queueWorkerManager = $queueWorkerManager;
     $this->messenger = $messenger;
+    $this->queues = $this->queueWorkerManager->getDefinitions();
   }
 
   /**
@@ -177,7 +177,7 @@ class HydroponicsSettingsForm extends ConfigFormBase {
     ];
 
 
-    $queues = $this->queueWorkerManager->getDefinitions();
+    $queues = (isset($this->queues)) ? $this->queues : [];
     foreach ($queues as $name => $queue_definition) {
       /** @var QueueInterface $queue */
       $queue = $this->queueFactory->get($name);
@@ -219,15 +219,14 @@ class HydroponicsSettingsForm extends ConfigFormBase {
     $response = new AjaxResponse();
     $command = rtrim($form_state->getValue('drush_path'), '/');
     $command = $command.' --version';
-
-    $canrun = \Drupal::service('strawberryfield.utility')->verifyCommand($form_state->getValue('drush_path'));
+    $canrun = \Drupal::service('strawberryfield.utility')->verifyCommand($command);
     if (!$canrun) {
       $response->addCommand(new InvokeCommand('#edit-drush-path', 'addClass', ['error']));
       $response->addCommand(new InvokeCommand('#edit-drush-path', 'removeClass', ['ok']));
       $response->addCommand(new MessageCommand('Drush path is not valid.', NULL, ['type' => 'error', 'announce' => 'Drush path is not valid.']));
 
     } else {
-      $response->addCommand(new InvokeCommand('#edit-drush-pat', 'removeClass', ['error']));
+      $response->addCommand(new InvokeCommand('#edit-drush-path', 'removeClass', ['error']));
       $response->addCommand(new InvokeCommand('#edit-drush-path', 'addClass', ['ok']));
       $response->addCommand(new MessageCommand('Drush path is valid!', NULL, ['type' => 'status', 'announce' => 'Drush path is valid!']));
 
