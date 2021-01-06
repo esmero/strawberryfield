@@ -146,11 +146,11 @@ class HydroponicsSettingsForm extends ConfigFormBase {
       '#type' => 'textfield',
       '#required' => TRUE,
       '#default_value' => !empty($drush_path) ? $drush_path : '/var/www/html/vendor/drush/drush/drush',
-      '#prefix' => '<span class="drush_path-validation"></span>',
+      '#prefix' => '<span class="drush-path-validation"></span>',
       '#ajax' => [
         'callback' => [$this, 'validateDrush'],
         'effect' => 'fade',
-        'wrapper' => 'drush_path-validation',
+        'wrapper' => 'drush-path-validation',
         'method' => 'replace',
         'event' => 'change'
       ]
@@ -161,7 +161,15 @@ class HydroponicsSettingsForm extends ConfigFormBase {
       '#description' => 'For a standard archipelago-deployment via Docker please DO NOT ADD this. For others the webserver user (e.g www-data) may need at least read permissions',
       '#type' => 'textfield',
       '#required' => FALSE,
-      '#default_value' => !empty($home_path) ? $home_path : NULL
+      '#default_value' => !empty($home_path) ? $home_path : NULL,
+      '#prefix' => '<span class="home-path-validation"></span>',
+      '#ajax' => [
+      'callback' => [$this, 'validateDrush'],
+      'effect' => 'fade',
+      'wrapper' => 'home-path-validation',
+      'method' => 'replace',
+      'event' => 'change'
+      ]
     ];
 
     $form['table-row'] = [
@@ -220,10 +228,7 @@ class HydroponicsSettingsForm extends ConfigFormBase {
     $home = rtrim($form_state->getValue('home_path'), '/');
     $command = rtrim($form_state->getValue('drush_path'), '/');
     $command = $command.' --version';
-    if (!empty($home)) {
-      $command = "export HOME='".$home."'; ".$command;
-    }
-    $canrun = \Drupal::service('strawberryfield.utility')->verifyDrush($command);
+    $canrun = \Drupal::service('strawberryfield.utility')->verifyDrush($command, $home);
     if (!$canrun) {
       $response->addCommand(new InvokeCommand('#edit-drush-path', 'addClass', ['error']));
       $response->addCommand(new InvokeCommand('#edit-drush-path', 'removeClass', ['ok']));
