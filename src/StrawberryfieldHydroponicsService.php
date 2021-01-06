@@ -174,7 +174,7 @@ class StrawberryfieldHydroponicsService {
         $cmd = $path.' archipelago:hydroponics --quiet --uri=' . $base_url;
         $home = $config->get('home_path');
         if (!empty($home)) {
-          $cmd = '$HOME='.$home.'/; '.$cmd;
+          $cmd = "export HOME='".$home."'; ".$cmd;
         }
 
         $pid = exec(

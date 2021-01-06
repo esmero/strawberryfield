@@ -158,7 +158,7 @@ class HydroponicsSettingsForm extends ConfigFormBase {
 
     $form['advanced']['home_path'] =  [
       '#title' => 'A full system path we can use as $HOME directory for your webserver user.',
-      '#description' => 'For a standard archipelago-deployment via Docker this is not needed. For others the webserver user (e.g www-data) may need at least read permissions',
+      '#description' => 'For a standard archipelago-deployment via Docker please DO NOT ADD this. For others the webserver user (e.g www-data) may need at least read permissions',
       '#type' => 'textfield',
       '#required' => FALSE,
       '#default_value' => !empty($home_path) ? $home_path : NULL
@@ -217,8 +217,12 @@ class HydroponicsSettingsForm extends ConfigFormBase {
   }
   public function validateDrush(array $form, FormStateInterface $form_state) {
     $response = new AjaxResponse();
+    $home = rtrim($form_state->getValue('home_path'), '/');
     $command = rtrim($form_state->getValue('drush_path'), '/');
     $command = $command.' --version';
+    if (!empty($home)) {
+      $command = "export HOME='".$home."'; ".$command;
+    }
     $canrun = \Drupal::service('strawberryfield.utility')->verifyDrush($command);
     if (!$canrun) {
       $response->addCommand(new InvokeCommand('#edit-drush-path', 'addClass', ['error']));
