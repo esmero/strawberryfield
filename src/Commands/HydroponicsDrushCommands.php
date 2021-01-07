@@ -110,6 +110,7 @@ class HydroponicsDrushCommands extends DrushCommands {
       }
     );
 
+/*
     $securitytimer = $loop->addTimer(720.0, function ($timer) use ($loop, $timer_ping, $idle_timer, &$done) {
       // Finish all if 720 seconds are reached
       \Drupal::logger('hydroponics')->info("720 seconds passed closing Hydroponics Service");
@@ -122,6 +123,7 @@ class HydroponicsDrushCommands extends DrushCommands {
       $loop->stop();
       }
     );
+*/
 
     /* TODO recompile with PCNTL enabled
     \pcntl_signal(SIGINT, 'signalhandler');
