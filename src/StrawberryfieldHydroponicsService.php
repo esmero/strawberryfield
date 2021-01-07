@@ -162,10 +162,15 @@ class StrawberryfieldHydroponicsService {
       $queuerunner_pid = (int) \Drupal::state()->get('hydroponics.queurunner_last_pid', 0);
       $lastRunTime = intval(\Drupal::state()->get('hydroponics.heartbeat'));
       $currentTime = intval(\Drupal::time()->getRequestTime());
-      $running_posix = posix_kill($queuerunner_pid, 0);
-      if (!$running_posix || !$queuerunner_pid) {
+      $deltaTime = ($currentTime - $lastRunTime);
+      $running_posix = FALSE;
+      if ($queuerunner_pid > 0) {
+        $running_posix = posix_kill($queuerunner_pid, 0);
+      }
+      //Normal stopped condition when all is ok
+      if (($deltaTime > 3) && ($queuerunner_pid <= 0) && !$running_posix) {
         $this->logger->info('Hydroponics Service Not running, starting, time passed since last seen @time', [
-          '@time' => ($currentTime - $lastRunTime)]
+          '@time' => $deltaTime]
         );
         $path = $config->get('drush_path');
         if (empty($path)) {
@@ -186,17 +191,26 @@ class StrawberryfieldHydroponicsService {
         $this->logger->info('PID for Hydroponics Service: @pid', [
             '@pid' => $pid]
         );
-      } else {
+      }
+      //The normal running condition when all is ok
+      elseif (($deltaTime < 4) && ($queuerunner_pid > 0) && $running_posix) {
         $this->logger->info('Hydroponics Service already running with PID @pid, time passed since last seen @time', [
-            '@time' => ($currentTime - $lastRunTime),
-            '@pid' => $queuerunner_pid
+          '@time' => $deltaTime,
+          '@pid' => $queuerunner_pid
+          ]
+        );
+      }
+      //Something went wrong so log error and no action
+      else {
+        $this->logger->error('Hydroponics Service error status: PID @pid, time passed since last seen @time, on Process table @ptable', [
+          '@time' => $deltaTime,
+          '@pid' => $queuerunner_pid,
+          '@ptable' => ($running_posix) ? "YES" : "NO"
           ]
         );
       }
     }
-    else {
-      return;
-    }
+    return;
   }
 
   public function checkRunning() {
@@ -220,13 +234,24 @@ class StrawberryfieldHydroponicsService {
        'PID' => $queuerunner_pid
       ];
     }
+    //Normal stopped condition when all is ok
+    elseif (($deltaTime > 3) && ($queuerunner_pid <= 0) && !$running_posix) {
+      $return = [
+        'running' => FALSE,
+        'message' =>  $this->t('Hydroponics Service Not running, time passed since last seen @time s', [
+         '@time' => $deltaTime
+        ]),
+        'PID' => $queuerunner_pid
+      ];
+    }
+    //Something went wrong. See logs and try a reset
     else {
      $return = [
        'running' => FALSE,
-       'message' =>  $this->t('Hydroponics Service Not running, time passed since last seen @time s, last PID @pid, on Process table @ptable', [
+       'message' =>  $this->t('Hydroponics Service ERROR! Check logs and try a reset. Time passed since last seen @time s, last PID @pid, on Process table @ptable', [
         '@time' => $deltaTime,
         '@pid' => $queuerunner_pid,
-        '@ptable' => ($running_posix) ? "YES" : "NO",
+        '@ptable' => ($running_posix) ? "YES" : "NO"
        ]),
        'PID' => $queuerunner_pid
      ];
