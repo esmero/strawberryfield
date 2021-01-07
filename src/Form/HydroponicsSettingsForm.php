@@ -170,6 +170,18 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
         ]
       ];
     }
+    elseif ($current_status['error'] == TRUE) {
+      $form['status']['stop'] = [
+        '#type' => 'button',
+        '#value' => $this->t('Reset Service'),
+        '#ajax' => [
+          'callback' => [$this, 'stopRunningServiceCallback'],
+          'effect' => 'fade',
+          'wrapper' => 'hydroponics-status',
+          'method' => 'replace',
+        ]
+      ];
+    }
 
     $form['active'] =  [
       '#title' => 'Check to enabled Hydroponics Queue Background processing service wakeup during Drupal Cron.',

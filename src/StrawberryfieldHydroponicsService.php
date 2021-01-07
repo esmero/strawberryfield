@@ -227,6 +227,7 @@ class StrawberryfieldHydroponicsService {
     if (($deltaTime < 4) && ($queuerunner_pid > 0) && $running_posix) {
       $return = [
        'running' => TRUE,
+       'error' => FALSE,
        'message' =>  $this->t('Hydroponics Service Is Running on PID @pid, time passed since last seen @time', [
         '@time' => $deltaTime,
         '@pid' => $queuerunner_pid
@@ -238,41 +239,54 @@ class StrawberryfieldHydroponicsService {
     elseif (($deltaTime > 3) && ($queuerunner_pid <= 0) && !$running_posix) {
       $return = [
         'running' => FALSE,
+        'error' => FALSE,
         'message' =>  $this->t('Hydroponics Service Not running, time passed since last seen @time s', [
          '@time' => $deltaTime
         ]),
-        'PID' => $queuerunner_pid
+        'PID' => $queuerunner_pid,
+        'DELTA' => $deltaTime,
+        'PTABLE' => $running_posix
       ];
     }
     //Something went wrong. See logs and try a reset
     else {
      $return = [
        'running' => FALSE,
+       'error' => TRUE,
        'message' =>  $this->t('Hydroponics Service ERROR! Check logs and try a reset. Time passed since last seen @time s, last PID @pid, on Process table @ptable', [
         '@time' => $deltaTime,
         '@pid' => $queuerunner_pid,
         '@ptable' => ($running_posix) ? "YES" : "NO"
        ]),
-       'PID' => $queuerunner_pid
+       'PID' => $queuerunner_pid,
+       'DELTA' => $deltaTime,
+       'PTABLE' => $running_posix
      ];
     }
     return $return;
   }
 
+  //This function is used for stop and for reset
   public function stop() {
     $queuerunner_pid = (int) \Drupal::state()->get('hydroponics.queurunner_last_pid', 0);
     $lastRunTime = intval(\Drupal::state()->get('hydroponics.heartbeat'));
     $currentTime = intval(\Drupal::time()->getRequestTime());
-    error_log($queuerunner_pid);
-    $running_posix = posix_kill($queuerunner_pid, 0);
-    if (!$running_posix || !$queuerunner_pid) {
+    $deltaTime = ($currentTime - $lastRunTime);
+    $running_posix = FALSE;
+    if ($queuerunner_pid > 0) {
+      $running_posix = posix_kill($queuerunner_pid, 0);
+    }
+    //Normal stopped condition when all is ok
+    if (($deltaTime > 3) && ($queuerunner_pid <= 0) && !$running_posix) {
       return NULL;
-    } else {
+    }
+    //process in table and pid available regardless of deltaTime
+    elseif (abs($queuerunner_pid) > 0 && $running_posix) {
       if (extension_loaded('pcntl')) {
-        $running_posix = posix_kill($queuerunner_pid, SIGTERM);
+        $running_posix = posix_kill(abs($queuerunner_pid), SIGTERM);
       }
       else {
-        $running_posix = posix_kill($queuerunner_pid, 15);
+        $running_posix = posix_kill(abs($queuerunner_pid), 15);
       }
       error_log($running_posix);
       sleep(2);
@@ -281,7 +295,6 @@ class StrawberryfieldHydroponicsService {
         $this->logger->info('Hydroponics Service could not stop because of @code', [
             '@code' => posix_strerror($errorcode)]
         );
-
         return posix_strerror($errorcode);
       } else {
         \Drupal::state()->set('hydroponics.queurunner_last_pid', 0);
@@ -289,8 +302,11 @@ class StrawberryfieldHydroponicsService {
         return "Successfully Stopped. Thanks";
       }
     }
+    //PID to clear, not running and not in ptable
+    else {
+      \Drupal::state()->set('hydroponics.queurunner_last_pid', 0);
+      sleep(1);
+      return "Successfully cleared pid. Thanks";
+    }
   }
-
-
-
 }
