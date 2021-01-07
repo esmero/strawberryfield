@@ -36,6 +36,7 @@ class HydroponicsDrushCommands extends DrushCommands {
    */
   public function hydroponics(
   ) {
+
     $loop = Factory::create();
     $timer_ping = $loop->addPeriodicTimer(3.0, function () {
       // store a heartbeat every 3 seconds.
@@ -121,6 +122,15 @@ class HydroponicsDrushCommands extends DrushCommands {
       $loop->stop();
       }
     );
+
+    /* TODO recompile with PCNTL enabled
+    \pcntl_signal(SIGINT, 'signalhandler');
+    \pcntl_signal_dispatch();
+    $signalhandler = function ($signal) use ($loop) {
+      error_log('We got a signal, breaking');
+      $loop->stop();
+    };
+    */
 
     $loop->run();
     Runtime::setCompleted();

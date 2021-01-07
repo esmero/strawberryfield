@@ -158,6 +158,18 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
         'method' => 'replace',
         ]
     ];
+    if ($current_status['running'] == TRUE) {
+      $form['status']['stop'] = [
+        '#type' => 'button',
+        '#value' => $this->t('Stop Running Service'),
+        '#ajax' => [
+          'callback' => [$this, 'stopRunningServiceCallback'],
+          'effect' => 'fade',
+          'wrapper' => 'hydroponics-status',
+          'method' => 'replace',
+        ]
+      ];
+    }
 
     $form['active'] =  [
       '#title' => 'Check to enabled Hydroponics Queue Background processing service wakeup during Drupal Cron.',
@@ -245,6 +257,15 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
    */
   public function ajaxRefreshStatusCallback($form, FormStateInterface $form_state) {
    return $form['status'];
+  }
+
+  /**
+   * AJAX callback.
+   */
+  public function stopRunningServiceCallback($form, FormStateInterface $form_state) {
+    $result = $this->hydroponicsService->stop();
+    $form['status']['#description'] = $result. '.Please assume any other triggered binaries (e.g Tesseract) may keep running until finishing.';
+    return $form['status'];
   }
   /**
    * @param array $form
