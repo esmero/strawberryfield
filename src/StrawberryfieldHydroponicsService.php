@@ -203,21 +203,30 @@ class StrawberryfieldHydroponicsService {
     $queuerunner_pid = (int) \Drupal::state()->get('hydroponics.queurunner_last_pid', 0);
     $lastRunTime = intval(\Drupal::state()->get('hydroponics.heartbeat'));
     $currentTime = intval(\Drupal::time()->getRequestTime());
-    $running_posix = posix_kill($queuerunner_pid, 0);
+    $deltaTime = ($currentTime - $lastRunTime);
+    $running_posix = FALSE;
+    if ($queuerunner_pid > 0) {
+      $running_posix = posix_kill($queuerunner_pid, 0);
+    }
 
-    if (!$running_posix || !$queuerunner_pid) {
-     $return = [
-       'running' => FALSE,
-       'message' =>  $this->t('Hydroponics Service Not running, time passed since last seen @time', [
-        '@time' => ($currentTime - $lastRunTime)]),
-        'PID' => $queuerunner_pid
-     ];
-    } else {
+    //The normal running condition when all is ok
+    if (($deltaTime < 4) && ($queuerunner_pid > 0) && $running_posix) {
       $return = [
        'running' => TRUE,
        'message' =>  $this->t('Hydroponics Service Is Running on PID @pid, time passed since last seen @time', [
-        '@time' => ($currentTime - $lastRunTime),
+        '@time' => $deltaTime,
+        '@pid' => $queuerunner_pid
+       ]),
+       'PID' => $queuerunner_pid
+      ];
+    }
+    else {
+     $return = [
+       'running' => FALSE,
+       'message' =>  $this->t('Hydroponics Service Not running, time passed since last seen @time s, last PID @pid, on Process table @ptable', [
+        '@time' => $deltaTime,
         '@pid' => $queuerunner_pid,
+        '@ptable' => ($running_posix) ? "YES" : "NO",
        ]),
        'PID' => $queuerunner_pid
      ];
