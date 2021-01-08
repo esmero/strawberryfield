@@ -7,3 +7,7 @@ services:
     class: Drupal\strawberryfield\Commands\HydroponicsDrushCommands
     tags:
       - { name: drush.command }
+  hydroqueue.commands:
+    class: Drupal\strawberryfield\Commands\HydroponicsQueueProcessDrushCommands
+    tags:
+      - { name: drush.command }

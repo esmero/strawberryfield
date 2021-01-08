@@ -98,12 +98,13 @@ class StrawberryfieldHydroponicsService {
    *
    * @param $name
    * @param int $time
+   * @param bool $single
    *
    * @return int
    * @throws \Drupal\Component\Plugin\Exception\PluginException
    * @throws \Drupal\Component\Plugin\Exception\PluginNotFoundException
    */
-  public function processQueue($name, $time = 120) {
+  public function processQueue($name, $time = 120, $single = FALSE) {
     // Grab the defined cron queues.
     $info = $this->queueManager->getDefinition($name);
     if ($info) {
@@ -114,33 +115,65 @@ class StrawberryfieldHydroponicsService {
       $end = time() + $time;
       $queue = $this->queueFactory->get($name, TRUE);
       $lease_time = $time;
-      while (time() < $end && ($item = $queue->claimItem($lease_time))) {
-        try {
+      if (!$single) {
+        while (time() < $end && ($item = $queue->claimItem($lease_time))) {
+          $this->logger->info('--- processing multiple items for @queue', [
+            '@queue' => $name]
+          );
+          try {
+            $queue_worker->processItem($item->data);
+            $queue->deleteItem($item);
+          }
+          catch (RequeueException $e) {
+            // The worker requested the task be immediately requeued.
+            $queue->releaseItem($item);
+          }
+          catch (SuspendQueueException $e) {
+            // If the worker indicates there is a problem with the whole queue,
+            $queue->releaseItem($item);
+            watchdog_exception('cron', $e);
+          }
+          catch (\Exception $e) {
+            // In case of any other kind of exception, log it and leave the item
+            // in the queue to be processed again later.
+            watchdog_exception('cron', $e);
+          }
+        }
+        $this->logger->info('--- --- Lease time is out for @queue or queue empty', [
+            '@queue' => $name]
+        );
+      }
+      else {
+        //process a single element
+        if ($item = $queue->claimItem($lease_time)) {
           $this->logger->info('--- processing one item for @queue', [
             '@queue' => $name]
           );
-          $queue_worker->processItem($item->data);
-          $queue->deleteItem($item);
+          try {
+            $queue_worker->processItem($item->data);
+            $queue->deleteItem($item);
+          }
+          catch (RequeueException $e) {
+            // The worker requested the task be immediately requeued.
+            $queue->releaseItem($item);
+          }
+          catch (SuspendQueueException $e) {
+            // If the worker indicates there is a problem with the whole queue,
+            $queue->releaseItem($item);
+            watchdog_exception('cron', $e);
+          }
+          catch (\Exception $e) {
+            // In case of any other kind of exception, log it and leave the item
+            // in the queue to be processed again later.
+            watchdog_exception('cron', $e);
+          }
         }
-        catch (RequeueException $e) {
-          // The worker requested the task be immediately requeued.
-          $queue->releaseItem($item);
-        }
-        catch (SuspendQueueException $e) {
-          // If the worker indicates there is a problem with the whole queue,
-          $queue->releaseItem($item);
-          watchdog_exception('cron', $e);
-
-        }
-        catch (\Exception $e) {
-          // In case of any other kind of exception, log it and leave the item
-          // in the queue to be processed again later.
-          watchdog_exception('cron', $e);
+        else {
+          $this->logger->info('--- --- Lease time is out for @queue or queue empty', [
+              '@queue' => $name]
+          );
         }
       }
-      $this->logger->info('--- --- Lease time is out for  @queue', [
-          '@queue' => $name]
-      );
       return $queue->numberOfItems();
     }
     else {
