@@ -12,7 +12,9 @@ use Drush\Commands\DrushCommands;
 use Drush\Exec\ExecTrait;
 use Drush\Runtime\Runtime;
 use React\EventLoop\Factory;
-
+use React\EventLoop\LoopInterface;
+use React\EventLoop\TimerInterface;
+use React\ChildProcess\Process;
 
 /**
  * A SBF Drush commandfile for ground-less Strawberry Growing.
@@ -49,6 +51,24 @@ class HydroponicsDrushCommands extends DrushCommands {
     //track when queue are empty for n cycles
     $idle = [];
 
+    //get parameters to run drush command
+    global $base_url;
+    $site_path = \Drupal::service('site.path'); // e.g.: 'sites/default'
+    $site_path = explode('/', $site_path);
+    $site_name = $site_path[1];
+
+    $path = \Drupal::config('strawberryfield.hydroponics_settings')->get('drush_path');
+    if (empty($path)) {
+      $path = '/var/www/html/vendor/drush/drush/drush';
+    }
+    $path = escapeshellcmd($path);
+    $cmd = $path.' archipelago:hydroqueue --quiet --uri=' . $base_url;
+    $home = \Drupal::config('strawberryfield.hydroponics_settings')->get('home_path');
+    if (!empty($home)) {
+      $home = escapeshellcmd($home);
+      $cmd = "export HOME='".$home."'; ".$cmd;
+    }
+
     // Get which queues we should run:
 
     foreach($active_queues as $queue) {
@@ -57,17 +77,49 @@ class HydroponicsDrushCommands extends DrushCommands {
       $idle[$queue] = 3;
 
 //      $done[$queue] = $loop->addPeriodicTimer(1.0, function ($timer) use ($loop, $queue) {
-      $done[$queue] = $loop->addPeriodicTimer(1.0, function ($timer) use ($loop, $queue, &$idle) {
+      $done[$queue] = $loop->addPeriodicTimer(5.0, function ($timer) use ($loop, $queue, &$idle, $cmd) {
         \Drupal::logger('hydroponics')->info("Starting to process queue @queue", [
           '@queue' => $queue
         ]);
 
+        //child process
+        $child_cmd = $cmd . ' ' . $queue;
+        \Drupal::logger('hydroponics')->info('Command: ' . $child_cmd);
+
+        $process = new Process($child_cmd);
+        $process->start($loop);
+        $process_pid = $process->getPid();
+
+        $process->stdout->on('data', function ($chunk) use ($queue, $process_pid){
+          //code to read chunck from child process output
+          \Drupal::logger('hydroponics')->info("Queue @queue, process @pid, output @chunk", [
+            '@queue' => $queue,
+            '@pid' => $process_pid,
+            '@chunk' => $chunk
+          ]);
+        });
+
+        $process->on('exit', function ($code, $term) use ($queue, $process_pid){
+          //ToDO: more deep check
+          \Drupal::logger('hydroponics')->info("Queue @queue, process @pid, exit code @code", [
+            '@queue' => $queue,
+            '@pid' => $process_pid,
+            '@code' => $code
+          ]);
+        });
+
+        //for test
+        $number = 0;
+
+
+/*
         $number = \Drupal::getContainer()
           ->get('strawberryfield.hydroponics')
           ->processQueue($queue, 60);
           \Drupal::logger('hydroponics')->info("Finished processing queue @queue", [
           '@queue' => $queue
         ]);
+*/
 
 
         if ($number == 0) {

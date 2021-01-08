@@ -50,6 +50,11 @@ class HydroponicsQueueProcessDrushCommands extends DrushCommands {
         '@number' => $number
       ]);
 
+      //test
+      sleep(13);
+
+      $this->output()->writeln($number);
+
     }
     else {
       \Drupal::logger('hydroqueue')->info("Queue needed to process");
