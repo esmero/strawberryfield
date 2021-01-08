@@ -88,9 +88,9 @@ class HydroponicsDrushCommands extends DrushCommands {
       });
     }
 
-    $idle_timer = $loop->addPeriodicTimer(60.0, function ($timer) use ($loop, $timer_ping, &$done, &$idle) {
+    $idle_timer = $loop->addPeriodicTimer(80.0, function ($timer) use ($loop, $timer_ping, &$done, &$idle) {
       // Finish all if all queues return 0 elements for at least 3 cycles
-      // Check this every 60 s
+      // Check this every 80 s
       $all_idle = 1;
       foreach($idle as $queue_idle) {
         if ($queue_idle > 0) {
@@ -102,7 +102,10 @@ class HydroponicsDrushCommands extends DrushCommands {
         foreach($done as $queue_timer) {
           $loop->cancelTimer($queue_timer);
         }
-        \Drupal::state()->set('hydroponics.queurunner_last_pid', 0);
+        $queuerunner_pid = (int) \Drupal::state()->get('hydroponics.queurunner_last_pid', 0);
+        //set pid to negative to avoid lost of information in case of hang
+        $queuerunner_pid = $queuerunner_pid * (-1);
+        \Drupal::state()->set('hydroponics.queurunner_last_pid', $queuerunner_pid);
         \Drupal::logger('hydroponics')->info("All queues are idle, closing timers");
 
         $loop->cancelTimer($timer);

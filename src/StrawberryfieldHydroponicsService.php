@@ -163,12 +163,14 @@ class StrawberryfieldHydroponicsService {
       $lastRunTime = intval(\Drupal::state()->get('hydroponics.heartbeat'));
       $currentTime = intval(\Drupal::time()->getRequestTime());
       $deltaTime = ($currentTime - $lastRunTime);
+      //conservative, max queue process time + 5s
+      $heartbeat_max_delta = 65;
       $running_posix = FALSE;
       if ($queuerunner_pid > 0) {
         $running_posix = posix_kill($queuerunner_pid, 0);
       }
       //Normal stopped condition when all is ok
-      if (($deltaTime > 3) && ($queuerunner_pid <= 0) && !$running_posix) {
+      if (($deltaTime > $heartbeat_max_delta) && ($queuerunner_pid <= 0) && !$running_posix) {
         $this->logger->info('Hydroponics Service Not running, starting, time passed since last seen @time', [
           '@time' => $deltaTime]
         );
@@ -193,7 +195,7 @@ class StrawberryfieldHydroponicsService {
         );
       }
       //The normal running condition when all is ok
-      elseif (($deltaTime < 4) && ($queuerunner_pid > 0) && $running_posix) {
+      elseif (($deltaTime <= $heartbeat_max_delta) && ($queuerunner_pid > 0) && $running_posix) {
         $this->logger->info('Hydroponics Service already running with PID @pid, time passed since last seen @time', [
           '@time' => $deltaTime,
           '@pid' => $queuerunner_pid
@@ -218,13 +220,14 @@ class StrawberryfieldHydroponicsService {
     $lastRunTime = intval(\Drupal::state()->get('hydroponics.heartbeat'));
     $currentTime = intval(\Drupal::time()->getRequestTime());
     $deltaTime = ($currentTime - $lastRunTime);
+    //conservative, max queue process time + 5s
+    $heartbeat_max_delta = 65;
     $running_posix = FALSE;
     if ($queuerunner_pid > 0) {
       $running_posix = posix_kill($queuerunner_pid, 0);
     }
-
     //The normal running condition when all is ok
-    if (($deltaTime < 4) && ($queuerunner_pid > 0) && $running_posix) {
+    if (($deltaTime <= $heartbeat_max_delta) && ($queuerunner_pid > 0) && $running_posix) {
       $return = [
        'running' => TRUE,
        'error' => FALSE,
@@ -236,7 +239,10 @@ class StrawberryfieldHydroponicsService {
       ];
     }
     //Normal stopped condition when all is ok
-    elseif (($deltaTime > 3) && ($queuerunner_pid <= 0) && !$running_posix) {
+    //elseif (($deltaTime > $heartbeat_max_delta) && ($queuerunner_pid <= 0) && !$running_posix) {
+    //Be more conservative so:
+    //Stopped condition without heartbeat check
+    elseif (($queuerunner_pid <= 0) && !$running_posix) {
       $return = [
         'running' => FALSE,
         'error' => FALSE,
@@ -272,12 +278,14 @@ class StrawberryfieldHydroponicsService {
     $lastRunTime = intval(\Drupal::state()->get('hydroponics.heartbeat'));
     $currentTime = intval(\Drupal::time()->getRequestTime());
     $deltaTime = ($currentTime - $lastRunTime);
+    //conservative, max queue process time + 5s
+    $heartbeat_max_delta = 65;
     $running_posix = FALSE;
     if ($queuerunner_pid > 0) {
       $running_posix = posix_kill($queuerunner_pid, 0);
     }
     //Normal stopped condition when all is ok
-    if (($deltaTime > 3) && ($queuerunner_pid <= 0) && !$running_posix) {
+    if (($deltaTime > $heartbeat_max_delta) && ($queuerunner_pid <= 0) && !$running_posix) {
       return NULL;
     }
     //process in table and pid available regardless of deltaTime
