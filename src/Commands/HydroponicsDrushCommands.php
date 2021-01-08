@@ -62,7 +62,7 @@ class HydroponicsDrushCommands extends DrushCommands {
       $path = '/var/www/html/vendor/drush/drush/drush';
     }
     $path = escapeshellcmd($path);
-    $cmd = $path.' archipelago:hydroqueue --quiet --uri=' . $base_url;
+    $cmd = $path.' archipelago:hydroqueue --uri=' . $base_url;
     $home = \Drupal::config('strawberryfield.hydroponics_settings')->get('home_path');
     if (!empty($home)) {
       $home = escapeshellcmd($home);

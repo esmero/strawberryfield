@@ -51,9 +51,9 @@ class HydroponicsQueueProcessDrushCommands extends DrushCommands {
       ]);
 
       //test
-      sleep(13);
+      sleep(3);
 
-      $this->output()->writeln($number);
+      echo $number . PHP_EOL;
 
     }
     else {
