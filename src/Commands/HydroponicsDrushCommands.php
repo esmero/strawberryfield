@@ -82,8 +82,14 @@ class HydroponicsDrushCommands extends DrushCommands {
       // Reset running child counter per queue
       $running[$queue] = 0;
 
+      // Reset number of item left on queue
+      $onqueue[$queue] = 0;
+
+      // Reset output code
+      $outputcode[$queue] = 0;
+
 //      $done[$queue] = $loop->addPeriodicTimer(1.0, function ($timer) use ($loop, $queue) {
-      $done[$queue] = $loop->addPeriodicTimer(5.0, function ($timer) use ($loop, $queue, &$idle, $cmd, &$running) {
+      $done[$queue] = $loop->addPeriodicTimer(5.0, function ($timer) use ($loop, $queue, &$idle, $cmd, &$running, &$onqueue, &$outputcode) {
         \Drupal::logger('hydroponics')->info("Starting to process queue @queue", [
           '@queue' => $queue
         ]);
@@ -101,8 +107,9 @@ class HydroponicsDrushCommands extends DrushCommands {
           $process->start($loop);
           $process_pid = $process->getPid();
 
-          $process->stdout->on('data', function ($chunk) use ($queue, $process_pid){
+          $process->stdout->on('data', function ($chunk) use ($queue, $process_pid, &$onqueue){
             //code to read chunck from child process output
+            $onqueue[$queue] = (int) $chunk;
             \Drupal::logger('hydroponics')->info("Queue @queue, process @pid, output @chunk", [
               '@queue' => $queue,
               '@pid' => $process_pid,
@@ -110,18 +117,27 @@ class HydroponicsDrushCommands extends DrushCommands {
             ]);
           });
 
-          $process->on('exit', function ($code, $term) use ($queue, $process_pid, &$running){
+          $process->on('exit', function ($code, $term) use ($queue, $process_pid, &$running, &$outputcode){
             $running[$queue] -= 1;
-            //ToDO: more deep check
-            \Drupal::logger('hydroponics')->info("Queue @queue, process @pid, exit code @code", [
-              '@queue' => $queue,
-              '@pid' => $process_pid,
-              '@code' => $code
-            ]);
+            $outputcode[$queue] = $code;
           });
 
           //for test
-          $number = 0;
+          //$number = 0;
+
+          if ($outputcode[$queue] == 0) {
+            $number = $onqueue[$queue];
+          }
+          else {
+            //something went wrong, what do we do?
+            //at the moment left =0 and log
+            $number = 0;
+            \Drupal::logger('hydroponics')->error("Queue @queue, process @pid, exit code @code", [
+              '@queue' => $queue,
+              '@pid' => $process_pid,
+              '@code' => $outputcode[$queue]
+            ]);
+          }
 
 
   /*
