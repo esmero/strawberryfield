@@ -51,9 +51,6 @@ class HydroponicsDrushCommands extends DrushCommands {
     //track when queue are empty for n cycles
     $idle = [];
 
-    //count running child per queue
-    $running = [];
-
     $onqueue = [];
     $outputcode = [];
 
@@ -86,14 +83,11 @@ class HydroponicsDrushCommands extends DrushCommands {
       // Set number of idle cycle to wait
       $idle[$queue] = 5;
 
-      // Reset running child counter per queue
-      $running[$queue] = 0;
-
       // Store child start, end, output, exit code
       $child[$queue] = [];
 
 //      $done[$queue] = $loop->addPeriodicTimer(1.0, function ($timer) use ($loop, $queue) {
-      $done[$queue] = $loop->addPeriodicTimer(5.0, function ($timer) use ($loop, $queue, &$idle, $cmd, &$running, &$child) {
+      $done[$queue] = $loop->addPeriodicTimer(5.0, function ($timer) use ($loop, $queue, &$idle, $cmd, &$child) {
         \Drupal::logger('hydroponics')->info("Starting to process queue @queue. Idle counter @idle", [
           '@queue' => $queue,
           '@idle' => $idle[$queue]
@@ -147,7 +141,7 @@ class HydroponicsDrushCommands extends DrushCommands {
             ]);
           });
 
-          $process->on('exit', function ($code, $term) use ($queue, $process_pid, &$idle, &$running, &$child){
+          $process->on('exit', function ($code, $term) use ($queue, $process_pid, &$idle, &$child){
             $child[$queue][$process_pid]['end'] = \Drupal::time()->getCurrentTime();
             $child[$queue][$process_pid]['exitcode'] = $code;
             \Drupal::logger('hydroponics')->info("EXIT event: Queue @queue, process @pid, output @output, exit code @code, start @start, end @end", [
@@ -179,7 +173,7 @@ class HydroponicsDrushCommands extends DrushCommands {
     }
 
     $idle_timer = $loop->addPeriodicTimer(80.0, function ($timer) use ($loop, $timer_ping, &$done, &$idle) {
-      // Finish all if all queues return 0 elements for at least 3 cycles
+      // Finish all if all queues return 0 elements for at least N cycles
       // Check this every 80 s
       // ToDO also check child if all exited ok
       $all_idle = 1;
