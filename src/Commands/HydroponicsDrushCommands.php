@@ -54,6 +54,13 @@ class HydroponicsDrushCommands extends DrushCommands {
     //count running child per queue
     $running = [];
 
+    $onqueue = [];
+    $outputcode = [];
+
+    $child = [];
+
+    $items = [];
+
     //get parameters to run drush command
     global $base_url;
     $site_path = \Drupal::service('site.path'); // e.g.: 'sites/default'
@@ -77,98 +84,96 @@ class HydroponicsDrushCommands extends DrushCommands {
     foreach($active_queues as $queue) {
 
       // Set number of idle cycle to wait
-      $idle[$queue] = 3;
+      $idle[$queue] = 5;
 
       // Reset running child counter per queue
       $running[$queue] = 0;
 
-      // Reset number of item left on queue
-      $onqueue[$queue] = 0;
-
-      // Reset output code
-      $outputcode[$queue] = 0;
+      // Store child start, end, output, exit code
+      $child[$queue] = [];
 
 //      $done[$queue] = $loop->addPeriodicTimer(1.0, function ($timer) use ($loop, $queue) {
-      $done[$queue] = $loop->addPeriodicTimer(5.0, function ($timer) use ($loop, $queue, &$idle, $cmd, &$running, &$onqueue, &$outputcode) {
-        \Drupal::logger('hydroponics')->info("Starting to process queue @queue", [
-          '@queue' => $queue
+      $done[$queue] = $loop->addPeriodicTimer(5.0, function ($timer) use ($loop, $queue, &$idle, $cmd, &$running, &$child) {
+        \Drupal::logger('hydroponics')->info("Starting to process queue @queue. Idle counter @idle", [
+          '@queue' => $queue,
+          '@idle' => $idle[$queue]
         ]);
 
-        //No more than 1 child per queue
-        if ($running[$queue] < 1) {
+        //count items on queue
+        $items[$queue] = \Drupal::getContainer()->get('strawberryfield.hydroponics')->countQueue($queue);
+\Drupal::logger('hydroponics')->info('Items on queue: ' . $items[$queue]);
 
-          $running[$queue] += 1;
+        //Check how many child are running (we check if 'end' is_null)
+        $running_child = 0;
+        if (!empty($child[$queue])) {
+          $running_child = count(array_filter($child[$queue], function($element){
+            return is_null($element['end']);
+          }));
+        }
+\Drupal::logger('hydroponics')->info('Running child: ' . $running_child);
+
+        //No more than $max_child per queue
+        $max_child = 1;
+
+
+        // Execute child only if NOT more than max_child running AND some items on the queue
+        if (($running_child < $max_child) && ($items[$queue] > 0)) {
+
+          // Reset number of idle cycle to wait
+          $idle[$queue] = 5;
 
           //child process
           $child_cmd = $cmd . ' ' . $queue;
-          \Drupal::logger('hydroponics')->info('Command: ' . $child_cmd);
+\Drupal::logger('hydroponics')->info('Command: ' . $child_cmd);
 
           $process = new Process($child_cmd);
           $process->start($loop);
-          $process_pid = $process->getPid();
 
-          $process->stdout->on('data', function ($chunk) use ($queue, $process_pid, &$onqueue){
-            //code to read chunck from child process output
-            $onqueue[$queue] = (int) $chunk;
-            \Drupal::logger('hydroponics')->info("Queue @queue, process @pid, output @chunk", [
+          $process_pid = $process->getPid();
+          $child[$queue][$process_pid] = [];
+
+          $child[$queue][$process_pid]['start'] = \Drupal::time()->getCurrentTime();
+          $child[$queue][$process_pid]['end'] = NULL;
+          $child[$queue][$process_pid]['exitcode'] = NULL;
+          $child[$queue][$process_pid]['output'] = NULL;
+
+          $process->stdout->on('data', function ($chunk) use ($queue, $process_pid, &$child){
+            //read child process output (= item left on queue)
+            $child[$queue][$process_pid]['output'] = (int) $chunk;
+            \Drupal::logger('hydroponics')->info("OUTPUT event: Queue @queue, process @pid, output @chunk", [
               '@queue' => $queue,
               '@pid' => $process_pid,
               '@chunk' => $chunk
             ]);
           });
 
-          $process->on('exit', function ($code, $term) use ($queue, $process_pid, &$running, &$outputcode){
-            $running[$queue] -= 1;
-            $outputcode[$queue] = $code;
-          });
-
-          //for test
-          //$number = 0;
-
-          if ($outputcode[$queue] == 0) {
-            $number = $onqueue[$queue];
-          }
-          else {
-            //something went wrong, what do we do?
-            //at the moment left =0 and log
-            $number = 0;
-            \Drupal::logger('hydroponics')->error("Queue @queue, process @pid, exit code @code", [
+          $process->on('exit', function ($code, $term) use ($queue, $process_pid, &$idle, &$running, &$child){
+            $child[$queue][$process_pid]['end'] = \Drupal::time()->getCurrentTime();
+            $child[$queue][$process_pid]['exitcode'] = $code;
+            \Drupal::logger('hydroponics')->info("EXIT event: Queue @queue, process @pid, output @output, exit code @code, start @start, end @end", [
               '@queue' => $queue,
               '@pid' => $process_pid,
-              '@code' => $outputcode[$queue]
+              '@output' => is_null($child[$queue][$process_pid]['output']) ? "NULL" : $child[$queue][$process_pid]['output'],
+              '@code' => is_null($child[$queue][$process_pid]['exitcode']) ? "NULL" : $child[$queue][$process_pid]['exitcode'],
+              '@start' => is_null($child[$queue][$process_pid]['start']) ? "NULL" : $child[$queue][$process_pid]['start'],
+              '@end' => is_null($child[$queue][$process_pid]['end']) ? "NULL" : $child[$queue][$process_pid]['end']
             ]);
-          }
+          });
 
-
-  /*
-          $number = \Drupal::getContainer()
-            ->get('strawberryfield.hydroponics')
-            ->processQueue($queue, 60);
-            \Drupal::logger('hydroponics')->info("Finished processing queue @queue", [
-            '@queue' => $queue
-          ]);
-  */
-
-
-          if ($number == 0) {
-            \Drupal::logger('hydroponics')->info("No items left on queue @queue", [
-              '@queue' => $queue
-            ]);
-
-
-            // decrement idle counter
-            $idle[$queue] -= 1;
-          }
-
-          else {
-            // no empty so reset idle counter
-            $idle[$queue] = 3;
-          }
         }
         else {
-          \Drupal::logger('hydroponics')->info("Already 1 process running on queue @queue, wait next cycle", [
+          \Drupal::logger('hydroponics')->info("Already @max process running on queue @queue OR queue empty", [
+            '@max' => $max_child,
             '@queue' => $queue
           ]);
+
+          // If no child running and queue empty then decrement idle timer
+          //
+          // ToDO This never happens if a process hang so we have to manage by timeout
+          //
+          if (($running_child == 0) && ($items[$queue] == 0)) {
+            $idle[$queue] -= 1;
+          }
         }
       });
     }
@@ -176,6 +181,7 @@ class HydroponicsDrushCommands extends DrushCommands {
     $idle_timer = $loop->addPeriodicTimer(80.0, function ($timer) use ($loop, $timer_ping, &$done, &$idle) {
       // Finish all if all queues return 0 elements for at least 3 cycles
       // Check this every 80 s
+      // ToDO also check child if all exited ok
       $all_idle = 1;
       foreach($idle as $queue_idle) {
         if ($queue_idle > 0) {

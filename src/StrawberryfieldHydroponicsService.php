@@ -181,6 +181,29 @@ class StrawberryfieldHydroponicsService {
     }
   }
 
+  /**
+   * Count queue items.
+   *
+   * @param $name
+   *
+   * @return int
+   * @throws \Drupal\Component\Plugin\Exception\PluginException
+   * @throws \Drupal\Component\Plugin\Exception\PluginNotFoundException
+   */
+  public function countQueue($name) {
+    // Grab the defined cron queues.
+    $info = $this->queueManager->getDefinition($name);
+    if ($info) {
+      // Make sure every queue exists. There is no harm in trying to recreate
+      // an existing queue.
+      $this->queueFactory->get($name)->createQueue();
+      $queue = $this->queueFactory->get($name, TRUE);
+      return $queue->numberOfItems();
+    }
+    else {
+      return 0;
+    }
+  }
 
   /**
    * Checks if Background Drush can run, and if so, sends it away.
