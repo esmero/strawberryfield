@@ -51,11 +51,10 @@ class HydroponicsDrushCommands extends DrushCommands {
     //track when queue are empty for n cycles
     $idle = [];
 
-    $onqueue = [];
-    $outputcode = [];
-
+    // store data for each child process
     $child = [];
 
+    // track queue items count
     $items = [];
 
     //get parameters to run drush command
