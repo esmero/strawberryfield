@@ -219,8 +219,11 @@ class StrawberryfieldHydroponicsService {
       $lastRunTime = intval(\Drupal::state()->get('hydroponics.heartbeat'));
       $currentTime = intval(\Drupal::time()->getRequestTime());
       $deltaTime = ($currentTime - $lastRunTime);
-      //conservative, max queue process time + 5s
-      $heartbeat_max_delta = 65;
+      //NO MORE NEEDED => conservative, max queue process time + 5s
+      //due to child executed as process
+      //hearbeat interval is near to real time value
+      //so delta conservative could be heartbeat timer (3s) + 2s
+      $heartbeat_max_delta = 5;
       $running_posix = FALSE;
       if ($queuerunner_pid > 0) {
         $running_posix = posix_kill($queuerunner_pid, 0);
@@ -276,8 +279,11 @@ class StrawberryfieldHydroponicsService {
     $lastRunTime = intval(\Drupal::state()->get('hydroponics.heartbeat'));
     $currentTime = intval(\Drupal::time()->getRequestTime());
     $deltaTime = ($currentTime - $lastRunTime);
-    //conservative, max queue process time + 5s
-    $heartbeat_max_delta = 65;
+    //NO MORE NEEDED => conservative, max queue process time + 5s
+    //due to child executed as process
+    //hearbeat interval is near to real time value
+    //so delta conservative could be heartbeat timer (3s) + 2s
+    $heartbeat_max_delta = 5;
     $running_posix = FALSE;
     if ($queuerunner_pid > 0) {
       $running_posix = posix_kill($queuerunner_pid, 0);
@@ -295,10 +301,10 @@ class StrawberryfieldHydroponicsService {
       ];
     }
     //Normal stopped condition when all is ok
-    //elseif (($deltaTime > $heartbeat_max_delta) && ($queuerunner_pid <= 0) && !$running_posix) {
-    //Be more conservative so:
+    elseif (($deltaTime > $heartbeat_max_delta) && ($queuerunner_pid <= 0) && !$running_posix) {
+    //NO MORE NEEDED => Be more conservative so:
     //Stopped condition without heartbeat check
-    elseif (($queuerunner_pid <= 0) && !$running_posix) {
+    //elseif (($queuerunner_pid <= 0) && !$running_posix) {
       $return = [
         'running' => FALSE,
         'error' => FALSE,
@@ -334,8 +340,11 @@ class StrawberryfieldHydroponicsService {
     $lastRunTime = intval(\Drupal::state()->get('hydroponics.heartbeat'));
     $currentTime = intval(\Drupal::time()->getRequestTime());
     $deltaTime = ($currentTime - $lastRunTime);
-    //conservative, max queue process time + 5s
-    $heartbeat_max_delta = 65;
+    //NO MORE NEEDED => conservative, max queue process time + 5s
+    //due to child executed as process
+    //hearbeat interval is near to real time value
+    //so delta conservative could be heartbeat timer (3s) + 2s
+    $heartbeat_max_delta = 5;
     $running_posix = FALSE;
     if ($queuerunner_pid > 0) {
       $running_posix = posix_kill($queuerunner_pid, 0);
