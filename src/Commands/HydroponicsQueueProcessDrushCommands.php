@@ -41,25 +41,17 @@ class HydroponicsQueueProcessDrushCommands extends DrushCommands {
       $number = \Drupal::getContainer()
         ->get('strawberryfield.hydroponics')
         ->processQueue($queue, 60, TRUE);
-        \Drupal::logger('hydroqueue')->info("Finished processing one element from queue @queue", [
-        '@queue' => $queue
-      ]);
 
-      \Drupal::logger('hydroqueue')->info("Items left on queue @queue: @number", [
+      \Drupal::logger('hydroqueue')->info("Finished processing one element from queue @queue. Items left @number", [
         '@queue' => $queue,
         '@number' => $number
       ]);
 
-      //test
-      sleep(13);
-
       echo $number . PHP_EOL;
-
     }
     else {
-      \Drupal::logger('hydroqueue')->info("Queue needed to process");
+      \Drupal::logger('hydroqueue')->info("Queue parameters missing");
     }
-
     Runtime::setCompleted();
   }
 }
