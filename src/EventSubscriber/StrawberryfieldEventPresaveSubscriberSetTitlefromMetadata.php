@@ -131,7 +131,7 @@ class StrawberryfieldEventPresaveSubscriberSetTitlefromMetadata extends Strawber
       if (!$entity->label()) {
         // Means we need a title, got nothing from metadata or node, dealing with it.
         $title = $this->t(
-          'No New Untitled Archipelago Digital Object by @author',
+          'New Untitled Archipelago Digital Object by @author',
           ['@author' => $entity->getOwner()->getDisplayName()]
         );
         $entity->setTitle($title);
