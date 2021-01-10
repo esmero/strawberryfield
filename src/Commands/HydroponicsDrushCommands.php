@@ -62,6 +62,13 @@ class HydroponicsDrushCommands extends DrushCommands {
     // track queue items count
     $items = [];
 
+    // Parameters (ToDO put on config page?)
+    $queue_check_time = 1;
+    $child_timeout_time = 30;
+    $max_child_for_queue = 2;
+    $idle_timer_time = 60;
+    $idle_timer_cycles = 5;
+
     //get parameters to run drush command
     global $base_url;
     $site_path = \Drupal::service('site.path'); // e.g.: 'sites/default'
@@ -87,13 +94,13 @@ class HydroponicsDrushCommands extends DrushCommands {
       $timeout[$queue] = [];
 
       // Set number of idle cycle to wait
-      $idle[$queue] = 5;
+      $idle[$queue] = $idle_timer_cycles;
 
       // Store child start, end, output, exit code
       $child[$queue] = [];
 
 //      $done[$queue] = $loop->addPeriodicTimer(1.0, function ($timer) use ($loop, $queue) {
-      $done[$queue] = $loop->addPeriodicTimer(5.0, function ($timer) use ($loop, $queue, &$idle, $cmd, &$child, &$timeout) {
+      $done[$queue] = $loop->addPeriodicTimer($queue_check_time, function ($timer) use ($loop, $queue, $cmd, $child_timeout_time, $max_child_for_queue, $idle_timer_cycles, &$idle, &$child, &$timeout) {
         \Drupal::logger('hydroponics')->info("Starting to process queue @queue. Idle counter @idle", [
           '@queue' => $queue,
           '@idle' => $idle[$queue]
@@ -112,15 +119,11 @@ class HydroponicsDrushCommands extends DrushCommands {
         }
 \Drupal::logger('hydroponics')->info('Running child: ' . $running_child);
 
-        //No more than $max_child per queue
-        $max_child = 1;
-
-
         // Execute child only if NOT more than max_child running AND some items on the queue
-        if (($running_child < $max_child) && ($items[$queue] > 0)) {
+        if (($running_child < $max_child_for_queue) && ($items[$queue] > 0)) {
 
           // Reset number of idle cycle to wait
-          $idle[$queue] = 5;
+          $idle[$queue] = $idle_timer_cycles;
 
           //child process
           $child_cmd = $cmd . ' ' . $queue;
@@ -139,7 +142,7 @@ class HydroponicsDrushCommands extends DrushCommands {
           $child[$queue][$process_pid]['timeout'] = FALSE;
 
           //timeout per child per queue
-          $timeout[$queue][$process_pid] = $loop->addTimer(30.0, function () use ($process, $queue, $process_pid, &$child) {
+          $timeout[$queue][$process_pid] = $loop->addTimer($child_timeout_time, function () use ($process, $queue, $process_pid, &$child) {
             $process->stdin->end();
             $child[$queue][$process_pid]['timeout'] = TRUE;
             \Drupal::logger('hydroponics')->info("Process timeout, pid @pid, on queue @queue", [
@@ -180,7 +183,7 @@ class HydroponicsDrushCommands extends DrushCommands {
         }
         else {
           \Drupal::logger('hydroponics')->info("Queue empty OR max @max process running on queue @queue", [
-            '@max' => $max_child,
+            '@max' => $max_child_for_queue,
             '@queue' => $queue
           ]);
 
@@ -195,7 +198,7 @@ class HydroponicsDrushCommands extends DrushCommands {
       });
     }
 
-    $idle_timer = $loop->addPeriodicTimer(80.0, function ($timer) use ($loop, $timer_ping, &$done, &$idle) {
+    $idle_timer = $loop->addPeriodicTimer($idle_timer_time, function ($timer) use ($loop, $timer_ping, &$done, &$idle) {
       // Finish all if all queues return 0 elements for at least N cycles
       // Check this every 80 s
       // ToDO also check child if all exited ok
