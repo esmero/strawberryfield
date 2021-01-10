@@ -136,12 +136,15 @@ class HydroponicsDrushCommands extends DrushCommands {
           $child[$queue][$process_pid]['end'] = NULL;
           $child[$queue][$process_pid]['exitcode'] = NULL;
           $child[$queue][$process_pid]['output'] = NULL;
+          $child[$queue][$process_pid]['timeout'] = FALSE;
 
           //timeout per child per queue
-          $timeout[$queue][$process_pid] = $loop->addTimer(7.0, function () use ($process, $process_pid) {
+          $timeout[$queue][$process_pid] = $loop->addTimer(30.0, function () use ($process, $queue, $process_pid, &$child) {
             $process->stdin->end();
-            \Drupal::logger('hydroponics')->info("Process timeout, pid @pid", [
-              '@pid' => $process_pid
+            $child[$queue][$process_pid]['timeout'] = TRUE;
+            \Drupal::logger('hydroponics')->info("Process timeout, pid @pid, on queue @queue", [
+              '@pid' => $process_pid,
+              '@queue' => $queue
             ]);
           });
 
@@ -162,14 +165,15 @@ class HydroponicsDrushCommands extends DrushCommands {
 
             $child[$queue][$process_pid]['end'] = \Drupal::time()->getCurrentTime();
             $child[$queue][$process_pid]['exitcode'] = $code;
-            \Drupal::logger('hydroponics')->info("EXIT event: Queue @queue, process @pid, output @output, exit code @code, term @term, start @start, end @end", [
+            \Drupal::logger('hydroponics')->info("EXIT event: Queue @queue, process @pid, output @output, exit code @code, term @term, start @start, end @end, timeout @timeout", [
               '@queue' => $queue,
               '@pid' => $process_pid,
               '@output' => is_null($child[$queue][$process_pid]['output']) ? "NULL" : $child[$queue][$process_pid]['output'],
               '@code' => is_null($child[$queue][$process_pid]['exitcode']) ? "NULL" : $child[$queue][$process_pid]['exitcode'],
               '@term' => is_null($term) ? "NULL" : $term,
               '@start' => is_null($child[$queue][$process_pid]['start']) ? "NULL" : $child[$queue][$process_pid]['start'],
-              '@end' => is_null($child[$queue][$process_pid]['end']) ? "NULL" : $child[$queue][$process_pid]['end']
+              '@end' => is_null($child[$queue][$process_pid]['end']) ? "NULL" : $child[$queue][$process_pid]['end'],
+              '@timeout' => $child[$queue][$process_pid]['timeout'] ? "TRUE" : "FALSE"
             ]);
           });
 
