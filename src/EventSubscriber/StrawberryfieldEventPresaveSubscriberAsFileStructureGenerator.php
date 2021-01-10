@@ -155,7 +155,7 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
               $original_field = $entity->original->get(
                 $field_name
               );
-              if (isset($original_field[$delta])) {
+              if ($original_field !== NULL  && isset($original_field[$delta])) {
                 $original_fullvalues = $original_field[$delta]->provideFlatten();
               $original_fids = isset($original_fullvalues['dr:fid']) ? $original_fullvalues['dr:fid'] : [];
               $original_fids = is_array(
