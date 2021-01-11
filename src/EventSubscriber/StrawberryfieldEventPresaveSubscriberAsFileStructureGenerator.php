@@ -147,21 +147,30 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
           }
           $original_fids = [];
           // We will use the original data to compare if any files existing before were removed by the user
-          if (!$entity->isNew() && !empty($entity->original)) {
+          // Edge case. IF for some reason the user "escaped" our conditions and ended
+          // With an ADO with a SBF (not sure how) we want to check if the previous version
+          // REALLY has a SBF before trying to provide the flatten version
+          if (!$entity->isNew() && !empty($entity->original) && $entity->original->hasField($field_name)) {
             try {
-              $original_fullvalues = $entity->original->get(
+              $original_field = $entity->original->get(
                 $field_name
-              )[$delta]->provideFlatten();
+              );
+              if ($original_field !== NULL  && isset($original_field[$delta])) {
+                $original_fullvalues = $original_field[$delta]->provideFlatten();
               $original_fids = isset($original_fullvalues['dr:fid']) ? $original_fullvalues['dr:fid'] : [];
-              $original_fids = is_array($original_fids) ? $original_fids: [$original_fids];
+              $original_fids = is_array(
+                $original_fids
+              ) ? $original_fids : [$original_fids];
               // To save some memory
               unset($original_fullvalues);
+             } else {
+                $this->messenger->addWarning($this->t('Your previous revision did not have any JSON Metadata. This is strange. We worked around this but Please notify your site admin.'));
+              }
             }
             catch (\Exception $exception) {
               $this->messenger->addError($this->t('We could not retrieve your original data to clean up any changes in attached files. Please contact the site admin.'));
             }
           }
-
 
           $fullvalues = $this->cleanUpEntityMappingStructure($fullvalues);
           // 'ap:entitymapping' will always exists of ::cleanUpEntityMappingStructure
