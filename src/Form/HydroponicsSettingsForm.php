@@ -136,7 +136,7 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
     $drush_path = $config->get('drush_path') ?  $config->get('drush_path') : NULL;
     $home_path = $config->get('home_path') ?  $config->get('home_path') : NULL;
     $enabled_queues =  !empty($config->get('queues')) ? array_flip($config->get('queues')) : [];
-    $processing_type = $config->get('processing_type') ? $config->get('processing_type') : "mono";
+    $processing_type = $config->get('processing_type') ? $config->get('processing_type') : "hydroponics";
     $processing_monotime = $config->get('processing_monotime') ? $config->get('processing_monotime') : 60;
     $processing_multinumber = $config->get('processing_multinumber') ? $config->get('processing_multinumber') : 1;
 
@@ -194,8 +194,9 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
     ];
 
     //Add parameters depending on processing type selected
-    $processing_options['mono'] = "A single process for all queues";
-    $processing_options['multi'] = "One or more processes for each queue";
+    //The array KEY is the right part of drush command, i.e. hydroponics for archipelago:hydroponics
+    $processing_options['hydroponics'] = "A single process for all queues";
+    $processing_options['hydroponicsmulti'] = "One or more processes for each queue";
 
     $form['processingtype'] = [
       '#type' => 'select',
@@ -230,7 +231,7 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
       '#required' => FALSE,
       '#states' => [
         'visible' => [
-          ':input[name="processingtype"]' => ['value' => 'mono'],
+          ':input[name="processingtype"]' => ['value' => 'hydroponics'],
         ],
       ],
     ];
@@ -247,7 +248,7 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
       '#required' => FALSE,
       '#states' => [
         'visible' => [
-          ':input[name="processingtype"]' => ['value' => 'multi'],
+          ':input[name="processingtype"]' => ['value' => 'hydroponicsmulti'],
         ],
       ],
     ];

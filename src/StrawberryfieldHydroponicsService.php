@@ -206,11 +206,37 @@ class StrawberryfieldHydroponicsService {
   }
 
   /**
+  * Return Max Heartbeat delay expected
+  * It depends on processing type
+  */
+  public function getHearbeatMaxDelta() {
+    $config = $this->configFactory->get('strawberryfield.hydroponics_settings');
+    $processing_type = $config->get('processing_type') ? $config->get('processing_type') : "hydroponics";
+    $processing_monotime = $config->get('processing_monotime') ? $config->get('processing_monotime') : 60;
+    switch ($processing_type) {
+      case "hydroponics":
+        //if MONO then conservative, max queue process time + 5s
+        $heartbeat_max_delta = $processing_monotime + 5;
+        break;
+      case "hydroponicsmulti":
+        //if MULTI:
+        //due to child executed as process
+        //hearbeat interval is near to real time value
+        //so delta conservative could be heartbeat timer (3s) + 2s
+        $heartbeat_max_delta = 5;
+    }
+    return $heartbeat_max_delta;
+  }
+
+  /**
    * Checks if Background Drush can run, and if so, sends it away.
    */
   public function run() {
     $config = $this->configFactory->get('strawberryfield.hydroponics_settings');
     if ($config->get('active')) {
+
+      $processing_type = $config->get('processing_type') ? $config->get('processing_type') : "mono";
+
       global $base_url;
       $site_path = \Drupal::service('site.path'); // e.g.: 'sites/default'
       $site_path = explode('/', $site_path);
@@ -219,11 +245,9 @@ class StrawberryfieldHydroponicsService {
       $lastRunTime = intval(\Drupal::state()->get('hydroponics.heartbeat'));
       $currentTime = intval(\Drupal::time()->getRequestTime());
       $deltaTime = ($currentTime - $lastRunTime);
-      //NO MORE NEEDED => conservative, max queue process time + 5s
-      //due to child executed as process
-      //hearbeat interval is near to real time value
-      //so delta conservative could be heartbeat timer (3s) + 2s
-      $heartbeat_max_delta = 5;
+
+      $heartbeat_max_delta = $this->getHearbeatMaxDelta();
+
       $running_posix = FALSE;
       if ($queuerunner_pid > 0) {
         $running_posix = posix_kill($queuerunner_pid, 0);
@@ -238,7 +262,9 @@ class StrawberryfieldHydroponicsService {
           $path = '/var/www/html/vendor/drush/drush/drush';
         }
         $path = escapeshellcmd($path);
-        $cmd = $path.' archipelago:hydroponics --quiet --uri=' . $base_url;
+
+        //The parameter $processing_type is the right part of drush command
+        $cmd = $path.' archipelago:'.$processing_type.' --quiet --uri=' . $base_url;
         $home = $config->get('home_path');
         if (!empty($home)) {
           $home = escapeshellcmd($home);
@@ -279,11 +305,9 @@ class StrawberryfieldHydroponicsService {
     $lastRunTime = intval(\Drupal::state()->get('hydroponics.heartbeat'));
     $currentTime = intval(\Drupal::time()->getRequestTime());
     $deltaTime = ($currentTime - $lastRunTime);
-    //NO MORE NEEDED => conservative, max queue process time + 5s
-    //due to child executed as process
-    //hearbeat interval is near to real time value
-    //so delta conservative could be heartbeat timer (3s) + 2s
-    $heartbeat_max_delta = 5;
+
+    $heartbeat_max_delta = $this->getHearbeatMaxDelta();
+
     $running_posix = FALSE;
     if ($queuerunner_pid > 0) {
       $running_posix = posix_kill($queuerunner_pid, 0);
@@ -340,11 +364,9 @@ class StrawberryfieldHydroponicsService {
     $lastRunTime = intval(\Drupal::state()->get('hydroponics.heartbeat'));
     $currentTime = intval(\Drupal::time()->getRequestTime());
     $deltaTime = ($currentTime - $lastRunTime);
-    //NO MORE NEEDED => conservative, max queue process time + 5s
-    //due to child executed as process
-    //hearbeat interval is near to real time value
-    //so delta conservative could be heartbeat timer (3s) + 2s
-    $heartbeat_max_delta = 5;
+
+    $heartbeat_max_delta = $this->getHearbeatMaxDelta();
+    
     $running_posix = FALSE;
     if ($queuerunner_pid > 0) {
       $running_posix = posix_kill($queuerunner_pid, 0);
