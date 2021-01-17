@@ -40,7 +40,7 @@ class HydroponicsQueueProcessDrushCommands extends DrushCommands {
 
       $number = \Drupal::getContainer()
         ->get('strawberryfield.hydroponics')
-        ->processQueue($queue, 60, TRUE);
+        ->processSingleItemQueue($queue, 60);
 
       \Drupal::logger('hydroqueue')->info("Finished processing one element from queue @queue. Items left @number", [
         '@queue' => $queue,

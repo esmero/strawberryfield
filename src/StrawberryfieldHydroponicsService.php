@@ -94,17 +94,16 @@ class StrawberryfieldHydroponicsService {
 
 
   /**
-   * Processes cron queues.
+   * Processes queue items for a time.
    *
    * @param $name
    * @param int $time
-   * @param bool $single
    *
    * @return int
    * @throws \Drupal\Component\Plugin\Exception\PluginException
    * @throws \Drupal\Component\Plugin\Exception\PluginNotFoundException
    */
-  public function processQueue($name, $time = 120, $single = FALSE) {
+  public function processQueue($name, $time = 120) {
     // Grab the defined cron queues.
     $info = $this->queueManager->getDefinition($name);
     if ($info) {
@@ -115,64 +114,89 @@ class StrawberryfieldHydroponicsService {
       $end = time() + $time;
       $queue = $this->queueFactory->get($name, TRUE);
       $lease_time = $time;
-      if (!$single) {
-        while (time() < $end && ($item = $queue->claimItem($lease_time))) {
-          $this->logger->info('--- processing multiple items for @queue', [
-            '@queue' => $name]
-          );
-          try {
-            $queue_worker->processItem($item->data);
-            $queue->deleteItem($item);
-          }
-          catch (RequeueException $e) {
-            // The worker requested the task be immediately requeued.
-            $queue->releaseItem($item);
-          }
-          catch (SuspendQueueException $e) {
-            // If the worker indicates there is a problem with the whole queue,
-            $queue->releaseItem($item);
-            watchdog_exception('cron', $e);
-          }
-          catch (\Exception $e) {
-            // In case of any other kind of exception, log it and leave the item
-            // in the queue to be processed again later.
-            watchdog_exception('cron', $e);
-          }
-        }
-        $this->logger->info('--- --- Lease time is out for @queue or queue empty', [
-            '@queue' => $name]
+      while (time() < $end && ($item = $queue->claimItem($lease_time))) {
+        $this->logger->info('--- processing multiple items for @queue', [
+          '@queue' => $name]
         );
+        try {
+          $queue_worker->processItem($item->data);
+          $queue->deleteItem($item);
+        }
+        catch (RequeueException $e) {
+          // The worker requested the task be immediately requeued.
+          $queue->releaseItem($item);
+        }
+        catch (SuspendQueueException $e) {
+          // If the worker indicates there is a problem with the whole queue,
+          $queue->releaseItem($item);
+          watchdog_exception('cron', $e);
+        }
+        catch (\Exception $e) {
+          // In case of any other kind of exception, log it and leave the item
+          // in the queue to be processed again later.
+          watchdog_exception('cron', $e);
+        }
+      }
+      $this->logger->info('--- --- Lease time is out for @queue or queue empty', [
+          '@queue' => $name]
+      );
+
+      return $queue->numberOfItems();
+    }
+    else {
+      return 0;
+    }
+  }
+
+  /**
+   * Processes one item from a queue then return
+   *
+   * @param $name
+   * @param int $time
+   *
+   * @return int
+   * @throws \Drupal\Component\Plugin\Exception\PluginException
+   * @throws \Drupal\Component\Plugin\Exception\PluginNotFoundException
+   */
+  public function processSingleItemQueue($name, $time = 120) {
+    // Grab the defined cron queues.
+    $info = $this->queueManager->getDefinition($name);
+    if ($info) {
+      // Make sure every queue exists. There is no harm in trying to recreate
+      // an existing queue.
+      $this->queueFactory->get($name)->createQueue();
+      $queue_worker = $this->queueManager->createInstance($name);
+      $end = time() + $time;
+      $queue = $this->queueFactory->get($name, TRUE);
+      $lease_time = $time;
+      //process a single element
+      if ($item = $queue->claimItem($lease_time)) {
+        $this->logger->info('--- processing one item for @queue', [
+          '@queue' => $name]
+        );
+        try {
+          $queue_worker->processItem($item->data);
+          $queue->deleteItem($item);
+        }
+        catch (RequeueException $e) {
+          // The worker requested the task be immediately requeued.
+          $queue->releaseItem($item);
+        }
+        catch (SuspendQueueException $e) {
+          // If the worker indicates there is a problem with the whole queue,
+          $queue->releaseItem($item);
+          watchdog_exception('cron', $e);
+        }
+        catch (\Exception $e) {
+          // In case of any other kind of exception, log it and leave the item
+          // in the queue to be processed again later.
+          watchdog_exception('cron', $e);
+        }
       }
       else {
-        //process a single element
-        if ($item = $queue->claimItem($lease_time)) {
-          $this->logger->info('--- processing one item for @queue', [
+        $this->logger->info('--- --- Queue empty @queue' , [
             '@queue' => $name]
-          );
-          try {
-            $queue_worker->processItem($item->data);
-            $queue->deleteItem($item);
-          }
-          catch (RequeueException $e) {
-            // The worker requested the task be immediately requeued.
-            $queue->releaseItem($item);
-          }
-          catch (SuspendQueueException $e) {
-            // If the worker indicates there is a problem with the whole queue,
-            $queue->releaseItem($item);
-            watchdog_exception('cron', $e);
-          }
-          catch (\Exception $e) {
-            // In case of any other kind of exception, log it and leave the item
-            // in the queue to be processed again later.
-            watchdog_exception('cron', $e);
-          }
-        }
-        else {
-          $this->logger->info('--- --- Lease time is out for @queue or queue empty', [
-              '@queue' => $name]
-          );
-        }
+        );
       }
       return $queue->numberOfItems();
     }
@@ -273,6 +297,7 @@ class StrawberryfieldHydroponicsService {
 
         $pid = exec(
           sprintf("%s > /dev/null 2>&1 & echo $!", $cmd)
+          //sprintf("%s > /dev/null & echo $!", $cmd)
         );
         \Drupal::state()->set('hydroponics.queurunner_last_pid', $pid);
         $this->logger->info('PID for Hydroponics Service: @pid', [
@@ -366,7 +391,7 @@ class StrawberryfieldHydroponicsService {
     $deltaTime = ($currentTime - $lastRunTime);
 
     $heartbeat_max_delta = $this->getHearbeatMaxDelta();
-    
+
     $running_posix = FALSE;
     if ($queuerunner_pid > 0) {
       $running_posix = posix_kill($queuerunner_pid, 0);

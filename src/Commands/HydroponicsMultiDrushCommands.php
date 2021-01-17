@@ -22,7 +22,7 @@ use React\ChildProcess\Process;
  * Forks and executes a reactPHP loop to handle queues in background
  *
  */
-class HydroponicsDrushCommands extends DrushCommands {
+class HydroponicsMultiDrushCommands extends DrushCommands {
 
   use ExecTrait;
 
