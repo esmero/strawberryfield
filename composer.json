@@ -13,12 +13,22 @@
         }
     ],
     "require": {
+        "drupal/core": "^8.9 || ^9",
         "ml/json-ld": "^1.1",
         "mtdowling/jmespath.php":"^2.5",
-        "swaggest/json-schema":"^0.12.25",
+        "swaggest/json-schema":"^0.12.29",
+        "swaggest/json-diff":"^3.7.5",
         "frictionlessdata/datapackage": "dev-master",
-        "drupal/search_api": "~1.14"
+        "drupal/search_api": "~1.17",
+        "drupal/search_api_solr": "^4.1.4"
     },
     "minimum-stability": "dev",
-    "prefer-stable": true
+    "prefer-stable": true,
+    "extra": {
+        "drush": {
+            "services": {
+                "drush.services.yml": "^10"
+            }
+        }
+    }
 }

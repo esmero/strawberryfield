@@ -3,7 +3,7 @@
 namespace Drupal\strawberryfield\EventSubscriber;
 
 use Drupal\strawberryfield\StrawberryfieldEventType;
-use Drupal\strawberryfield\Event\StrawberryfieldServiceEvent;
+use Drupal\strawberryfield\Event\StrawberryfieldJsonProcessEvent;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 /**
@@ -27,6 +27,6 @@ abstract class StrawberryfieldEventJsonProcessingSubscriber implements EventSubs
    * @param \Drupal\strawberryfield\Event\StrawberryfieldServiceEvent $event
    *   The event.
    */
-  abstract public function onJsonInvokeProcess(StrawberryfieldServiceEvent $event);
+  abstract public function onJsonInvokeProcess(StrawberryfieldJsonProcessEvent $event);
 
 }

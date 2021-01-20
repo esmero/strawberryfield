@@ -2,6 +2,7 @@
 
 namespace Drupal\strawberryfield\EventSubscriber;
 
+use Drupal\Core\Session\AccountInterface;
 use Drupal\strawberryfield\Event\StrawberryfieldCrudEvent;
 use Drupal\Core\Messenger\MessengerInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
@@ -49,6 +50,18 @@ class StrawberryfieldEventPresaveSubscriberFilePersister extends Strawberryfield
    */
   protected $strawberryfilepersister;
 
+  /**
+   * The logger factory.
+   * @var \Drupal\Core\Logger\LoggerChannelFactoryInterface
+   */
+  protected $loggerFactory;
+
+  /**
+   * The current user.
+   *
+   * @var \Drupal\Core\Session\AccountInterface
+   */
+  protected $account;
 
   /**
    * StrawberryfieldEventPresaveSubscriberFilePersister constructor.
@@ -57,18 +70,21 @@ class StrawberryfieldEventPresaveSubscriberFilePersister extends Strawberryfield
    * @param \Drupal\Core\Messenger\MessengerInterface $messenger
    * @param \Drupal\Core\Logger\LoggerChannelFactoryInterface $logger_factory
    * @param \Drupal\strawberryfield\StrawberryfieldFilePersisterService $strawberry_filepersister
+   * @param \Drupal\Core\Session\AccountInterface $account
    */
   public function __construct(
     TranslationInterface $string_translation,
     MessengerInterface $messenger,
     LoggerChannelFactoryInterface $logger_factory,
-    StrawberryfieldFilePersisterService $strawberry_filepersister
+    StrawberryfieldFilePersisterService $strawberry_filepersister,
+    AccountInterface $account
 
   ) {
     $this->stringTranslation = $string_translation;
     $this->messenger = $messenger;
     $this->loggerFactory = $logger_factory;
     $this->strawberryfilepersister = $strawberry_filepersister;
+    $this->account = $account;
   }
 
 
@@ -90,7 +106,7 @@ class StrawberryfieldEventPresaveSubscriberFilePersister extends Strawberryfield
       /* @var \Drupal\strawberryfield\Field\StrawberryFieldItemList $field */
       $newlysavedcount = $newlysavedcount + $this->strawberryfilepersister->persistFilesInJsonToDisks($field);
     }
-    if ($newlysavedcount > 0) {
+    if ($newlysavedcount > 0 && $this->account->hasPermission('display strawberry messages')) {
       $this->messenger->addStatus($this->stringTranslation->formatPlural($newlysavedcount, 'Very good. New file persisted to permanent Storage.', 'Great! @count new files persisted to permanent Storage.'));
     }
     $current_class = get_called_class();

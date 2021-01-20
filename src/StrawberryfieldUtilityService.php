@@ -16,7 +16,7 @@ use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\file\FileInterface;
 use Drupal\Core\Entity\ContentEntityInterface;
-use Drupal\search_api\Entity\Index; 
+use Drupal\search_api\Entity\Index;
 /**
  * Provides a SBF utility class.
  */
@@ -126,15 +126,106 @@ class StrawberryfieldUtilityService {
       return $this->strawberryfieldMachineNames;
     }
     $node_field_definitions = $this->entityFieldManager->getFieldStorageDefinitions('node');
-    $sbf_field_names = array();
+    $sbf_field_names = [];
     foreach ($node_field_definitions as $field_definition) {
       if ($field_definition->getType() === "strawberryfield_field") {
         $sbf_field_names[] = $field_definition->getName();
       }
     }
-    
+
     return $sbf_field_names;
   }
+
+  /**
+   * Given a Bundle returns yes if it contains a SBF defined via a field config
+   *
+   * @param string $bundle
+   *
+   * @return bool
+   * @throws \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException
+   * @throws \Drupal\Component\Plugin\Exception\PluginNotFoundException
+   */
+  public function bundleHasStrawberryfield($bundle = 'digital_object') {
+
+    $field = $this->entityTypeManager->getStorage('field_config');
+    $field_ids = $this->entityTypeManager->getStorage('field_config')->getQuery()
+        ->condition('entity_type', 'node')
+        ->condition('bundle', $bundle)
+        ->condition('field_type' , 'strawberryfield_field')
+        ->execute();
+    $fields = $this->entityTypeManager->getStorage('field_config')->loadMultiple($field_ids);
+
+    return count($field_ids)? TRUE : FALSE;
+  }
+
+  /**
+   * Given a Bundle returns SBF's field config Object
+   * @param string $bundle
+   *
+   * @return \Drupal\Core\Entity\EntityInterface[]
+   * @throws \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException
+   * @throws \Drupal\Component\Plugin\Exception\PluginNotFoundException
+   */
+  public function getStrawberryfieldConfigFromStorage($bundle = 'digital_object') {
+
+    $field = $this->entityTypeManager->getStorage('field_config');
+    $field_ids = $this->entityTypeManager->getStorage('field_config')->getQuery()
+      ->condition('entity_type', 'node')
+      ->condition('bundle', $bundle)
+      ->condition('field_type' , 'strawberryfield_field')
+      ->execute();
+    $fields = $this->entityTypeManager->getStorage('field_config')->loadMultiple($field_ids);
+
+    return $fields;
+  }
+
+  /**
+   * Given a Bundle returns the SBF field machine names
+   *
+   * This include Code generated, overrides, etc. For just the directly created via the UI
+   * Which are FieldConfig Instances use:
+   * \Drupal\strawberryfield\StrawberryfieldUtilityService::getStrawberryfieldConfigFromStorage
+   *
+   * @param $bundle
+   *    A Node Bundle
+   *
+   * @return array
+   *  Returns array of SBF names
+   */
+  public function getStrawberryfieldMachineForBundle($bundle = 'digital_object') {
+    // @WARNING Never call this function inside any field based hook
+    // Chances are the hook will be called invoked inside ::getFieldDefinitions
+    // All you will find yourself inside a SUPER ETERNAL LOOP. You are adviced.
+
+    $all_bundled_fields = $this->entityFieldManager->getFieldDefinitions('node', $bundle);
+    $all_sbf_fields = $this->getStrawberryfieldMachineNames();
+    return array_intersect(array_keys($all_bundled_fields), $all_sbf_fields);
+  }
+
+  /**
+   * Given a Bundle returns the SBF field definition Objects
+   *
+   * This include Code generated, overrides, etc. For just the directly created via the UI
+   * Which are FieldConfig Instances use:
+   * \Drupal\strawberryfield\StrawberryfieldUtilityService::getStrawberryfieldConfigFromStorage
+   *
+   * @param $bundle
+   *    A Node Bundle
+   *
+   * @return \Drupal\Core\Field\FieldDefinitionInterface[]|array
+   *  Returns array of SBF names
+   */
+  public function getStrawberryfieldDefinitionsForBundle($bundle = 'digital_object') {
+    // @WARNING Never call this function inside any field based hook
+    // Chances are the hook will be called invoked inside ::getFieldDefinitions
+    // All you will find yourself inside a SUPER ETERNAL LOOP. You are adviced.
+    $fieldefinitions = [];
+    $all_bundled_fields = $this->entityFieldManager->getFieldDefinitions('node', $bundle);
+    $all_sbf_fields = $this->getStrawberryfieldMachineNames();
+    $all_sbf_fields = array_flip($all_sbf_fields);
+    return array_intersect_key($all_bundled_fields, $all_sbf_fields);
+  }
+
 
   /**
    * Returns the Solr Fields in a Solr Index are from SBFs
@@ -147,9 +238,9 @@ class StrawberryfieldUtilityService {
   public function getStrawberryfieldSolrFields(Index $index_entity) {
     $solr_fields = $index_entity->get('field_settings');
     $property_path_is_sbf = array();
-    
+
     $sbf_solr_fields = array();
-    
+
     foreach ($solr_fields as $id => $field) {
       $property_path = explode(":", $field['property_path']);
       // use the first part of the property path (this will be the field machine name)
@@ -166,7 +257,82 @@ class StrawberryfieldUtilityService {
         $sbf_solr_fields[$id] = $field;
       }
     }
-    
+
     return $sbf_solr_fields;
   }
+
+  /**
+   * Checks if a given command exists and is executable.
+   *
+   * @param $command
+   *
+   * @return bool
+   */
+  public function verifyCommand($execpath) :bool {
+    $iswindows = strpos(PHP_OS, 'WIN') === 0;
+    $canexecute = FALSE;
+    $execpath = trim(escapeshellcmd($execpath));
+    $test = $iswindows ? 'where' : 'command -v';
+    $output = shell_exec("$test $execpath");
+    if ($output) {
+      $canexecute = is_executable($execpath);
+    }
+    return $canexecute;
+  }
+
+  /**
+   * Format a quantity of bytes.
+   *
+   * @param int $size
+   * @param int $precision
+   *
+   * @return string
+   */
+  public function formatBytes($size, $precision = 2)
+  {
+    if ($size === 0) {
+      return 0;
+    }
+    $base = log($size, 1024);
+    $suffixes = array('', 'k', 'M', 'G', 'T');
+    return round(pow(1024, $base - floor($base)), $precision) . $suffixes[floor($base)];
+  }
+
+
+  /**
+   * Checks if a given command exists and is executable.
+   *
+   * @param string $execpath
+   * @param string $home
+   *
+   * @return bool
+   */
+  public function verifyDrush(string $execpath, string $home) :bool {
+    $site_path = \Drupal::service('site.path'); // e.g.: 'sites/default'
+    $site_path = explode('/', $site_path);
+    $site_name = $site_path[1];
+    $execpath = $execpath.' --uri='.$site_name;
+    $iswindows = strpos(PHP_OS, 'WIN') === 0;
+    $canexecute = FALSE;
+    $execpath = trim(escapeshellcmd($execpath));
+    $test = $iswindows ? 'where' : 'command -v';
+    $output = shell_exec("$test $execpath");
+    if ($output) {
+      if (!empty($home)) {
+        $home = escapeshellcmd($home);
+        $execpath = "export HOME='".$home."'; ". $execpath;
+      }
+      $output = shell_exec($execpath);
+      if ($output) {
+        if (strpos($output, 'Drush Commandline Tool') === 0) {
+          $canexecute = TRUE;
+        }
+      }
+    }
+    return $canexecute;
+  }
+
+
+
+
 }

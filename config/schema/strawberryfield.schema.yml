@@ -55,6 +55,17 @@ strawberryfield.strawberry_keynameprovider.jmespath:
       type: string
       label: 'The field property we expose for the Strawberryfield'
 
+strawberryfield.strawberry_keynameprovider.entityjmespath:
+  type: config_object
+  label: 'Strawberry Key Name Provider Entity JMesPath specific config'
+  mapping:
+    source_key:
+      type: string
+      label: 'A Comma separated string containing one or more JMESPaths pointing to JSON key with NODE ids.'
+    exposed_key:
+      type: string
+      label: 'The field property we expose for the Strawberryfield'
+
 strawberryfield.storage_settings:
   type: config_object
   label: 'Strawberry Storage specific config'
@@ -134,3 +145,60 @@ field.value.strawberryfield_field:
     value:
       type: string
       label: 'Strawberryfield Metadata'
+
+strawberryfield.filepersister_service_settings:
+  type: config_object
+  label: 'Archipelago IIIF Server configurations'
+  mapping:
+    extractmetadata:
+      type: boolean
+      label: 'Whether to run (TRUE) or to skip (FALSE) file identification directly on file persistence.'
+    exif_exec_path:
+      type: string
+      label: 'Exifinfo binary full executable path'
+    fido_exec_path:
+      type: string
+      label: 'FIDO binary full executable path'
+    identify_exec_path:
+      type: string
+      label: 'Identify binary full executable path (graphics magic or Imagemagick)'
+    pdfinfo_exec_path:
+      type: string
+      label: 'pdfinfo binary full executable path (poppler utils)'
+
+strawberryfield.general:
+  type: config_object
+  label: General SBF Module settings
+  mapping:
+    benchmark:
+      type: boolean
+      label: Benchmark time and memory usage of Event Subscribers
+
+field.formatter.settings.strawberry_default_formatter:
+  type: mapping
+  label: 'Specific Config for strawberry_map_formatter'
+  mapping:
+    limit_access:
+      type: string
+      label: 'Access level the user needs on a bundle to be able to see it rendered, defaults to "edit"'
+
+# Multiple JSON type / View Mode Mappings
+strawberryfield.hydroponics_settings:
+  type: config_object
+  label: 'Queues enabled to be processed by the Hydroponics Service'
+  mapping:
+    active:
+      type: boolean
+      label: If Hydroponics Service is enabled or not
+    drush_path:
+      type: string
+      label: 'Full system path to the /vendor composer Drush installation including drush script'
+    home_path:
+      type: string
+      label: 'Full system path to a folder we can use as webserver user home for Drush'
+    queues:
+      type: sequence
+      label: 'Queues marked as to be run by the Hydroponics Service'
+      sequence:
+        type: string
+        label: 'Queue Names'

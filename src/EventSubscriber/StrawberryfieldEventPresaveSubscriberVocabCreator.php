@@ -6,6 +6,7 @@ use Drupal\strawberryfield\Event\StrawberryfieldCrudEvent;
 use Drupal\Core\Messenger\MessengerInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\StringTranslation\TranslationInterface;
+use Drupal\Core\Session\AccountInterface;
 use CachingIterator;
 use ArrayIterator;
 
@@ -19,7 +20,7 @@ class StrawberryfieldEventPresaveSubscriberVocabCreator extends StrawberryfieldE
   /**
    * @var int
    */
-  protected static $priority = -700;
+  protected static $priority = -1000;
 
   /**
    * The messenger.
@@ -27,6 +28,13 @@ class StrawberryfieldEventPresaveSubscriberVocabCreator extends StrawberryfieldE
    * @var \Drupal\Core\Messenger\MessengerInterface
    */
   protected $messenger;
+
+  /**
+   * The current user.
+   *
+   * @var \Drupal\Core\Session\AccountInterface
+   */
+  protected $account;
 
 
   /**
@@ -36,13 +44,16 @@ class StrawberryfieldEventPresaveSubscriberVocabCreator extends StrawberryfieldE
    *   The string translation.
    * @param \Drupal\Core\Messenger\MessengerInterface $messenger
    *   The messenger.
+   * @param \Drupal\Core\Session\AccountInterface $account
    */
   public function __construct(
     TranslationInterface $string_translation,
-    MessengerInterface $messenger
+    MessengerInterface $messenger,
+    AccountInterface $account
   ) {
     $this->stringTranslation = $string_translation;
     $this->messenger = $messenger;
+    $this->account = $account;
   }
 
 
@@ -120,7 +131,7 @@ class StrawberryfieldEventPresaveSubscriberVocabCreator extends StrawberryfieldE
         }
       }
     }
-    if ($newlycreatedcount > 0) {
+    if ($newlycreatedcount > 0 && $this->account->hasPermission('display strawberry messages')) {
       $this->messenger->addStatus(t('New Terms added to the vocabulary'));
     }
   }

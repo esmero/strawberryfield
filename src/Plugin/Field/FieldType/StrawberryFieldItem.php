@@ -1,10 +1,12 @@
 <?php
 namespace Drupal\strawberryfield\Plugin\Field\FieldType;
 
+use Drupal\Core\Entity\TypedData\EntityDataDefinition;
 use Drupal\Core\Field\FieldItemBase;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\TypedData\DataDefinition;
+use Drupal\Core\TypedData\DataReferenceDefinition;
 use Drupal\strawberryfield\Entity\keyNameProviderEntity;
 use Drupal\Component\Utility\Random;
 use Drupal\Core\TypedData\ListDataDefinition;
@@ -83,7 +85,7 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
     */
    public static function propertyDefinitions(FieldStorageDefinitionInterface $field_definition) {
 
-     $reserverd_keys = [
+     $reserved_keys = [
        'value',
        'str_flatten_keys',
      ];
@@ -140,23 +142,54 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
          }
        }
      }
-
      foreach ($keynamelist as $processor_class => $plugin_info) {
        if (is_array($plugin_info)) {
          foreach ($plugin_info as $property => $keyname) {
-           if (isset($reserverd_keys[$property])) {
+           if (isset($reserved_keys[$property])) {
              // Avoid internal reserved keys
              continue;
            }
-           $properties[$property] = ListDataDefinition::create($item_types[$processor_class])
-             ->setLabel($property)
-             ->setComputed(TRUE)
-             ->setClass(
-               $processor_class
+           // @TODO discuss with @giancarlobi
+           // This is a Hack and it does the job of allowing
+           // Search API's fieldHelper class to find the actual
+           // Elements. Since this is a property and we can not
+           // add Entity References Field Lists only base DataTypes
+           // We define this as a single Element (escaping the problem with the fact
+           // that each of our SBF in fact! can refer to MANY things. So delta
+           // Is included. But to allow functioning code to do the rest
+           // We override the class ($processor_class) to actually use a ListInterface
+           // data Type that pushes EntityAdapter objects.
+           // Quite clever to be honest.
+           if  ($item_types[$processor_class] == 'entity_reference') {
+             $properties[$property] = DataReferenceDefinition::create(
+               'entity'
              )
-             ->setInternal(TRUE)
-             ->setSetting('jsonkey', $keyname)
-             ->setReadOnly(TRUE);
+               ->setLabel('entity_'.$property)
+               ->setComputed(TRUE)
+               ->setClass(
+                 $processor_class
+               )
+               ->setInternal(TRUE)
+               ->setSetting('jsonkey', $keyname)
+               ->setReadOnly(TRUE)
+               ->setTargetDefinition(EntityDataDefinition::create('node'))
+               ->addConstraint('EntityType', 'node');
+
+           }
+           else {
+
+             $properties[$property] = ListDataDefinition::create(
+               $item_types[$processor_class]
+             )
+               ->setLabel($property)
+               ->setComputed(TRUE)
+               ->setClass(
+                 $processor_class
+               )
+               ->setInternal(TRUE)
+               ->setSetting('jsonkey', $keyname)
+               ->setReadOnly(TRUE);
+           }
          }
        }
      }
@@ -186,6 +219,61 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
 
 
    /**
+    * Decodes main value JSON string into an array
+    *
+    * We don't keep this around because this will be mainly used to be
+    * modified and re encoded afterwards.
+    *
+    * @param bool $assoc
+    *   If return is array or a stdclass Object.
+    *
+    * @return array|\stdClass
+    */
+   public function provideDecoded($assoc = TRUE) {
+     $jsonArray = [];
+     if ($this->isEmpty()) {
+       $this->flattenjson = [];
+       $jsonArray = [];
+     }
+     elseif ($this->validate()->count() == 0) {
+       $mainproperty = $this->mainPropertyName();
+       $jsonArray = json_decode($this->{$mainproperty}, $assoc, 50);
+     }
+     return $jsonArray;
+   }
+
+
+   /**
+    * Encodes and sets main value from array
+    *
+    * This method also clears flattenjson and jsonjmesresult caches.
+    *
+    * @param array $jsonarray
+    *   Array of data we want to save in the main property
+    *
+    * @return string|boolean
+    *   Returns either the correctly encoded string or boolean FALSE
+    *   Make sure you compare using === FALSE!.
+    *
+    * @throws  \InvalidArgumentException
+    *    If what is passed to ::setValue() is not an array.
+    */
+   public function setMainValueFromArray(array $jsonarray) {
+
+     $jsonstring = json_encode($jsonarray, JSON_PRETTY_PRINT, 50);
+
+     if ($jsonstring) {
+       $this->setValue([$this->mainPropertyName() => $jsonstring], TRUE);
+       // Clear this caches just in case
+       $this->flattenjson = [];
+       $this->jsonjmesresults = [];
+     }
+
+     return $jsonstring;
+   }
+
+
+   /**
     * Calculates / keeps around a flatten common keys array for the main value.
     *
     * @param bool $force
@@ -201,7 +289,8 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
      elseif ($this->validate()->count() == 0) {
        if ($this->flattenjson == NULL || $force) {
          $mainproperty = $this->mainPropertyName();
-         $jsonArray = json_decode($this->{$mainproperty}, TRUE, 10);
+         $jsonArray = [];
+         $jsonArray = json_decode($this->{$mainproperty}, TRUE, 50);
          $flattened = [];
          StrawberryfieldJsonHelper::arrayToFlatCommonkeys(
            $jsonArray,
@@ -234,7 +323,7 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
      else {
        if ($this->jsonjmesresults == NULL || !isset($this->jsonjmesresults[$expression]) || $force) {
          $mainproperty = $this->mainPropertyName();
-         $jsonArray = json_decode($this->{$mainproperty}, TRUE, 10);
+         $jsonArray = json_decode($this->{$mainproperty}, TRUE, 50);
          $searchresult = StrawberryfieldJsonHelper::searchJson($expression, $jsonArray);
          $this->jsonjmesresults[$expression] = $searchresult;
          return $searchresult;

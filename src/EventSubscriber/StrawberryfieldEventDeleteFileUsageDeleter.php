@@ -8,6 +8,7 @@ use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\StringTranslation\TranslationInterface;
 use Drupal\strawberryfield\StrawberryfieldFilePersisterService;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
+use Drupal\Core\Session\AccountInterface;
 
 
 /**
@@ -42,6 +43,18 @@ class StrawberryfieldEventDeleteFileUsageDeleter extends StrawberryfieldEventDel
    */
   protected $strawberryfilepersister;
 
+  /**
+   * The logger factory.
+   * @var \Drupal\Core\Logger\LoggerChannelFactoryInterface
+   */
+  protected $loggerFactory;
+
+  /**
+   * The current user.
+   *
+   * @var \Drupal\Core\Session\AccountInterface
+   */
+  protected $account;
 
   /**
    * StrawberryfieldEventInsertFileUsageUpdater constructor.
@@ -50,18 +63,21 @@ class StrawberryfieldEventDeleteFileUsageDeleter extends StrawberryfieldEventDel
    * @param \Drupal\Core\Messenger\MessengerInterface $messenger
    * @param \Drupal\Core\Logger\LoggerChannelFactoryInterface $logger_factory
    * @param \Drupal\strawberryfield\StrawberryfieldFilePersisterService $strawberry_filepersister
+   * @param \Drupal\Core\Session\AccountInterface $account
    */
   public function __construct(
     TranslationInterface $string_translation,
     MessengerInterface $messenger,
     LoggerChannelFactoryInterface $logger_factory,
-    StrawberryfieldFilePersisterService $strawberry_filepersister
+    StrawberryfieldFilePersisterService $strawberry_filepersister,
+    AccountInterface $account
 
   ) {
     $this->stringTranslation = $string_translation;
     $this->messenger = $messenger;
     $this->loggerFactory = $logger_factory;
     $this->strawberryfilepersister = $strawberry_filepersister;
+    $this->account = $account;
   }
 
 
@@ -78,12 +94,25 @@ class StrawberryfieldEventDeleteFileUsageDeleter extends StrawberryfieldEventDel
     // First one: removed count, second one:orphaned ones cleaned.
 
     $processedfiles = $this->strawberryfilepersister->removeUsageFilesInJson($entity);
-
-    if ($processedfiles[0] > 0) {
-      $this->messenger->addStatus($this->stringTranslation->formatPlural($processedfiles[0], 'One file usage removed for this digital Object.', '@count files usage removed for this digital Object.'));
-    }
-    if ($processedfiles[1] > 0) {
-      $this->messenger->addStatus($this->stringTranslation->formatPlural($processedfiles[1], 'One file usage removed for a no longer existing digital Object.', '@count files usage removed for no longer existing digital Objects.'));
+    if ($this->account->hasPermission('display strawberry messages')) {
+      if ($processedfiles[0] > 0) {
+        $this->messenger->addStatus(
+          $this->stringTranslation->formatPlural(
+            $processedfiles[0],
+            'One file usage removed for this digital Object.',
+            '@count files usage removed for this digital Object.'
+          )
+        );
+      }
+      if ($processedfiles[1] > 0) {
+        $this->messenger->addStatus(
+          $this->stringTranslation->formatPlural(
+            $processedfiles[1],
+            'One file usage removed for a no longer existing digital Object.',
+            '@count files usage removed for no longer existing digital Objects.'
+          )
+        );
+      }
     }
     $current_class = get_called_class();
     $event->setProcessedBy($current_class, TRUE);
