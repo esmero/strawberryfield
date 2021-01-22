@@ -136,7 +136,7 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
     $drush_path = $config->get('drush_path') ?  $config->get('drush_path') : NULL;
     $home_path = $config->get('home_path') ?  $config->get('home_path') : NULL;
     $enabled_queues =  !empty($config->get('queues')) ? array_flip($config->get('queues')) : [];
-    $processing_type = $config->get('processing_type') ? $config->get('processing_type') : "hydroponics";
+    $processing_type = $config->get('processing_type') ? $config->get('processing_type') : "archipelago:hydroponics";
     $processing_monotime = $config->get('processing_monotime') ? $config->get('processing_monotime') : 60;
     $processing_multinumber = $config->get('processing_multinumber') ? $config->get('processing_multinumber') : 1;
 
@@ -195,8 +195,8 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
 
     //Add parameters depending on processing type selected
     //The array KEY is the right part of drush command, i.e. hydroponics for archipelago:hydroponics
-    $processing_options['hydroponics'] = $this->t("A single process for all queues");
-    $processing_options['hydroponicsmulti'] = $this->t("One or more processes for each queue");
+    $processing_options['archipelago:hydroponics'] = $this->t("A single process for all queues");
+    $processing_options['archipelago:hydroponicsmulti'] = $this->t("One or more processes for each queue");
 
     $form['processingtype'] = [
       '#type' => 'select',
@@ -227,7 +227,7 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
       '#required' => FALSE,
       '#states' => [
         'visible' => [
-          ':input[name="processingtype"]' => ['value' => 'hydroponics'],
+          ':input[name="processingtype"]' => ['value' => 'archipelago:hydroponics'],
         ],
       ],
     ];
@@ -244,7 +244,7 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
       '#required' => FALSE,
       '#states' => [
         'visible' => [
-          ':input[name="processingtype"]' => ['value' => 'hydroponicsmulti'],
+          ':input[name="processingtype"]' => ['value' => 'archipelago:hydroponicsmulti'],
         ],
       ],
     ];

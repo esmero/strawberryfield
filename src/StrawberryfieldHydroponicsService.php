@@ -235,14 +235,14 @@ class StrawberryfieldHydroponicsService {
   */
   public function getHearbeatMaxDelta() {
     $config = $this->configFactory->get('strawberryfield.hydroponics_settings');
-    $processing_type = $config->get('processing_type') ? $config->get('processing_type') : "hydroponics";
+    $processing_type = $config->get('processing_type') ? $config->get('processing_type') : "archipelago:hydroponics";
     $processing_monotime = $config->get('processing_monotime') ? $config->get('processing_monotime') : 60;
     switch ($processing_type) {
-      case "hydroponics":
+      case "archipelago:hydroponics":
         //if MONO then conservative, max queue process time + 5s
         $heartbeat_max_delta = $processing_monotime + 5;
         break;
-      case "hydroponicsmulti":
+      case "archipelago:hydroponicsmulti":
         //if MULTI:
         //due to child executed as process
         //hearbeat interval is near to real time value
@@ -259,7 +259,7 @@ class StrawberryfieldHydroponicsService {
     $config = $this->configFactory->get('strawberryfield.hydroponics_settings');
     if ($config->get('active')) {
 
-      $processing_type = $config->get('processing_type') ? $config->get('processing_type') : "mono";
+      $processing_type = $config->get('processing_type') ? $config->get('processing_type') : "archipelago:hydroponics";
 
       global $base_url;
       $site_path = \Drupal::service('site.path'); // e.g.: 'sites/default'
@@ -287,8 +287,8 @@ class StrawberryfieldHydroponicsService {
         }
         $path = escapeshellcmd($path);
 
-        //The parameter $processing_type is the right part of drush command
-        $cmd = $path.' archipelago:'.$processing_type.' --quiet --uri=' . $base_url;
+        //The parameter $processing_type is the drush command
+        $cmd = $path.' '.$processing_type.' --quiet --uri=' . $base_url;
         $home = $config->get('home_path');
         if (!empty($home)) {
           $home = escapeshellcmd($home);
