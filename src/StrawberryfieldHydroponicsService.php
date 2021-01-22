@@ -17,7 +17,7 @@ use Drupal\Core\Queue\RequeueException;
 use Drupal\Core\Queue\SuspendQueueException;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Psr\Log\LoggerInterface;
-use Drupal\Core\State\State;
+use Drupal\Core\State\StateInterface;
 
 /**
  * Provides a SBF utility class.
@@ -70,7 +70,7 @@ class StrawberryfieldHydroponicsService {
   /**
    * The state store.
    *
-   * @var \Drupal\Core\State\State
+   * @var \Drupal\Core\State\StateInterface
    */
   protected $state;
 
@@ -83,7 +83,7 @@ class StrawberryfieldHydroponicsService {
    * @param \Drupal\Core\Queue\QueueWorkerManagerInterface $queue_manager
    * @param \Drupal\Core\Queue\QueueFactory $queue_factory
    * @param \Psr\Log\LoggerInterface $hydroponics_logger
-   * @param \Drupal\Core\State\State $state
+   * @param \Drupal\Core\State\StateInterface $state
    */
   public function __construct(
     EntityTypeManagerInterface $entity_type_manager,
@@ -92,7 +92,7 @@ class StrawberryfieldHydroponicsService {
     QueueWorkerManagerInterface $queue_manager,
     QueueFactory $queue_factory,
     LoggerInterface $hydroponics_logger,
-    State $state
+    StateInterface $state
   ) {
     $this->entityTypeManager = $entity_type_manager;
     $this->configFactory = $config_factory;
