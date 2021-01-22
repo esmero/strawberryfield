@@ -17,6 +17,7 @@ use Drupal\Core\Queue\RequeueException;
 use Drupal\Core\Queue\SuspendQueueException;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Psr\Log\LoggerInterface;
+use Drupal\Core\State\State;
 
 /**
  * Provides a SBF utility class.
@@ -59,7 +60,6 @@ class StrawberryfieldHydroponicsService {
    */
   protected $queueFactory;
 
-
   /**
    * The logger service.
    *
@@ -68,13 +68,22 @@ class StrawberryfieldHydroponicsService {
   protected $logger;
 
   /**
+   * The state store.
+   *
+   * @var \Drupal\Core\State\State
+   */
+  protected $state;
+
+  /**
    * StrawberryfieldHydroponicsService constructor.
    *
    * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entity_type_manager
    * @param \Drupal\Core\Config\ConfigFactoryInterface $config_factory
    * @param \Drupal\Core\Extension\ModuleHandlerInterface $module_handler
    * @param \Drupal\Core\Queue\QueueWorkerManagerInterface $queue_manager
+   * @param \Drupal\Core\Queue\QueueFactory $queue_factory
    * @param \Psr\Log\LoggerInterface $hydroponics_logger
+   * @param \Drupal\Core\State\State $state
    */
   public function __construct(
     EntityTypeManagerInterface $entity_type_manager,
@@ -82,7 +91,8 @@ class StrawberryfieldHydroponicsService {
     ModuleHandlerInterface $module_handler,
     QueueWorkerManagerInterface $queue_manager,
     QueueFactory $queue_factory,
-    LoggerInterface $hydroponics_logger
+    LoggerInterface $hydroponics_logger,
+    State $state
   ) {
     $this->entityTypeManager = $entity_type_manager;
     $this->configFactory = $config_factory;
@@ -90,6 +100,7 @@ class StrawberryfieldHydroponicsService {
     $this->queueManager = $queue_manager;
     $this->queueFactory = $queue_factory;
     $this->logger = $hydroponics_logger;
+    $this->state = $state;
   }
 
 
@@ -265,8 +276,8 @@ class StrawberryfieldHydroponicsService {
       $site_path = \Drupal::service('site.path'); // e.g.: 'sites/default'
       $site_path = explode('/', $site_path);
       $site_name = $site_path[1];
-      $queuerunner_pid = (int) \Drupal::state()->get('hydroponics.queurunner_last_pid', 0);
-      $lastRunTime = intval(\Drupal::state()->get('hydroponics.heartbeat'));
+      $queuerunner_pid = (int) $this->state->get('hydroponics.queurunner_last_pid', 0);
+      $lastRunTime = intval($this->state->get('hydroponics.heartbeat'));
       $currentTime = intval(\Drupal::time()->getRequestTime());
       $deltaTime = ($currentTime - $lastRunTime);
 
@@ -299,7 +310,7 @@ class StrawberryfieldHydroponicsService {
           sprintf("%s > /dev/null 2>&1 & echo $!", $cmd)
           //sprintf("%s > /dev/null & echo $!", $cmd)
         );
-        \Drupal::state()->set('hydroponics.queurunner_last_pid', $pid);
+        $this->state->set('hydroponics.queurunner_last_pid', $pid);
         $this->logger->info('PID for Hydroponics Service: @pid', [
             '@pid' => $pid]
         );
@@ -326,8 +337,8 @@ class StrawberryfieldHydroponicsService {
   }
 
   public function checkRunning() {
-    $queuerunner_pid = (int) \Drupal::state()->get('hydroponics.queurunner_last_pid', 0);
-    $lastRunTime = intval(\Drupal::state()->get('hydroponics.heartbeat'));
+    $queuerunner_pid = (int) $this->state->get('hydroponics.queurunner_last_pid', 0);
+    $lastRunTime = intval($this->state->get('hydroponics.heartbeat'));
     $currentTime = intval(\Drupal::time()->getRequestTime());
     $deltaTime = ($currentTime - $lastRunTime);
 
@@ -385,8 +396,8 @@ class StrawberryfieldHydroponicsService {
 
   //This function is used for stop and for reset
   public function stop() {
-    $queuerunner_pid = (int) \Drupal::state()->get('hydroponics.queurunner_last_pid', 0);
-    $lastRunTime = intval(\Drupal::state()->get('hydroponics.heartbeat'));
+    $queuerunner_pid = (int) $this->state->get('hydroponics.queurunner_last_pid', 0);
+    $lastRunTime = intval($this->state->get('hydroponics.heartbeat'));
     $currentTime = intval(\Drupal::time()->getRequestTime());
     $deltaTime = ($currentTime - $lastRunTime);
 
@@ -417,14 +428,14 @@ class StrawberryfieldHydroponicsService {
         );
         return posix_strerror($errorcode);
       } else {
-        \Drupal::state()->set('hydroponics.queurunner_last_pid', 0);
+        $this->state->set('hydroponics.queurunner_last_pid', 0);
         sleep(1);
         return "Successfully Stopped. Thanks";
       }
     }
     //PID to clear, not running and not in ptable
     else {
-      \Drupal::state()->set('hydroponics.queurunner_last_pid', 0);
+      $this->state->set('hydroponics.queurunner_last_pid', 0);
       sleep(1);
       return "Successfully cleared pid. Thanks";
     }
