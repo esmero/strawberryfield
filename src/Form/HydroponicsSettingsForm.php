@@ -187,7 +187,7 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
     }
 
     $form['active'] =  [
-      '#title' => 'Check to enabled Hydroponics Queue Background processing service wakeup during Drupal Cron.',
+      '#title' => $this->t('Check to enabled Hydroponics Queue Background processing service wakeup during Drupal Cron.'),
       '#type' => 'checkbox',
       '#required' => FALSE,
       '#default_value' => $active,
@@ -195,8 +195,8 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
 
     //Add parameters depending on processing type selected
     //The array KEY is the right part of drush command, i.e. hydroponics for archipelago:hydroponics
-    $processing_options['hydroponics'] = "A single process for all queues";
-    $processing_options['hydroponicsmulti'] = "One or more processes for each queue";
+    $processing_options['hydroponics'] = $this->t("A single process for all queues");
+    $processing_options['hydroponicsmulti'] = $this->t("One or more processes for each queue");
 
     $form['processingtype'] = [
       '#type' => 'select',
@@ -257,12 +257,12 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
     //advanced parameters
     $form['advanced'] =  [
       '#type' => 'details',
-      '#title' => 'Advanced settings',
-      '#description' => 'If you are not running under under the esmero-php:7.x docker containers you need to provide the following settings'
+      '#title' => $this->t('Advanced settings'),
+      '#description' => $this->t('If you are not running under under the esmero-php:7.x docker containers you need to provide the following settings')
     ];
     $form['advanced']['drush_path'] =  [
-      '#title' => 'The full system path to your composer vendor drush installation (including the actual drush php script).',
-      '#description' => 'For a standard archipelago-deployment docker the right path is "/var/www/html/vendor/drush/drush/drush"',
+      '#title' => $this->t('The full system path to your composer vendor drush installation (including the actual drush php script).'),
+      '#description' => $this->t('For a standard archipelago-deployment docker the right path is "/var/www/html/vendor/drush/drush/drush"'),
       '#type' => 'textfield',
       '#required' => TRUE,
       '#default_value' => !empty($drush_path) ? $drush_path : '/var/www/html/vendor/drush/drush/drush',
@@ -277,8 +277,8 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
     ];
 
     $form['advanced']['home_path'] =  [
-      '#title' => 'A full system path we can use as $HOME directory for your webserver user.',
-      '#description' => 'For a standard archipelago-deployment via Docker please DO NOT ADD this. For others the webserver user (e.g www-data) may need at least read permissions',
+      '#title' => $this->t('A full system path we can use as $HOME directory for your webserver user.'),
+      '#description' => $this->t('For a standard archipelago-deployment via Docker please DO NOT ADD this. For others the webserver user (e.g www-data) may need at least read permissions'),
       '#type' => 'textfield',
       '#required' => FALSE,
       '#default_value' => !empty($home_path) ? $home_path : NULL,

@@ -214,15 +214,6 @@ class HydroponicsMultiDrushCommands extends DrushCommands {
       }
     );
 
-    /* TODO recompile with PCNTL enabled
-    \pcntl_signal(SIGINT, 'signalhandler');
-    \pcntl_signal_dispatch();
-    $signalhandler = function ($signal) use ($loop) {
-      error_log('We got a signal, breaking');
-      $loop->stop();
-    };
-    */
-
     $loop->run();
     Runtime::setCompleted();
   }
