@@ -217,13 +217,13 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
 
     $form['params']['monotime'] = [
       '#type' => 'number',
-      '#title' => t('Process time [s]'),
+      '#title' => $this->t('Process time [s]'),
       '#maxlength' => 3,
       '#default_value' => $processing_monotime,
       '#min' => 1,
       '#max' => 999,
       '#step' => 1,
-      '#description' => t("Time in seconds to spend for processing elements from a queue before process following queue"),
+      '#description' => $this->t("Time in seconds to spend for processing elements from a queue before process following queue"),
       '#required' => FALSE,
       '#states' => [
         'visible' => [
@@ -234,13 +234,13 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
 
     $form['params']['multinumber'] = [
       '#type' => 'number',
-      '#title' => t('Number of concurrent processes'),
+      '#title' => $this->t('Number of concurrent processes'),
       '#maxlength' => 255,
       '#default_value' => $processing_multinumber,
       '#min' => 1,
       '#max' => 20,
       '#step' => 1,
-      '#description' => t("How many processes in parallel per queue can be runned to process items"),
+      '#description' => $this->t("How many processes in parallel per queue can be runned to process items"),
       '#required' => FALSE,
       '#states' => [
         'visible' => [
