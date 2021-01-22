@@ -205,10 +205,6 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
       '#options' => $processing_options,
       "#empty_option" =>t('- Select One -'),
       '#required'=> true,
-      //'#ajax' => [
-      //  'callback' => [get_class($this), 'ajaxRefreshTypeCallback'],
-      //  'wrapper' => 'params-container',
-      //]
     ];
 
     $form['params'] = [
