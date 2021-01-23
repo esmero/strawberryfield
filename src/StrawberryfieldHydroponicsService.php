@@ -360,28 +360,41 @@ class StrawberryfieldHydroponicsService {
        'PID' => $queuerunner_pid
       ];
     }
-    //Normal stopped condition when all is ok
-    elseif (($deltaTime > $heartbeat_max_delta) && ($queuerunner_pid <= 0) && !$running_posix) {
-    //NO MORE NEEDED => Be more conservative so:
-    //Stopped condition without heartbeat check
-    //elseif (($queuerunner_pid <= 0) && !$running_posix) {
-      $return = [
-        'running' => FALSE,
-        'error' => FALSE,
-        'message' =>  $this->t('Hydroponics Service Not running, time passed since last seen @time s', [
-         '@time' => $deltaTime
-        ]),
-        'PID' => $queuerunner_pid,
-        'DELTA' => $deltaTime,
-        'PTABLE' => $running_posix
-      ];
+    elseif (($queuerunner_pid <= 0) && !$running_posix) {
+      if ($deltaTime > $heartbeat_max_delta) {
+        //Normal stopped condition when all is ok
+        $return = [
+          'running' => FALSE,
+          'error' => FALSE,
+          'message' =>  $this->t('Hydroponics Service Not running, time passed since last seen @time s', [
+           '@time' => $deltaTime
+          ]),
+          'PID' => $queuerunner_pid,
+          'DELTA' => $deltaTime,
+          'PTABLE' => $running_posix
+        ];
+      }
+      else {
+        //Probably stopped, wait max heartbeat delta to be sure
+        $return = [
+          'running' => FALSE,
+          'error' => TRUE,
+          'message' =>  $this->t('Hydroponics Service probably not running, last seen @time s, wait at least @maxdelta s before check', [
+           '@time' => $deltaTime,
+           '@maxdelta' => $heartbeat_max_delta
+          ]),
+          'PID' => $queuerunner_pid,
+          'DELTA' => $deltaTime,
+          'PTABLE' => $running_posix
+        ];
+      }
     }
     //Something went wrong. See logs and try a reset
     else {
      $return = [
        'running' => FALSE,
        'error' => TRUE,
-       'message' =>  $this->t('Hydroponics Service ERROR! Check logs and try a reset. Time passed since last seen @time s, last PID @pid, on Process table @ptable', [
+       'message' =>  $this->t('Hydroponics Service ERROR! Check logs and try a reset. Time passed since last seen @time s, last PID @pid (negative means runned as), on Process table @ptable', [
         '@time' => $deltaTime,
         '@pid' => $queuerunner_pid,
         '@ptable' => ($running_posix) ? "YES" : "NO"
