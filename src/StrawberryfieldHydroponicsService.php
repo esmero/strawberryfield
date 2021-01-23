@@ -308,7 +308,6 @@ class StrawberryfieldHydroponicsService {
 
         $pid = exec(
           sprintf("%s > /dev/null 2>&1 & echo $!", $cmd)
-          //sprintf("%s > /dev/null & echo $!", $cmd)
         );
         $this->state->set('hydroponics.queurunner_last_pid', $pid);
         $this->logger->info('PID for Hydroponics Service: @pid', [
@@ -432,7 +431,6 @@ class StrawberryfieldHydroponicsService {
       else {
         $running_posix = posix_kill(abs($queuerunner_pid), 15);
       }
-      error_log($running_posix);
       sleep(2);
       if (!$running_posix) {
         $errorcode = posix_get_last_error();
