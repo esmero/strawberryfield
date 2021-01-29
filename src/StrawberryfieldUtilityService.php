@@ -19,6 +19,7 @@ use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\search_api\Entity\Index;
 use Drupal\search_api\ParseMode\ParseModePluginManager;
 use Drupal\search_api\Query\QueryInterface;
+use Drupal\strawberryfield\Plugin\search_api\datasource\StrawberryfieldFlavorDatasource;
 
 /**
  * Provides a SBF utility class.
@@ -287,19 +288,18 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
   /**
    * {@inheritdoc}
    */
-  public function getCountByProcessorInSolr(EntityInterface $entity, string $processor, array $indexes = [], string $checksum = ''): int {
+  public function getCountByProcessorInSolr(EntityInterface $entity, string $processor, array $indexes = [], string $checksum = NULL): int {
     $count = 0;
 
-    // If no index specified, query all of them.
+    // If no index specified, query all that implement the strawberry flavor
+    // datasource.
     if (empty($indexes)) {
-      $indexes = \Drupal::entityTypeManager()
-        ->getStorage('search_api_index')
-        ->loadMultiple();
+      $indexes = StrawberryfieldFlavorDatasource::getValidIndexes();
     }
 
-    foreach ($indexes as $search_api_index) {
+    foreach ($indexes as $index) {
       // Create the query.
-      $query = $search_api_index->query([
+      $query = $index->query([
         'limit' => 1,
         'offset' => 0,
       ]);
@@ -323,7 +323,7 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
       $query->setOption('ocr_highlight','on');
       $results = $query->execute();
 
-      // In case of more than one Index with the same Data Source we accumulate
+      // In case of more than one Index with the same Data Source we accumulate.
       $count += (int) $results->getResultCount();
     }
 

@@ -143,6 +143,6 @@ interface StrawberryfieldUtilityServiceInterface {
    *
    * @throws \Drupal\search_api\SearchApiException
    */
-  public function getCountByProcessorInSolr(EntityInterface $entity, string $processor, array $indexes = [], string $checksum = ''): int;
+  public function getCountByProcessorInSolr(EntityInterface $entity, string $processor, array $indexes = [], string $checksum = NULL): int;
 
 }
