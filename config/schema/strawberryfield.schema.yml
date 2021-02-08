@@ -202,3 +202,12 @@ strawberryfield.hydroponics_settings:
       sequence:
         type: string
         label: 'Queue Names'
+    processing_type:
+      type: string
+      label: 'Processing type for queue element'
+    processing_monotime:
+      type: integer
+      label: 'Time in seconds for processing elements from every queue'
+    processing_multinumber:
+      type: integer
+      label: 'How many processes in parallel per queue'

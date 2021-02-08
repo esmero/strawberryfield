@@ -136,6 +136,9 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
     $drush_path = $config->get('drush_path') ?  $config->get('drush_path') : NULL;
     $home_path = $config->get('home_path') ?  $config->get('home_path') : NULL;
     $enabled_queues =  !empty($config->get('queues')) ? array_flip($config->get('queues')) : [];
+    $processing_type = $config->get('processing_type') ? $config->get('processing_type') : "archipelago:hydroponics";
+    $processing_monotime = $config->get('processing_monotime') ? $config->get('processing_monotime') : 60;
+    $processing_multinumber = $config->get('processing_multinumber') ? $config->get('processing_multinumber') : 1;
 
     $current_status = $this->hydroponicsService->checkRunning();
 
@@ -170,21 +173,92 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
         ]
       ];
     }
+    elseif ($current_status['error'] == TRUE) {
+      $form['status']['stop'] = [
+        '#type' => 'button',
+        '#value' => $this->t('Reset Service'),
+        '#ajax' => [
+          'callback' => [$this, 'stopRunningServiceCallback'],
+          'effect' => 'fade',
+          'wrapper' => 'hydroponics-status',
+          'method' => 'replace',
+        ]
+      ];
+    }
 
     $form['active'] =  [
-      '#title' => 'Check to enabled Hydroponics Queue Background processing service wakeup during Drupal Cron.',
+      '#title' => $this->t('Check to enabled Hydroponics Queue Background processing service wakeup during Drupal Cron.'),
       '#type' => 'checkbox',
       '#required' => FALSE,
       '#default_value' => $active,
     ];
+
+    //Add parameters depending on processing type selected
+    //The array KEY is the right part of drush command, i.e. hydroponics for archipelago:hydroponics
+    $processing_options['archipelago:hydroponics'] = $this->t("A single process for all queues");
+    $processing_options['archipelago:hydroponicsmulti'] = $this->t("One or more processes for each queue");
+
+    $form['processingtype'] = [
+      '#type' => 'select',
+      '#title' => $this->t('Select processing type of queue elements'),
+      '#default_value' => $processing_type,
+      '#options' => $processing_options,
+      "#empty_option" =>t('- Select One -'),
+      '#required'=> true,
+    ];
+
+    $form['params'] = [
+      '#type' => 'fieldset',
+      '#title' => $this->t('Processing parameters'),
+      '#tree' => FALSE,
+      '#prefix' => "<div id='params-container'>",
+      '#suffix' => '</div>',
+    ];
+
+    $form['params']['monotime'] = [
+      '#type' => 'number',
+      '#title' => $this->t('Process time [s]'),
+      '#maxlength' => 3,
+      '#default_value' => $processing_monotime,
+      '#min' => 1,
+      '#max' => 999,
+      '#step' => 1,
+      '#description' => $this->t("Time in seconds to spend for processing elements from a queue before process following queue"),
+      '#required' => FALSE,
+      '#states' => [
+        'visible' => [
+          ':input[name="processingtype"]' => ['value' => 'archipelago:hydroponics'],
+        ],
+      ],
+    ];
+
+    $form['params']['multinumber'] = [
+      '#type' => 'number',
+      '#title' => $this->t('Number of concurrent processes'),
+      '#maxlength' => 255,
+      '#default_value' => $processing_multinumber,
+      '#min' => 1,
+      '#max' => 20,
+      '#step' => 1,
+      '#description' => $this->t("How many processes in parallel per queue can be runned to process items"),
+      '#required' => FALSE,
+      '#states' => [
+        'visible' => [
+          ':input[name="processingtype"]' => ['value' => 'archipelago:hydroponicsmulti'],
+        ],
+      ],
+    ];
+
+
+    //advanced parameters
     $form['advanced'] =  [
       '#type' => 'details',
-      '#title' => 'Advanced settings',
-      '#description' => 'If you are not running under under the esmero-php:7.x docker containers you need to provide the following settings'
+      '#title' => $this->t('Advanced settings'),
+      '#description' => $this->t('If you are not running under under the esmero-php:7.x docker containers you need to provide the following settings')
     ];
     $form['advanced']['drush_path'] =  [
-      '#title' => 'The full system path to your composer vendor drush installation (including the actual drush php script).',
-      '#description' => 'For a standard archipelago-deployment docker the right path is "/var/www/html/vendor/drush/drush/drush"',
+      '#title' => $this->t('The full system path to your composer vendor drush installation (including the actual drush php script).'),
+      '#description' => $this->t('For a standard archipelago-deployment docker the right path is "/var/www/html/vendor/drush/drush/drush"'),
       '#type' => 'textfield',
       '#required' => TRUE,
       '#default_value' => !empty($drush_path) ? $drush_path : '/var/www/html/vendor/drush/drush/drush',
@@ -199,8 +273,8 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
     ];
 
     $form['advanced']['home_path'] =  [
-      '#title' => 'A full system path we can use as $HOME directory for your webserver user.',
-      '#description' => 'For a standard archipelago-deployment via Docker please DO NOT ADD this. For others the webserver user (e.g www-data) may need at least read permissions',
+      '#title' => $this->t('A full system path we can use as $HOME directory for your webserver user.'),
+      '#description' => $this->t('For a standard archipelago-deployment via Docker please DO NOT ADD this. For others the webserver user (e.g www-data) may need at least read permissions'),
       '#type' => 'textfield',
       '#required' => FALSE,
       '#default_value' => !empty($home_path) ? $home_path : NULL,
@@ -250,7 +324,6 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
 
     return parent::buildForm($form, $form_state);
   }
-
 
   /**
    * AJAX callback.
@@ -312,12 +385,19 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
         $enabled[] = $queuename;
       }
     }
+    $processing_type = $form_state->getValue('processingtype');
+    $processing_monotime = (int) $form_state->getValue('monotime');
+    $processing_multinumber = (int) $form_state->getValue('multinumber');
+
 
     $this->config('strawberryfield.hydroponics_settings')
       ->set('active', $global_active)
       ->set('drush_path', $drush_path)
       ->set('home_path', $home_path)
       ->set('queues', $enabled)
+      ->set('processing_type', $processing_type)
+      ->set('processing_monotime', $processing_monotime)
+      ->set('processing_multinumber', $processing_multinumber)
       ->save();
     parent::submitForm($form, $form_state);
   }

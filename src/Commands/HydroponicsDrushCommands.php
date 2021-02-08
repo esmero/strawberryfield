@@ -13,7 +13,6 @@ use Drush\Exec\ExecTrait;
 use Drush\Runtime\Runtime;
 use React\EventLoop\Factory;
 
-
 /**
  * A SBF Drush commandfile for ground-less Strawberry Growing.
  *
@@ -44,53 +43,62 @@ class HydroponicsDrushCommands extends DrushCommands {
       \Drupal::state()->set('hydroponics.heartbeat', $currenttime);
     });
     $active_queues = \Drupal::config('strawberryfield.hydroponics_settings')->get('queues');
+    $processing_monotime = \Drupal::config('strawberryfield.hydroponics_settings')->get('processing_monotime');
+
+    // Store timer per queue
     $done = [];
 
     //track when queue are empty for n cycles
     $idle = [];
+
+    // Parameters (ToDO put on config page?)
+    $queue_check_time = 1;
+    $idle_timer_time = 60;
+    $idle_timer_cycles = 5;
 
     // Get which queues we should run:
 
     foreach($active_queues as $queue) {
 
       // Set number of idle cycle to wait
-      $idle[$queue] = 3;
+      $idle[$queue] = $idle_timer_cycles;
 
-//      $done[$queue] = $loop->addPeriodicTimer(1.0, function ($timer) use ($loop, $queue) {
-      $done[$queue] = $loop->addPeriodicTimer(1.0, function ($timer) use ($loop, $queue, &$idle) {
-        \Drupal::logger('hydroponics')->info("Starting to process queue @queue", [
-          '@queue' => $queue
+      // Periodic timer for every queue
+      $done[$queue] = $loop->addPeriodicTimer($queue_check_time, function ($timer) use ($loop, $queue, $idle_timer_cycles, $processing_monotime, &$idle) {
+        \Drupal::logger('hydroponics')->info("Starting to process queue @queue. Idle counter @idle", [
+          '@queue' => $queue,
+          '@idle' => $idle[$queue]
         ]);
 
-        $number = \Drupal::getContainer()
-          ->get('strawberryfield.hydroponics')
-          ->processQueue($queue, 60);
-          \Drupal::logger('hydroponics')->info("Finished processing queue @queue", [
-          '@queue' => $queue
-        ]);
-
-
-        if ($number == 0) {
-          \Drupal::logger('hydroponics')->info("No items left on queue @queue", [
+        if (\Drupal::getContainer()->get('strawberryfield.hydroponics')->countQueue($queue) > 0){
+          //blocking call for no more then $processing_monotime
+          $item_left = \Drupal::getContainer()
+            ->get('strawberryfield.hydroponics')
+            ->processQueue($queue, $processing_monotime);
+            \Drupal::logger('hydroponics')->info("Finished processing queue @queue", [
             '@queue' => $queue
           ]);
-
-
+          if ($item_left > 0) {
+            \Drupal::logger('hydroponics')->info("Queue time processing reached. Items left on queue @queue", [
+              '@queue' => $queue
+            ]);
+            // no empty so reset idle counter
+            $idle[$queue] = $idle_timer_cycles;
+          }
+        }
+        else {
+          \Drupal::logger('hydroponics')->info("No items on queue @queue", [
+            '@queue' => $queue
+          ]);
           // decrement idle counter
           $idle[$queue] -= 1;
         }
-
-        else {
-          // no empty so reset idle counter
-          $idle[$queue] = 3;
-        }
-
       });
     }
 
-    $idle_timer = $loop->addPeriodicTimer(60.0, function ($timer) use ($loop, $timer_ping, &$done, &$idle) {
-      // Finish all if all queues return 0 elements for at least 3 cycles
-      // Check this every 60 s
+    // idle check every $idle_timer_time s
+    $idle_timer = $loop->addPeriodicTimer($idle_timer_time, function ($timer) use ($loop, $timer_ping, &$done, &$idle) {
+      // Close main loop if all queues return 0 elements for at least N cycles
       $all_idle = 1;
       foreach($idle as $queue_idle) {
         if ($queue_idle > 0) {
@@ -102,24 +110,14 @@ class HydroponicsDrushCommands extends DrushCommands {
         foreach($done as $queue_timer) {
           $loop->cancelTimer($queue_timer);
         }
-        \Drupal::state()->set('hydroponics.queurunner_last_pid', 0);
+        $queuerunner_pid = (int) \Drupal::state()->get('hydroponics.queurunner_last_pid', 0);
+        //set pid to negative to avoid lost of information in case of hang
+        $queuerunner_pid = $queuerunner_pid * (-1);
+        \Drupal::state()->set('hydroponics.queurunner_last_pid', $queuerunner_pid);
         \Drupal::logger('hydroponics')->info("All queues are idle, closing timers");
 
         $loop->cancelTimer($timer);
         }
-      }
-    );
-
-    $securitytimer = $loop->addTimer(720.0, function ($timer) use ($loop, $timer_ping, $idle_timer, &$done) {
-      // Finish all if 720 seconds are reached
-      \Drupal::logger('hydroponics')->info("720 seconds passed closing Hydroponics Service");
-      $loop->cancelTimer($timer_ping);
-      foreach($done as $queue_timer) {
-        $loop->cancelTimer($queue_timer);
-      }
-      \Drupal::state()->set('hydroponics.queurunner_last_pid', 0);
-      $loop->cancelTimer($idle_timer);
-      $loop->stop();
       }
     );
 
