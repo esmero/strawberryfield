@@ -109,6 +109,7 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
        ->setReadOnly(TRUE);
 
      $keynamelist = [];
+     $plugin_config_entity_configs = [];
      $item_types = [];
 
      // Fixes Search paging. Properties get lost because something in D8 fails
@@ -139,6 +140,11 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
            }
            //@TODO HOW MANY KEYS? we should be able to set this per instance.
            $keynamelist[$processor_class] = array_merge($plugin_instance->provideKeyNames($entity_id), $keynamelist[$processor_class]);
+
+           // Store the configuration options for use later.
+           if(!empty($configuration_options['exposed_key'])) {
+             $plugin_config_entity_configs[$processor_class][$configuration_options['exposed_key']] = $configuration_options;
+           }
          }
        }
      }
@@ -161,6 +167,10 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
            // data Type that pushes EntityAdapter objects.
            // Quite clever to be honest.
            if  ($item_types[$processor_class] == 'entity_reference') {
+             // Get the entity type being referenced from the configuration options
+             // (assume 'node' if for some reason it is not provided).
+             $referenced_entity_type = !empty($plugin_config_entity_configs[$processor_class][$property]['entity_type']) ?
+               $plugin_config_entity_configs[$processor_class][$property]['entity_type'] : 'node';
              $properties[$property] = DataReferenceDefinition::create(
                'entity'
              )
@@ -172,8 +182,8 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
                ->setInternal(TRUE)
                ->setSetting('jsonkey', $keyname)
                ->setReadOnly(TRUE)
-               ->setTargetDefinition(EntityDataDefinition::create('node'))
-               ->addConstraint('EntityType', 'node');
+               ->setTargetDefinition(EntityDataDefinition::create($referenced_entity_type))
+               ->addConstraint('EntityType', $referenced_entity_type);
 
            }
            else {
