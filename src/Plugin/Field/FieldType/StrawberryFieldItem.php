@@ -115,7 +115,6 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
      // to invoke correctly (null results)
      // \Drupal::EntityTypeManager()->getListBuilder('strawberry_keynameprovider')
      $plugin_config_entities = \Drupal::EntityTypeManager()->getStorage('strawberry_keynameprovider')->loadMultiple();
-
      if (count($plugin_config_entities))  {
        /* @var keyNameProviderEntity[] $plugin_config_entities */
        foreach($plugin_config_entities as $plugin_config_entity) {
@@ -161,31 +160,34 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
            // data Type that pushes EntityAdapter objects.
            // Quite clever to be honest.
            if  ($item_types[$processor_class] == 'entity_reference') {
+             // Get the entity type being referenced from the configuration options
+             // (assume 'node' if for some reason it is not provided).
+             $referenced_entity_type = !empty($plugin_config_entity_configs[$processor_class][$property]['entity_type']) ?
+               $plugin_config_entity_configs[$processor_class][$property]['entity_type'] : 'node';
+             // Added a Setting 'entitytype' for field properties implementing
+             // \Drupal\strawberryfield\Plugin\DataType\StrawberryEntitiesViaJmesPathFromJson
+             // To allow that class to do its internal reference loading based on the given
+             // Entity Type at this level.
              $properties[$property] = DataReferenceDefinition::create(
                'entity'
              )
                ->setLabel('entity_'.$property)
                ->setComputed(TRUE)
-               ->setClass(
-                 $processor_class
-               )
+               ->setClass($processor_class)
                ->setInternal(TRUE)
                ->setSetting('jsonkey', $keyname)
+               ->setSetting('entitytype', $referenced_entity_type)
                ->setReadOnly(TRUE)
-               ->setTargetDefinition(EntityDataDefinition::create('node'))
-               ->addConstraint('EntityType', 'node');
-
+               ->setTargetDefinition(EntityDataDefinition::create($referenced_entity_type))
+               ->addConstraint('EntityType', $referenced_entity_type);
            }
            else {
-
              $properties[$property] = ListDataDefinition::create(
                $item_types[$processor_class]
              )
                ->setLabel($property)
                ->setComputed(TRUE)
-               ->setClass(
-                 $processor_class
-               )
+               ->setClass($processor_class)
                ->setInternal(TRUE)
                ->setSetting('jsonkey', $keyname)
                ->setReadOnly(TRUE);
