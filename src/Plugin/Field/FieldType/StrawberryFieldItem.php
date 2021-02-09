@@ -109,6 +109,7 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
        ->setReadOnly(TRUE);
 
      $keynamelist = [];
+     $plugin_config_entity_configs = [];
      $item_types = [];
 
      // Fixes Search paging. Properties get lost because something in D8 fails
@@ -138,6 +139,10 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
            }
            //@TODO HOW MANY KEYS? we should be able to set this per instance.
            $keynamelist[$processor_class] = array_merge($plugin_instance->provideKeyNames($entity_id), $keynamelist[$processor_class]);
+           // Store the configuration options for use later.
+           if(!empty($configuration_options['exposed_key'])) {
+             $plugin_config_entity_configs[$processor_class][$configuration_options['exposed_key']] = $configuration_options;
+           }
          }
        }
      }
