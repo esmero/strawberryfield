@@ -48,7 +48,7 @@ function strawberryfield_update_9101() {
   $config_factory = \Drupal::configFactory();
   // Find strawberry_keynameprovider configs that are using the entity jmespath
   // provider and have no entity type set yet.
-  foreach ($config_factory->listAll('strawberryfield.strawberry_keynameprovider.*') as $keynameprovider_name) {
+  foreach ($config_factory->listAll('strawberryfield.strawberry_keynameprovider.') as $keynameprovider_name) {
     $keynameprovider = $config_factory->getEditable($keynameprovider_name);
     if ($keynameprovider->get('pluginid') == 'entityjmespath' && $keynameprovider->get('pluginconfig.entity_type') == NULL) {
       $keynameprovider->set('pluginconfig.entity_type', 'node')->save();
