@@ -43,6 +43,7 @@ class StrawberryEntitiesViaJmesPathFromJson extends StrawberryValuesViaJmesPathF
     }
     return $values;
   }
+
   /**
    * @param null $langcode
    *
@@ -97,7 +98,7 @@ class StrawberryEntitiesViaJmesPathFromJson extends StrawberryValuesViaJmesPathF
           $thing = $this->typedDataManager->create($target_id_definition);
           // No parent, so don't notify
           $thing->setValue($reference, FALSE);
-          // @TODO we may want to validate the existance of the reference here
+          // @TODO we may want to validate the existence of the reference here
           // To avoid issues of "not found" references if they get deleted
           // During Search Indexing.
           if ($thing->getTarget() instanceof ComplexDataInterface) {
