@@ -139,6 +139,7 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
            }
            //@TODO HOW MANY KEYS? we should be able to set this per instance.
            $keynamelist[$processor_class] = array_merge($plugin_instance->provideKeyNames($entity_id), $keynamelist[$processor_class]);
+
            // Store the configuration options for use later.
            if(!empty($configuration_options['exposed_key'])) {
              $plugin_config_entity_configs[$processor_class][$configuration_options['exposed_key']] = $configuration_options;
@@ -161,6 +162,7 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
              // (assume 'node' if for some reason it is not provided).
              $referenced_entity_type = !empty($plugin_config_entity_configs[$processor_class][$property]['entity_type']) ?
                $plugin_config_entity_configs[$processor_class][$property]['entity_type'] : 'node';
+
              // Added a Setting 'entitytype' for field properties implementing
              // \Drupal\strawberryfield\Plugin\DataType\StrawberryEntitiesViaJmesPathFromJson
              // To allow that class to do its internal reference loading based on the given
