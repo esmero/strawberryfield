@@ -14,12 +14,11 @@ use Drupal\field\Entity\FieldConfig;
  * Implements hook_install().
  */
 
-function strawberry_install() {
+function strawberryfield_install() {
   $vid = "strawberryfield_voc_id";
   $name = "Strawberryfield Metadata Keys";
   $vocabularies = Vocabulary::loadMultiple();
   if (!isset($vocabularies[$vid])) {
-
     // Create a vocabulary to hold strawberryfield json keys.
     $vocabulary = Vocabulary::create([
       'name' => $name,
@@ -39,12 +38,20 @@ function strawberry_install() {
 
     $field = FieldConfig::create(['field_storage' => $fieldstorage, 'bundle' => $vid]);
     $field->save();
-
   }
-  else {
-    // @TODO Vocabulary Already exist. Reuse as key provider.
-    $query = \Drupal::entityQuery('taxonomy_term');
-    $query->condition('vid', $vid);
-    $tids = $query->execute();
+}
+
+/**
+ * Adds entity_type default to entity reference strawberry keynameprovider.
+ */
+function strawberryfield_update_9101() {
+  $config_factory = \Drupal::configFactory();
+  // Find strawberry_keynameprovider configs that are using the entity jmespath
+  // provider and have no entity type set yet.
+  foreach ($config_factory->listAll('strawberryfield.strawberry_keynameprovider.') as $keynameprovider_name) {
+    $keynameprovider = $config_factory->getEditable($keynameprovider_name);
+    if ($keynameprovider->get('pluginid') == 'entityjmespath' && $keynameprovider->get('pluginconfig.entity_type') == NULL) {
+      $keynameprovider->set('pluginconfig.entity_type', 'node')->save();
+    }
   }
 }

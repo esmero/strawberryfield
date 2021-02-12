@@ -109,13 +109,13 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
        ->setReadOnly(TRUE);
 
      $keynamelist = [];
+     $plugin_config_entity_configs = [];
      $item_types = [];
 
      // Fixes Search paging. Properties get lost because something in D8 fails
      // to invoke correctly (null results)
      // \Drupal::EntityTypeManager()->getListBuilder('strawberry_keynameprovider')
      $plugin_config_entities = \Drupal::EntityTypeManager()->getStorage('strawberry_keynameprovider')->loadMultiple();
-
      if (count($plugin_config_entities))  {
        /* @var keyNameProviderEntity[] $plugin_config_entities */
        foreach($plugin_config_entities as $plugin_config_entity) {
@@ -139,6 +139,11 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
            }
            //@TODO HOW MANY KEYS? we should be able to set this per instance.
            $keynamelist[$processor_class] = array_merge($plugin_instance->provideKeyNames($entity_id), $keynamelist[$processor_class]);
+
+           // Store the configuration options for use later.
+           if(!empty($configuration_options['exposed_key'])) {
+             $plugin_config_entity_configs[$processor_class][$configuration_options['exposed_key']] = $configuration_options;
+           }
          }
        }
      }
@@ -149,43 +154,39 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
              // Avoid internal reserved keys
              continue;
            }
-           // @TODO discuss with @giancarlobi
-           // This is a Hack and it does the job of allowing
-           // Search API's fieldHelper class to find the actual
-           // Elements. Since this is a property and we can not
-           // add Entity References Field Lists only base DataTypes
-           // We define this as a single Element (escaping the problem with the fact
-           // that each of our SBF in fact! can refer to MANY things. So delta
-           // Is included. But to allow functioning code to do the rest
            // We override the class ($processor_class) to actually use a ListInterface
            // data Type that pushes EntityAdapter objects.
            // Quite clever to be honest.
            if  ($item_types[$processor_class] == 'entity_reference') {
-             $properties[$property] = DataReferenceDefinition::create(
-               'entity'
+             // Get the entity type being referenced from the configuration options
+             // (assume 'node' if for some reason it is not provided).
+             $referenced_entity_type = !empty($plugin_config_entity_configs[$processor_class][$property]['entity_type']) ?
+               $plugin_config_entity_configs[$processor_class][$property]['entity_type'] : 'node';
+
+             // Added a Setting 'entitytype' for field properties implementing
+             // \Drupal\strawberryfield\Plugin\DataType\StrawberryEntitiesViaJmesPathFromJson
+             // To allow that class to do its internal reference loading based on the given
+             // Entity Type at this level.
+             // @TODO clean \Drupal\strawberryfield\Plugin\DataType\StrawberryEntitiesViaJmesPathFromJson
+             // To be less custom and simply use ::createItem().
+             $properties[$property] = ListDataDefinition::create(
+               'entity:'.$referenced_entity_type
              )
                ->setLabel('entity_'.$property)
                ->setComputed(TRUE)
-               ->setClass(
-                 $processor_class
-               )
+               ->setClass($processor_class)
                ->setInternal(TRUE)
                ->setSetting('jsonkey', $keyname)
-               ->setReadOnly(TRUE)
-               ->setTargetDefinition(EntityDataDefinition::create('node'))
-               ->addConstraint('EntityType', 'node');
-
+               ->setSetting('entitytype', $referenced_entity_type)
+               ->setReadOnly(TRUE);
            }
            else {
-
              $properties[$property] = ListDataDefinition::create(
                $item_types[$processor_class]
              )
                ->setLabel($property)
                ->setComputed(TRUE)
-               ->setClass(
-                 $processor_class
-               )
+               ->setClass($processor_class)
                ->setInternal(TRUE)
                ->setSetting('jsonkey', $keyname)
                ->setReadOnly(TRUE);
