@@ -125,19 +125,19 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
    */
   public function onEntityPresave(StrawberryfieldCrudEvent $event) {
 
-    /** @var $entity \Drupal\Core\Entity\ContentEntityInterface */
+    /** @var \Drupal\Core\Entity\ContentEntityInterface $entity*/
     $entity = $event->getEntity();
     $sbf_fields = $event->getFields();
 
     foreach ($sbf_fields as $field_name) {
-      /** @var $field \Drupal\Core\Field\FieldItemInterface */
+      /** @var \Drupal\Core\Field\FieldItemInterface $field*/
       $field = $entity->get($field_name);
       /** @var \Drupal\strawberryfield\Field\StrawberryFieldItemList $field */
       if (!$field->isEmpty()) {
         $entity = $field->getEntity();
         /** @var $field \Drupal\Core\Field\FieldItemList */
         foreach ($field->getIterator() as $delta => $itemfield) {
-          /** @var $itemfield \Drupal\strawberryfield\Plugin\Field\FieldType\StrawberryFieldItem */
+          /** @var \Drupal\strawberryfield\Plugin\Field\FieldType\StrawberryFieldItem $itemfield */
           $fullvalues = $itemfield->provideDecoded(TRUE);
 
           // SBF needs to have the entity mapping key
