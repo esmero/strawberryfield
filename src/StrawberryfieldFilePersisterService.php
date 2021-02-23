@@ -785,7 +785,7 @@ class StrawberryfieldFilePersisterService {
    * @throws \Drupal\Core\Entity\EntityStorageException
    */
   public function removefromAsFileStructure(
-    array $file_id_list = [],
+    array $file_id_list,
     array $originaljson,
     ContentEntityInterface $entity
   ) {
@@ -850,7 +850,7 @@ class StrawberryfieldFilePersisterService {
    * @return array
    */
   public function removefromAsFileStructureBrutForce(
-    array $file_id_list = [],
+    array $file_id_list,
     array $originaljson
   ) {
     // Iterate and over every as:file and compare against our known not existing

@@ -261,14 +261,14 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
    *
    *  @param array $for_from_as
    *    An array with all source keys (dr:from) fetched from the flat array
-   *    This may not exist of course.
+   *    This may not exist of course and be an empty array.
    *
    * @return array
    *   The cleaned/up $entityMapping
    */
-  private function cleanUpEntityMappingStructure(array $fullvalues, array $for_from_as) {
+  private function cleanUpEntityMappingStructure(array $fullvalues, array $for_from_as = []) {
 
-    // If not present of empty and we do have dr:for try to rebuild from that
+    // If not present or empty and we do have dr:for try to rebuild from that
     // Its an edge cases but adds an extra level of dexterity/safety.
     if (!isset($fullvalues['ap:entitymapping']['entity:file']) && !empty($for_from_as)) {
       $fullvalues['ap:entitymapping']['entity:file'] = $for_from_as;
