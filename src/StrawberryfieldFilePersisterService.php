@@ -283,10 +283,25 @@ class StrawberryfieldFilePersisterService {
         $current_uri,
         PATHINFO_FILENAME
       );
+
       $file_parts['destination_extension'] = pathinfo(
         $current_uri,
         PATHINFO_EXTENSION
       );
+      // Check if the file may have a secondary extension
+
+      $file_parts['destination_extension_secondary'] = pathinfo(
+        $file_parts['destination_filename'],
+        PATHINFO_EXTENSION
+      );
+      // Deal with 2 part extension problem.
+      if (!empty($file_parts['destination_extension_secondary']) &&
+        strlen($file_parts['destination_extension_secondary'])<=4 &&
+        strlen($file_parts['destination_extension_secondary']) > 0
+      ) {
+        $file_parts['destination_extension'] = $file_parts['destination_extension_secondary'].'.'.$file_parts['destination_extension'];
+      }
+
       $file_parts['destination_scheme'] = $this->streamWrapperManager
         ->getScheme($current_uri);
 
@@ -458,7 +473,7 @@ class StrawberryfieldFilePersisterService {
       // Real use case since the file DB gets never reprocessed once saved.
       // And we could have update/upgraded our mappings.
       $uri = $file->getFileUri();
-      $mimetype = \Drupal::service('file.mime_type.guesser.extension')->guess(
+      $mimetype = \Drupal::service('strawberryfield.mime_type.guesser.mime')->guess(
         $uri
       );
       if (($file->getMimeType(
