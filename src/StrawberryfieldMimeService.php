@@ -38,4 +38,42 @@ class StrawberryfieldMimeService extends ExtensionMimeTypeGuesser implements Mim
     }
     return $extension;
   }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function guess($path) {
+    if ($this->mapping === NULL) {
+      $mapping = $this->defaultMapping;
+      // Allow modules to alter the default mapping.
+      $this->moduleHandler->alter('file_mimetype_mapping', $mapping);
+      $this->mapping = $mapping;
+    }
+
+    $extension = '';
+    $file_parts = explode('.', \Drupal::service('file_system')->basename($path));
+
+    // Remove the first part: a full filename should not match an extension.
+    array_shift($file_parts);
+
+    // Iterate over the file parts, trying to find all matches.
+    // For my.awesome.image.jpeg, we try and accumulate:
+    //   - jpeg
+    //   - image.jpeg, and
+    //   - awesome.image.jpeg
+    $qualified = ['application/octet-stream'];
+    while ($additional_part = array_pop($file_parts)) {
+      $extension = strtolower($additional_part . ($extension ? '.' . $extension : ''));
+      if (isset($this->mapping['extensions'][$extension])) {
+        $qualified[] = $this->mapping['mimetypes'][$this->mapping['extensions'][$extension]];
+      }
+    }
+
+    // We return only the last one giving any more precise one to have a chance.
+    return end($qualified);
+
+  }
+
+
+
 }
