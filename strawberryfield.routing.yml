@@ -60,14 +60,14 @@ strawberryfield.custom_node_edit:
       node:
         type: entity:node
 
-# Direct access to Metadata display processed json using Metadata Expose Config Entity.
+# Search Highlight Endpoint for a given Node file uuid and processor.
 strawberryfield.flavor_datasource_search:
   path: '/do/{node}/flavorsearch/{fileuuid}/{processor}'
   methods: [GET]
   defaults:
     _controller: '\Drupal\strawberryfield\Controller\StrawberryfieldFlavorDatasourceSearchController::search'
   options:
-    no_cache: 'TRUE'
+    no_cache: TRUE
     parameters:
       node:
         type: 'entity:node'
@@ -76,5 +76,22 @@ strawberryfield.flavor_datasource_search:
       fileuuid: 'all'
   requirements:
     fileuuid: .+
+    processor: .+
+    _entity_access: 'node.view'
+
+# Count of Solr docs given Node and a processor.
+strawberryfield.flavor_datasource_count:
+  path: '/do/{node}/flavorcount/{processor}'
+  methods: [GET]
+  defaults:
+    _controller: '\Drupal\strawberryfield\Controller\StrawberryfieldFlavorDatasourceSearchController::count'
+  options:
+    no_cache: TRUE
+    parameters:
+      node:
+        type: 'entity:node'
+      resource_type:
+        type: 'ado'
+  requirements:
     processor: .+
     _entity_access: 'node.view'

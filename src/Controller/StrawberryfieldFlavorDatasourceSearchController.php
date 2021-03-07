@@ -98,10 +98,6 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
     string $processor = 'ocr'
   ) {
 
-
-
-
-
     if (!Uuid::isValid($fileuuid) && $fileuuid !== 'all') {
       // We do not want to expose the user to errors here?
       // So an empty JSON response is better?
@@ -256,6 +252,16 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
       }
     }
     return ['matches' => $result_snippets];
+  }
+  public function count(
+    Request $request,
+    ContentEntityInterface $node,
+    string $processor = 'ocr'
+  ) {
+    $count = $this->strawberryfieldUtility->getCountByProcessorInSolr(
+      $node, 'ocr'
+    );
+    return new JsonResponse(['count' => $count]);
   }
 }
 
