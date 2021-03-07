@@ -59,8 +59,6 @@ strawberryfield.custom_node_edit:
     parameters:
       node:
         type: entity:node
-      user:
-        type: entity:user
 
 # Direct access to Metadata display processed json using Metadata Expose Config Entity.
 strawberryfield.flavor_datasource_search:
