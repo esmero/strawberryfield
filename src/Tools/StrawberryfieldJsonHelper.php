@@ -36,6 +36,15 @@ class StrawberryfieldJsonHelper {
     'as:message',
   ];
 
+  const JMESPATH_FILTER_COMPARATOR = [
+    '<',
+    '<=',
+    '==',
+    '>=',
+    '>',
+    '!=',
+  ];
+
   /**
    * Defines a minimal JSON-LD context.
    */
@@ -357,6 +366,73 @@ class StrawberryfieldJsonHelper {
     return JmesPath::search($expression, $sourcearray);
   }
 
+
+  /**
+   * Takes an array and generates a JMESPath Filter expression
+   *
+   * @see https://jmespath.org/specification.html#filter-expressions
+   *
+   * @param array $needle
+   *    In the form of [
+   *    'key1' => [
+   *    'op' => '==',
+   *    'value' => 'some string'
+   *    ],
+   *    'prefixed:key2' => [
+   *    'op' => '>=',
+   *    'value' => 1
+   *    ],
+   *    'key3' => [
+   *    'op' => 'contains',
+   *    'value' => 'piece'
+   *    ],
+   * @param string $op
+   *    One of 'and','filter','or'
+   *
+   * @return string|null
+   *    A valid JMESPath filter expression or NULL
+   */
+  public static function arrayToJMESPathfilterExpression(array $needle, $op = 'and') {
+    $filter_expression = [];
+    $needle = array_filter($needle);
+    $prefix = ($op == 'pipe') ? "[?" : "";
+    $suffix = ($op == 'pipe') ? "]" : "";
+    foreach ($needle as $key => $data) {
+      if (!isset($data['op'])) {
+        continue;
+      }
+      // This will make raw literals numbers, null, etc.
+      // requires that the actual $needle is using native types of course
+      if (isset($data['value'])) {
+        $value = is_string($data['value']) ? "'" . $data['value'] . "'" : "`" . $data['value'] . "`";
+      }
+      else {
+        // Maybe there is a smater way?
+        $value = "`null`";
+      }
+      if (in_array($data['op'], self::JMESPATH_FILTER_COMPARATOR)) {
+        $filter_expression[] = $prefix . self::surroundInDuobleQuotes($key) . $data['op'] . $value . $suffix;
+      }
+      else {
+        // Means its "probably" a function. Will depend on the caller to validate.
+        $filter_expression[] = $prefix . $data['op'] . '(' . self::surroundInDuobleQuotes($key) . ',' . $value . ')' . $suffix;
+      }
+    }
+    if (empty($filter_expression)) {
+      return NULL;
+    }
+    switch ($op) {
+      case "pipe":
+        $filter_expression_string = implode('|', $filter_expression);
+        break;
+      case "or":
+        $filter_expression_string = "[?" . implode('||', $filter_expression) . "]";
+        break;
+      default:
+        $filter_expression_string = "[?" . implode('&&', $filter_expression) . "]";
+    }
+    return $filter_expression_string;
+  }
 
   /**
    * Validate a URI according to RFC 3986

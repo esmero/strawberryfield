@@ -61,10 +61,13 @@ strawberryfield.strawberry_keynameprovider.entityjmespath:
   mapping:
     source_key:
       type: string
-      label: 'A Comma separated string containing one or more JMESPaths pointing to JSON key with NODE ids.'
+      label: 'A Comma separated string containing one or more JMESPaths pointing to JSON keys containing Entity IDs or UUIDs. All need to share the same Entity Type.'
     exposed_key:
       type: string
       label: 'The field property we expose for the Strawberryfield'
+    entity_type:
+      type: string
+      label: 'The entity type that will be used to load the IDs present in the JSON Keys.'
 
 strawberryfield.storage_settings:
   type: config_object

@@ -43,6 +43,7 @@ class StrawberryEntitiesViaJmesPathFromJson extends StrawberryValuesViaJmesPathF
     }
     return $values;
   }
+
   /**
    * @param null $langcode
    *
@@ -57,10 +58,12 @@ class StrawberryEntitiesViaJmesPathFromJson extends StrawberryValuesViaJmesPathF
       $node_entities = [];
       /* @var $item StrawberryFieldItem */
       $definition = $this->getDataDefinition();
+
       // This key is passed by the property definition in the field class
       // jsonkey in this context is a string containing one or more
       // jmespath's separated by comma.
       $jmespaths = $definition['settings']['jsonkey'];
+      $entity_type = $definition['settings']['entitytype'] ?? 'node';
       $jmespath_array = array_map('trim', explode(',', $jmespaths));
       $jmespath_result = [];
       foreach ($jmespath_array as $jmespath) {
@@ -79,7 +82,6 @@ class StrawberryEntitiesViaJmesPathFromJson extends StrawberryValuesViaJmesPathF
       $this->processed = array_values($node_entities);
       $delta = 0;
       foreach ($this->processed as $reference) {
-
        // No way we can use  $this->createItem($delta, $reference); here
        // Because our public facing datatype is not what it seems
        // We can not use DataReferenceDefinitions here, we need actually EntityAdapter!
@@ -92,10 +94,13 @@ class StrawberryEntitiesViaJmesPathFromJson extends StrawberryValuesViaJmesPathF
         // Hackish! But genius?
         if (is_scalar($reference)) {
           $target_id_definition = DataReferenceDefinition::create('entity')
-            ->setTargetDefinition(EntityDataDefinition::create('node'));
+            ->setTargetDefinition(EntityDataDefinition::create($entity_type));
           $thing = $this->typedDataManager->create($target_id_definition);
           // No parent, so don't notify
           $thing->setValue($reference, FALSE);
+          // @TODO we may want to validate the existence of the reference here
+          // To avoid issues of "not found" references if they get deleted
+          // During Search Indexing.
           if ($thing->getTarget() instanceof ComplexDataInterface) {
             $delta++;
             $this->list[$delta] = $thing->getTarget();

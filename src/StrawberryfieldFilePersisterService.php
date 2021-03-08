@@ -28,11 +28,7 @@ use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\strawberryfield\Event\StrawberryfieldJsonProcessEvent;
 use Drupal\Core\StreamWrapper\StreamWrapperInterface;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
-use Drupal\strawberryfield\StrawberryfieldUtilityService;
-use Drupal\Core\Config\ImmutableConfig;
-use Drupal\strawberryfield\StrawberryfieldEventType;
-use Symfony\Component\Process\Exception\ProcessFailedException;
-use Symfony\Component\Process\Process;
+use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
 use Drupal\Core\Url;
 
 
@@ -287,10 +283,25 @@ class StrawberryfieldFilePersisterService {
         $current_uri,
         PATHINFO_FILENAME
       );
+
       $file_parts['destination_extension'] = pathinfo(
         $current_uri,
         PATHINFO_EXTENSION
       );
+      // Check if the file may have a secondary extension
+
+      $file_parts['destination_extension_secondary'] = pathinfo(
+        $file_parts['destination_filename'],
+        PATHINFO_EXTENSION
+      );
+      // Deal with 2 part extension problem.
+      if (!empty($file_parts['destination_extension_secondary']) &&
+        strlen($file_parts['destination_extension_secondary'])<=4 &&
+        strlen($file_parts['destination_extension_secondary']) > 0
+      ) {
+        $file_parts['destination_extension'] = $file_parts['destination_extension_secondary'].'.'.$file_parts['destination_extension'];
+      }
+
       $file_parts['destination_scheme'] = $this->streamWrapperManager
         ->getScheme($current_uri);
 
@@ -462,7 +473,7 @@ class StrawberryfieldFilePersisterService {
       // Real use case since the file DB gets never reprocessed once saved.
       // And we could have update/upgraded our mappings.
       $uri = $file->getFileUri();
-      $mimetype = \Drupal::service('file.mime_type.guesser.extension')->guess(
+      $mimetype = \Drupal::service('strawberryfield.mime_type.guesser.mime')->guess(
         $uri
       );
       if (($file->getMimeType(
@@ -781,7 +792,7 @@ class StrawberryfieldFilePersisterService {
    * @param array $file_id_list
    * @param array $originaljson
    *
-   * @param int $nodeid
+   * @param ContentEntityInterface $entity
    *
    * @return array
    * @throws \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException
@@ -789,9 +800,9 @@ class StrawberryfieldFilePersisterService {
    * @throws \Drupal\Core\Entity\EntityStorageException
    */
   public function removefromAsFileStructure(
-    array $file_id_list = [],
+    array $file_id_list,
     array $originaljson,
-    int $nodeid
+    ContentEntityInterface $entity
   ) {
 
     /** @var \Drupal\file\FileInterface[] $files */
@@ -809,13 +820,15 @@ class StrawberryfieldFilePersisterService {
     } catch (PluginNotFoundException $e) {
       $this->messenger()->addError(
         $this->t(
-          'Sorry, we had real issues loading your files during cleanup/removal. File Plugin not Found'
+          'Sorry, we had real issues loading your files during cleanup/removal. File Plugin not Found.'
         )
       );
       return $originaljson;
     }
+    $existing_ids = [];
     // Iterate and classify by as: type
     foreach ($files as $file) {
+      $existing_ids[] = $file->id();
       $as_file_type = $this->calculateAsKeyFromFile($file);
       $uuid = $file->uuid();
       if (isset($originaljson[self::AS_TYPE_PREFIX . $as_file_type][self::FILE_IRI_PREFIX . $uuid])) {
@@ -824,7 +837,46 @@ class StrawberryfieldFilePersisterService {
           $originaljson[self::AS_TYPE_PREFIX . $as_file_type][self::FILE_IRI_PREFIX . $uuid]['dr:fid'] == $file->id(
           )) {
           unset($originaljson[self::AS_TYPE_PREFIX . $as_file_type][self::FILE_IRI_PREFIX . $uuid]);
-          $this->remove_file_usage($file, $nodeid, 'node', 1);
+          // We can only remove usage for already saved content entities.
+          if (!$entity->isNew()) {
+            $this->remove_file_usage($file, $entity->id(), 'node', 1);
+          }
+        }
+      }
+    }
+
+    $not_existing = array_diff($file_id_list, $existing_ids);
+
+    // means we have left over files (coming from dr:fid that DO not longer
+    // exist inside Drupal as entities. Clean this up but in a costly way.
+    if (count($not_existing) > 0) {
+      $originaljson = $this->removefromAsFileStructureBrutForce($not_existing, $originaljson);
+    }
+
+    return $originaljson;
+  }
+
+  /**
+   * Removes a list of File IDs from the as:structure in a non optimal way.
+   *
+   * @param array $file_id_list
+   * @param array $originaljson
+   *
+   * @return array
+   */
+  public function removefromAsFileStructureBrutForce(
+    array $file_id_list,
+    array $originaljson
+  ) {
+    // Iterate and over every as:file and compare against our known not existing
+    // File entity IDs. If found remove.
+    foreach (StrawberryfieldJsonHelper::AS_FILE_TYPE as $file_key) {
+      if (isset($originaljson[$file_key]) &&
+        is_array($originaljson[$file_key])) {
+        foreach ($originaljson[$file_key] as $as_key => $as_entry) {
+          if (isset($as_entry['dr:fid']) && in_array($as_entry['dr:fid'], $file_id_list)) {
+            unset($originaljson[$file_key][$as_key]);
+          }
         }
       }
     }

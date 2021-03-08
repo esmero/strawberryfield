@@ -8,19 +8,23 @@
 
 namespace Drupal\strawberryfield;
 
+use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\File\FileSystemInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\EntityFieldManagerInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
-use Drupal\file\FileInterface;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\search_api\Entity\Index;
+use Drupal\search_api\ParseMode\ParseModePluginManager;
+use Drupal\search_api\Query\QueryInterface;
+use Drupal\strawberryfield\Plugin\search_api\datasource\StrawberryfieldFlavorDatasource;
+
 /**
  * Provides a SBF utility class.
  */
-class StrawberryfieldUtilityService {
+class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInterface {
 
   use StringTranslationTrait;
 
@@ -69,30 +73,36 @@ class StrawberryfieldUtilityService {
    */
   protected $strawberryfieldMachineNames = NULL;
 
-  public function __construct(
-    FileSystemInterface $file_system,
-    EntityTypeManagerInterface $entity_type_manager,
-    ConfigFactoryInterface $config_factory,
-    ModuleHandlerInterface $module_handler,
-    EntityFieldManagerInterface $entity_field_manager
-  ) {
+  /**
+   * The parse mode manager.
+   *
+   * @var \Drupal\search_api\ParseMode\ParseModePluginManager
+   */
+  protected $parseModeManager;
+
+  /**
+   * StrawberryfieldUtilityService constructor.
+   *
+   * @param \Drupal\Core\File\FileSystemInterface $file_system
+   * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entity_type_manager
+   * @param \Drupal\Core\Config\ConfigFactoryInterface $config_factory
+   * @param \Drupal\Core\Extension\ModuleHandlerInterface $module_handler
+   * @param \Drupal\Core\Entity\EntityFieldManagerInterface $entity_field_manager
+   * @param \Drupal\search_api\ParseMode\ParseModePluginManager $parse_mode_manager
+   *   The Search API parse Manager
+   */
+  public function __construct(FileSystemInterface $file_system, EntityTypeManagerInterface $entity_type_manager, ConfigFactoryInterface $config_factory, ModuleHandlerInterface $module_handler, EntityFieldManagerInterface $entity_field_manager, ParseModePluginManager $parse_mode_manager) {
     $this->fileSystem = $file_system;
     $this->entityTypeManager = $entity_type_manager;
     $this->configFactory = $config_factory;
     $this->moduleHandler = $module_handler;
     $this->entityFieldManager = $entity_field_manager;
     $this->strawberryfieldMachineNames = $this->getStrawberryfieldMachineNames();
+    $this->parseModeManager = $parse_mode_manager;
   }
 
   /**
-   * Checks if Content entity bears SBF and if so returns field machine names.
-   *
-   * This function statically caches per Bundle and entity type the results.
-   *
-   * @param \Drupal\Core\Entity\ContentEntityInterface $entity
-   *
-   * @return array
-   *  Returns a numeric keyed array with machine names for the SBF fields
+   * {@inheritdoc}
    */
   public function bearsStrawberryfield(ContentEntityInterface $entity) {
     $hassbf = &drupal_static(__FUNCTION__);
@@ -112,10 +122,7 @@ class StrawberryfieldUtilityService {
   }
 
   /**
-   * Returns a list of the machine names of all existing SBF fields
-   *
-   * @return array
-   *  Returns array of names
+   * {@inheritdoc}
    */
   public function getStrawberryfieldMachineNames() {
     // Only NUll if not initialized. The moment this Service
@@ -137,13 +144,7 @@ class StrawberryfieldUtilityService {
   }
 
   /**
-   * Given a Bundle returns yes if it contains a SBF defined via a field config
-   *
-   * @param string $bundle
-   *
-   * @return bool
-   * @throws \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException
-   * @throws \Drupal\Component\Plugin\Exception\PluginNotFoundException
+   * {@inheritdoc}
    */
   public function bundleHasStrawberryfield($bundle = 'digital_object') {
 
@@ -159,38 +160,22 @@ class StrawberryfieldUtilityService {
   }
 
   /**
-   * Given a Bundle returns SBF's field config Object
-   * @param string $bundle
-   *
-   * @return \Drupal\Core\Entity\EntityInterface[]
-   * @throws \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException
-   * @throws \Drupal\Component\Plugin\Exception\PluginNotFoundException
+   * {@inheritdoc}
    */
   public function getStrawberryfieldConfigFromStorage($bundle = 'digital_object') {
-
-    $field = $this->entityTypeManager->getStorage('field_config');
-    $field_ids = $this->entityTypeManager->getStorage('field_config')->getQuery()
+    $field_config = $this->entityTypeManager->getStorage('field_config');
+    $field_ids = $field_config->getQuery()
       ->condition('entity_type', 'node')
       ->condition('bundle', $bundle)
       ->condition('field_type' , 'strawberryfield_field')
       ->execute();
-    $fields = $this->entityTypeManager->getStorage('field_config')->loadMultiple($field_ids);
+    $fields = $field_config->loadMultiple($field_ids);
 
     return $fields;
   }
 
   /**
-   * Given a Bundle returns the SBF field machine names
-   *
-   * This include Code generated, overrides, etc. For just the directly created via the UI
-   * Which are FieldConfig Instances use:
-   * \Drupal\strawberryfield\StrawberryfieldUtilityService::getStrawberryfieldConfigFromStorage
-   *
-   * @param $bundle
-   *    A Node Bundle
-   *
-   * @return array
-   *  Returns array of SBF names
+   * {@inheritdoc}
    */
   public function getStrawberryfieldMachineForBundle($bundle = 'digital_object') {
     // @WARNING Never call this function inside any field based hook
@@ -203,17 +188,7 @@ class StrawberryfieldUtilityService {
   }
 
   /**
-   * Given a Bundle returns the SBF field definition Objects
-   *
-   * This include Code generated, overrides, etc. For just the directly created via the UI
-   * Which are FieldConfig Instances use:
-   * \Drupal\strawberryfield\StrawberryfieldUtilityService::getStrawberryfieldConfigFromStorage
-   *
-   * @param $bundle
-   *    A Node Bundle
-   *
-   * @return \Drupal\Core\Field\FieldDefinitionInterface[]|array
-   *  Returns array of SBF names
+   * {@inheritdoc}
    */
   public function getStrawberryfieldDefinitionsForBundle($bundle = 'digital_object') {
     // @WARNING Never call this function inside any field based hook
@@ -226,14 +201,8 @@ class StrawberryfieldUtilityService {
     return array_intersect_key($all_bundled_fields, $all_sbf_fields);
   }
 
-
   /**
-   * Returns the Solr Fields in a Solr Index are from SBFs
-   **
-   * @param \Drupal\search_api\Entity\Index $index_entity
-   *
-   * @return array
-   *  Returns array of solr fields only including those from SBFs
+   * {@inheritdoc}
    */
   public function getStrawberryfieldSolrFields(Index $index_entity) {
     $solr_fields = $index_entity->get('field_settings');
@@ -262,11 +231,7 @@ class StrawberryfieldUtilityService {
   }
 
   /**
-   * Checks if a given command exists and is executable.
-   *
-   * @param $command
-   *
-   * @return bool
+   * {@inheritdoc}
    */
   public function verifyCommand($execpath) :bool {
     $iswindows = strpos(PHP_OS, 'WIN') === 0;
@@ -281,15 +246,9 @@ class StrawberryfieldUtilityService {
   }
 
   /**
-   * Format a quantity of bytes.
-   *
-   * @param int $size
-   * @param int $precision
-   *
-   * @return string
+   * {@inheritdoc}
    */
-  public function formatBytes($size, $precision = 2)
-  {
+  public function formatBytes($size, $precision = 2) {
     if ($size === 0) {
       return 0;
     }
@@ -298,14 +257,8 @@ class StrawberryfieldUtilityService {
     return round(pow(1024, $base - floor($base)), $precision) . $suffixes[floor($base)];
   }
 
-
   /**
-   * Checks if a given command exists and is executable.
-   *
-   * @param string $execpath
-   * @param string $home
-   *
-   * @return bool
+   * {@inheritdoc}
    */
   public function verifyDrush(string $execpath, string $home) :bool {
     $site_path = \Drupal::service('site.path'); // e.g.: 'sites/default'
@@ -332,7 +285,49 @@ class StrawberryfieldUtilityService {
     return $canexecute;
   }
 
+  /**
+   * {@inheritdoc}
+   */
+  public function getCountByProcessorInSolr(EntityInterface $entity, string $processor, array $indexes = [], string $checksum = NULL): int {
+    $count = 0;
 
+    // If no index specified, query all that implement the strawberry flavor
+    // datasource.
+    if (empty($indexes)) {
+      $indexes = StrawberryfieldFlavorDatasource::getValidIndexes();
+    }
 
+    foreach ($indexes as $index) {
+      // Create the query.
+      $query = $index->query([
+        'limit' => 1,
+        'offset' => 0,
+      ]);
+      $parse_mode = $this->parseModeManager->createInstance('terms');
+      $query->setParseMode($parse_mode);
+      $query->sort('search_api_relevance', 'DESC');
+
+      $query->addCondition('parent_id', $entity->id())
+        ->addCondition('processor_id', $processor)
+        ->addCondition('search_api_datasource', 'strawberryfield_flavor_datasource');
+
+      if ($checksum) {
+        $query->addCondition('checksum', $checksum);
+      }
+
+      // Another solution would be to make our conditions all together an OR
+      // But no post processing here is also good, faster and we just want
+      // to know if its there or not.
+      $query->setProcessingLevel(QueryInterface::PROCESSING_NONE);
+      // @see strawberryfield_search_api_solr_query_alter()
+      $query->setOption('ocr_highlight','on');
+      $results = $query->execute();
+
+      // In case of more than one Index with the same Data Source we accumulate.
+      $count += (int) $results->getResultCount();
+    }
+
+    return $count;
+  }
 
 }
