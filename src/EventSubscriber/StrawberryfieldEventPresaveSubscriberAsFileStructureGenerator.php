@@ -288,10 +288,12 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
       // We can not have an array of arrays.
 
       foreach ($entityMapping as $entity_type_key => $jsonkeys_with_fileids) {
-        $jsonkeys_with_fileids_clean = array_filter(
-          $jsonkeys_with_fileids,
-          [$this,'isNotArray']
-        );
+        if (is_array($jsonkeys_with_fileids)) {
+          $jsonkeys_with_fileids_clean = array_filter(
+            $jsonkeys_with_fileids,
+            [$this, 'isNotArray']
+          );
+        }
 
 
         if (is_array($jsonkeys_with_fileids_clean)) {
