@@ -270,6 +270,9 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
 
     // If not present or empty and we do have dr:for try to rebuild from that
     // Its an edge cases but adds an extra level of dexterity/safety.
+
+    $jsonkeys_with_fileids_clean = [];
+
     if (!isset($fullvalues['ap:entitymapping']['entity:file']) && !empty($for_from_as)) {
       $fullvalues['ap:entitymapping']['entity:file'] = $for_from_as;
     }
@@ -289,9 +292,11 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
           $jsonkeys_with_fileids,
           [$this,'isNotArray']
         );
-        // Clean again in case we have an empty mapping, like entity:node?
-        $jsonkeys_with_fileids_clean = array_filter($jsonkeys_with_fileids_clean);
+
+
         if (is_array($jsonkeys_with_fileids_clean)) {
+          // Clean again in case we have an empty mapping, like entity:node?
+          $jsonkeys_with_fileids_clean = array_filter($jsonkeys_with_fileids_clean);
           foreach ($jsonkeys_with_fileids_clean as $json_key) {
             // If not present simply create
             if (!isset($fullvalues[$json_key])) {
