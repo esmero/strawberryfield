@@ -13,6 +13,7 @@
         }
     ],
     "require": {
+        "ext-json": "*",
         "drupal/core": "^8.9 || ^9",
         "ml/json-ld": "^1.1",
         "mtdowling/jmespath.php":"^2.5",
@@ -20,7 +21,8 @@
         "swaggest/json-diff":"^3.7.5",
         "frictionlessdata/datapackage": "dev-master",
         "drupal/search_api": "~1.17",
-        "drupal/search_api_solr": "^4.1.4"
+        "drupal/search_api_solr": "^4.1.4",
+        "professional-wiki/edtf": "0.1.x-dev"
     },
     "minimum-stability": "dev",
     "prefer-stable": true,
