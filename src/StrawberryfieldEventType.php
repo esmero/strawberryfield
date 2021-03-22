@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Created by PhpStorm.
  * User: dpino
@@ -8,7 +9,11 @@
 
 namespace Drupal\strawberryfield;
 
-
+/**
+ * Class StrawberryfieldEventType.
+ *
+ * @package Drupal\strawberryfield
+ */
 final class StrawberryfieldEventType {
   /**
    * Name of the event fired when pre saving an node with a SBF attached.
@@ -17,11 +22,9 @@ final class StrawberryfieldEventType {
    * with a SBF(Strawberry Field) is saved. The event listener method receives a
    * \Drupal\strawberryfield\Event\StrawberryfieldCrudEvent instance.
    *
-   * See \strawberryfield_node_presave
-   *
    * @Event
    *
-   * @see strawberryfield_node_presave
+   * @see strawberryfield_node_presave()
    * @see \Drupal\strawberryfield\Event\StrawberryfieldCrudEvent
    * @see \Drupal\strawberryfield\EventSubscriber\StrawberryfieldEventPresaveSubscriberVocabCreator
    *
@@ -37,11 +40,9 @@ final class StrawberryfieldEventType {
    * The event listener method receives a
    * \Drupal\strawberryfield\Event\StrawberryfieldCrudEvent instance.
    *
-   * See \strawberryfield_node_insert
-   *
    * @Event
    *
-   * @see strawberryfield_node_insert
+   * @see strawberryfield_node_insert()
    * @see \Drupal\strawberryfield\Event\StrawberryfieldCrudEvent
    *
    * @var string
@@ -58,11 +59,9 @@ final class StrawberryfieldEventType {
    * The event listener method receives a
    * \Drupal\strawberryfield\Event\StrawberryfieldCrudEvent instance.
    *
-   * See \strawberryfield_node_update
-   *
    * @Event
    *
-   * @see
+   * @see strawberryfield_node_presave()
    * @see \Drupal\strawberryfield\Event\StrawberryfieldCrudEvent
    *
    * @var string
@@ -81,7 +80,7 @@ final class StrawberryfieldEventType {
    *
    * @Event
    *
-   * @see strawberryfield_node_update
+   * @see strawberryfield_node_revision_create()
    * @see \Drupal\strawberryfield\Event\StrawberryfieldCrudEvent
    *
    * @var string
@@ -96,11 +95,9 @@ final class StrawberryfieldEventType {
    * The event listener method receives a
    * \Drupal\strawberryfield\Event\StrawberryfieldCrudEvent instance.
    *
-   * See \strawberryfield_node_revision_delete
-   *
    * @Event
    *
-   * @see strawberryfield_node_revision_delete
+   * @see strawberryfield_node_revision_delete()
    * @see \Drupal\strawberryfield\Event\StrawberryfieldCrudEvent
    *
    * @var string
@@ -108,18 +105,16 @@ final class StrawberryfieldEventType {
   const DELETE_REVISION = 'sbf.node.deleterevision';
 
   /**
-   * Name of the event fired when a node with SBF attached is deleted.
+   * Name of the event fired when a node with SBF attached is deleted..
    *
    * This event allows modules to perform an action whenever a node
    * with a SBF(Strawberry Field) gets deleted
    * The event listener method receives a
    * \Drupal\strawberryfield\Event\StrawberryfieldCrudEvent instance.
    *
-   * See \strawberryfield_node_delete
-   *
    * @Event
    *
-   * @see strawberryfield_node_delete
+   * @see strawberryfield_node_delete()
    * @see \Drupal\strawberryfield\Event\StrawberryfieldCrudEvent
    *
    * @var string
@@ -127,7 +122,7 @@ final class StrawberryfieldEventType {
   const DELETE = 'sbf.node.delete';
 
   /**
-   * Name of the event fired when a SBF JSON needs to be processed
+   * Name of the event fired when a SBF JSON needs to be processed.
    *
    * This event allows modules to perform an action whenever a SBF
    * JSON needs to be enriched, cleaned and or normalized.
@@ -144,7 +139,7 @@ final class StrawberryfieldEventType {
   const JSONPROCESS = 'sbf.json.process';
 
   /**
-   * Name of the event fired when invoking SBF JSON "Seasoners"
+   * Name of the event fired when invoking SBF JSON "Seasoners".
    *
    * This event allows modules to perform an action whenever invoking SBF
    * JSON Seasoners, a.k.a embeded Services.
@@ -158,7 +153,7 @@ final class StrawberryfieldEventType {
   const INVOKE_SERVICE = 'sbf.json.invokeservice';
 
   /**
-   * Name of the event fired when inserting a SBF JSON Flavour
+   * Name of the event fired when inserting a SBF JSON Flavour.
    *
    * This event allows modules to perform an action whenever a new JSON Flavour
    * is generated.
@@ -174,7 +169,7 @@ final class StrawberryfieldEventType {
   const INSERT_FLAVOUR = 'sbf.flavour.insert';
 
   /**
-   * Name of the event fired when deleting a SBF JSON Flavour
+   * Name of the event fired when deleting a SBF JSON Flavour.
    *
    * This event allows modules to perform an action whenever a JSON Flavour
    * is deleted.
@@ -188,4 +183,5 @@ final class StrawberryfieldEventType {
    * @var string
    */
   const DELETE_FLAVOUR = 'sbf.flavour.delete';
+
 }
