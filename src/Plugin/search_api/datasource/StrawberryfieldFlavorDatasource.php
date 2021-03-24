@@ -6,12 +6,14 @@ use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityDisplayRepositoryInterface;
 use Drupal\Core\TypedData\ComplexDataInterface;
 use Drupal\search_api\Datasource\DatasourcePluginBase;
+use Drupal\search_api\LoggerTrait;
 use Drupal\strawberryfield\TypedData\StrawberryfieldFlavorDataDefinition;
 use Drupal\Core\Language\LanguageInterface;
 use Drupal\search_api\Utility\Utility;
 use Drupal\search_api\Plugin\PluginFormTrait;
 use Drupal\Core\Form\FormStateInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
+use Drupal\Core\Plugin\PluginDependencyTrait;
 
 /**
  * Represents a datasource which exposes flavors.
@@ -24,6 +26,8 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements StrawberryfieldFlavorDatasourceInterface {
 
   use PluginFormTrait;
+  use PluginDependencyTrait;
+  use LoggerTrait;
 
   /**
    * The entity type manager.
@@ -141,6 +145,10 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements St
   /**
    * {@inheritdoc}
    */
+  public function canContainEntityReferences(): bool {
+    return TRUE;
+  }
+
   public function getItemId(ComplexDataInterface $item) {
     // @TODO This id is not the one for a particular flavor
     // but the one from the source, which in this case is a node
@@ -183,6 +191,47 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements St
    */
   public function getItemIds($page = NULL) {
     return $this->getPartialItemIds($page);
+  }
+
+  /**
+   * Retrieves a scalar field value from a result item.
+   *
+   * @param \Drupal\Core\TypedData\ComplexDataInterface $item
+   *   The result item.
+   * @param string $config_key
+   *   The key in the configuration.
+   *
+   * @return mixed|null
+   *   The scalar value of the specified field (first value for multi-valued
+   *   fields), if it exists; NULL otherwise.
+   *
+   * @throws \Drupal\Core\TypedData\Exception\MissingDataException
+   */
+  protected function getFieldValue(ComplexDataInterface $item, $config_key) {
+    if (empty($this->configuration[$config_key])) {
+      return NULL;
+    }
+    $values = $item->get($this->configuration[$config_key])->getValue();
+    if (is_array($values)) {
+      $values = $values ? reset($values) : NULL;
+    }
+    return $values ?: NULL;
+  }
+  /**
+   * {@inheritdoc}
+   *
+   * @throws \Drupal\Core\TypedData\Exception\MissingDataException
+   */
+  public function getItemLabel(ComplexDataInterface $item) {
+    if ($this->getFieldValue($item, 'label_field')) {
+      return $this->getFieldValue($item, 'label_field');
+    }
+    elseif ($entity = $this->getEntity($item)) {
+      return $entity->label();
+    }
+    else {
+      return NULL;
+    }
   }
 
   /**
@@ -410,6 +459,28 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements St
         '#multiple' => TRUE,
       ];
     }
+    if ($this->moduleHandler()->moduleExists('format_strawberryfield')) {
+      $form['metadatadisplayentity_source'] = [
+        '#type' => 'entity_autocomplete',
+        '#target_type' => 'metadatadisplay_entity',
+        '#selection_handler' => 'default:metadatadisplay',
+        '#validate_reference' => FALSE,
+        '#default_value' => $this->configuration['metadatadisplayentity_source'],
+        '#states' => [
+          'visible' => [
+            ':input[data-formatter-selector="mediasource"]' => ['value' => 'metadatadisplayentity'],
+          ],
+        ],
+      ];
+    }
+    else {
+      $form['metadatadisplayentity_source'] = [
+        '#type' => 'value',
+        '#default_value' => NULL,
+      ];
+    }
+
+
 
     return $form;
   }
@@ -438,10 +509,9 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements St
     // $id = $entity->id() . ':'.$sequence .':'.$translation_id.':'.$file->uuid().':'.$data->plugin_config_entity_id;
     $keyvalue_collection = 'Strawberryfield_flavor_datasource_temp';
 
-    foreach ($this->getEntityStorage()->loadMultiple(
-      $entity_ids
-    ) as $entity_id => $entity) {
+    foreach ($this->getEntityStorage()->loadMultiple($entity_ids) as $entity_id => $entity) {
       foreach ($entity_ids_splitted[$entity_id] as $item_id => $splitted_id_for_node) {
+        $sequence_id = !empty($splitted_id_for_node[1]) ? $splitted_id_for_node[1] : 1;
         $fid_uuid = isset($splitted_id_for_node[3]) ? $splitted_id_for_node[3] : NULL;
         $plugin_id = isset($splitted_id_for_node[4]) ? $splitted_id_for_node[4] : NULL;
         // probably we will want to add the module/class namespace for the plugin id?
@@ -458,17 +528,21 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements St
           );
           // Put the package File ID / Package.
           $fulltext = isset($processed_data->fulltext) ? (string) $processed_data->fulltext : '';
+          $plaintext = isset($processed_data->plaintext) ? (string) $processed_data->plaintext : '';
           $checksum = isset($processed_data->checksum) ? (string) $processed_data->checksum : NULL;
+          $sequence_total = isset($processed_data->sequence_total) ? (string) $processed_data->sequence_total : $sequence_id;
           if ($checksum) {
             $data = [
               'item_id' => $item_id,
-              'sequence_id' => $splitted_id_for_node[1],
+              'sequence_id' => $sequence_id,
+              'sequence_total' => $sequence_total,
               'target_id' => $splitted_id_for_node[0],
               'parent_id' => $splitted_id_for_node[0],
               'file_uuid' => $fid_uuid,
               'target_fileid' => $file->id(),
               'processor_id' => $plugin_id,
               'fulltext' => '',
+              'plaintext' => '',
               'checksum' => $checksum,
             ];
             // This will then always create a new Index document, even if empty.
@@ -477,6 +551,16 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements St
             if (!empty(trim($fulltext))) {
               $data['fulltext'] = trim($fulltext);
             }
+            if (!empty(trim($plaintext))) {
+              $data['plaintext'] = trim($plaintext);
+            }
+            elseif (!empty($data['fulltext'])) {
+              // This assumes miniOCR and is only meant for backwards compat
+              // for existing Solr Documents/ Data Sources.
+              $data['plaintext'] = str_replace("<w>", "<w> ", $data['fulltext']);
+              $data['plaintext'] = strip_tags(str_replace("<l>", PHP_EOL . "<l> ", $data['plaintext']));
+            }
+
             $documents[$item_id] = $this->typedDataManager->create(
               $sbfflavordata_definition
             );
@@ -484,10 +568,13 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements St
           }
         }
         else {
-          //@TODO replace with an actual verbose Logger Entry
-          error_log(
-            'passed Data Source ID for Strawberryfield_flavor_datasource had NULL elements in its path or a source file does no longer exists'
-          );
+          //@TODO should we untrack when this is the case?
+          $this->getLogger()
+            ->warning('Passed Data Source with ID  @id for Strawberryfield_flavor_datasource had NULL elements in its path or a source file does no longer exists',
+              [
+                '@id' => $item_id,
+              ]
+            );
         }
       }
     }
@@ -527,6 +614,7 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements St
    * {@inheritdoc}
    */
   public function viewItem(ComplexDataInterface $item, $view_mode, $langcode = NULL) {
+    error_log('called viewItem form SBFlavor');
     return [];
   }
 
@@ -535,6 +623,7 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements St
    */
   public function viewMultipleItems(array $items, $view_mode, $langcode = NULL) {
     try {
+      error_log('called viewMultipleItems form SBFlavor');
       $view_builder = $this->getEntityTypeManager()
         ->getViewBuilder($this->getEntityTypeId());
       // Langcode passed, use that for viewing.
