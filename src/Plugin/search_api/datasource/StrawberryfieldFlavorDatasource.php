@@ -402,6 +402,8 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements St
       ];
     }
 
+    $default_configuration['metadatadisplayentity_source'] = NULL;
+
     return $default_configuration;
   }
 
@@ -460,12 +462,20 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements St
       ];
     }
     if ($this->moduleHandler()->moduleExists('format_strawberryfield')) {
+
+      $entity = NULL;
+      if ($this->configuration['metadatadisplayentity_source']) {
+        $entity = $this->entityTypeManager->getStorage(
+          'metadatadisplay_entity'
+        )->load($this->configuration['metadatadisplayentity_source']);
+      }
       $form['metadatadisplayentity_source'] = [
+        '#title' => $this->t('A Metadata Display entity (Twig Template) to be used to Render a single Item.'),
         '#type' => 'entity_autocomplete',
         '#target_type' => 'metadatadisplay_entity',
         '#selection_handler' => 'default:metadatadisplay',
         '#validate_reference' => FALSE,
-        '#default_value' => $this->configuration['metadatadisplayentity_source'],
+        '#default_value' => $entity,
         '#states' => [
           'visible' => [
             ':input[data-formatter-selector="mediasource"]' => ['value' => 'metadatadisplayentity'],
@@ -479,11 +489,10 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements St
         '#default_value' => NULL,
       ];
     }
-
-
-
     return $form;
   }
+
+
 
   /**
    * {@inheritdoc}
@@ -614,16 +623,13 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements St
    * {@inheritdoc}
    */
   public function viewItem(ComplexDataInterface $item, $view_mode, $langcode = NULL) {
-    error_log('called viewItem form SBFlavor');
     return [];
   }
-
   /**
    * {@inheritdoc}
    */
   public function viewMultipleItems(array $items, $view_mode, $langcode = NULL) {
     try {
-      error_log('called viewMultipleItems form SBFlavor');
       $view_builder = $this->getEntityTypeManager()
         ->getViewBuilder($this->getEntityTypeId());
       // Langcode passed, use that for viewing.
