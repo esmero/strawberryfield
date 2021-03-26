@@ -54,6 +54,10 @@ services:
     class: Drupal\strawberryfield\EventSubscriber\StrawberryEventSaveFileDeleteFlavorSubscriber
     tags:
       - { name: event_subscriber }
+  strawberryfield.node_delete_flavor:
+    class: Drupal\strawberryfield\EventSubscriber\StrawberryEventDeleteFlavorSubscriber
+    tags:
+      - { name: event_subscriber }
   strawberryfield.paramconverter.entity:
     class: Drupal\strawberryfield\ParamConverter\UuidEntityConverter
     tags:
