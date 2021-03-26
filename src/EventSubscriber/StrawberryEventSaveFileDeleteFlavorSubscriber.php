@@ -45,6 +45,8 @@ class StrawberryEventSaveFileDeleteFlavorSubscriber extends StrawberryfieldEvent
       // removing the tracking contextually to the entity.
       $this->trackFilesDeleted($entity, $file);
     }
+    $current_class = get_called_class();
+    $event->setProcessedBy($current_class, TRUE);
   }
 
   /**
