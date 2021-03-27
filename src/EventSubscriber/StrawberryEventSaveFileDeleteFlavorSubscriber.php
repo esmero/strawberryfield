@@ -3,6 +3,7 @@
 namespace Drupal\strawberryfield\EventSubscriber;
 
 use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\KeyValueStore\KeyValueFactoryInterface;
 use Drupal\file\FileInterface;
 use Drupal\search_api\Query\QueryInterface;
 use Drupal\search_api\Utility\Utility;
@@ -20,6 +21,23 @@ class StrawberryEventSaveFileDeleteFlavorSubscriber extends StrawberryfieldEvent
    * {@inheritdoc}
    */
   protected static $priority = 100;
+
+  /**
+   * Key value service.
+   *
+   * @var \Drupal\Core\KeyValueStore\KeyValueFactoryInterface
+   */
+  protected $keyValue;
+
+
+  /**
+   * StrawberryEventDeleteFlavorSubscriber constructor.
+   *
+   * @param \Drupal\Core\KeyValueStore\KeyValueFactoryInterface $keyvalue
+   */
+  public function __construct(KeyValueFactoryInterface $keyvalue) {
+    $this->keyValue = $keyvalue;
+  }
 
   /**
    * {@inheritdoc}
@@ -100,6 +118,9 @@ class StrawberryEventSaveFileDeleteFlavorSubscriber extends StrawberryfieldEvent
         // Untrack after all possible query calls with offsets.
         if (count($tracked_ids) > 0) {
           $index->trackItemsDeleted($datasource_id, $tracked_ids);
+          $this->keyValue
+            ->get(StrawberryfieldFlavorDatasource::SBFL_KEY_COLLECTION)
+            ->deleteMultiple($tracked_ids);
         }
       }
       catch (SearchApiException $searchApiException) {

@@ -3,12 +3,11 @@
 namespace Drupal\strawberryfield\EventSubscriber;
 
 use Drupal\Core\Entity\EntityInterface;
-use Drupal\file\FileInterface;
 use Drupal\search_api\Query\QueryInterface;
 use Drupal\search_api\Utility\Utility;
+use Drupal\Core\KeyValueStore\KeyValueFactoryInterface;
 use Drupal\strawberryfield\Event\StrawberryfieldCrudEvent;
 use Drupal\strawberryfield\Plugin\search_api\datasource\StrawberryfieldFlavorDatasource;
-use Drupal\strawberryfield\Tools\Ocfl\OcflHelper;
 use Drupal\search_api\SearchApiException;
 
 /**
@@ -20,6 +19,24 @@ class StrawberryEventDeleteFlavorSubscriber extends StrawberryfieldEventDeleteSu
    * {@inheritdoc}
    */
   protected static $priority = 100;
+
+  /**
+   * Key value service.
+   *
+   * @var \Drupal\Core\KeyValueStore\KeyValueFactoryInterface
+   */
+  protected $keyValue;
+
+
+  /**
+   * StrawberryEventDeleteFlavorSubscriber constructor.
+   *
+   * @param \Drupal\Core\KeyValueStore\KeyValueFactoryInterface $keyvalue
+   */
+  public function __construct(KeyValueFactoryInterface $keyvalue) {
+    $this->keyValue = $keyvalue;
+  }
+
 
   /**
    * {@inheritdoc}
@@ -44,6 +61,7 @@ class StrawberryEventDeleteFlavorSubscriber extends StrawberryfieldEventDeleteSu
    * @throws \Drupal\search_api\SearchApiException
    */
   protected function trackDeleted(EntityInterface $entity) {
+
     $datasource_id = 'strawberryfield_flavor_datasource';
     $limit = 200;
     foreach (StrawberryfieldFlavorDatasource::getValidIndexes() as $index) {
@@ -83,6 +101,10 @@ class StrawberryEventDeleteFlavorSubscriber extends StrawberryfieldEventDeleteSu
         // Untrack after all possible query calls with offsets.
         if (count($tracked_ids) > 0) {
           $index->trackItemsDeleted($datasource_id, $tracked_ids);
+          // Removes temporary stored Flavors from Key Collection
+          $this->keyValue
+            ->get(StrawberryfieldFlavorDatasource::SBFL_KEY_COLLECTION)
+            ->deleteMultiple($tracked_ids);
         }
       }
       catch (SearchApiException $searchApiException) {
