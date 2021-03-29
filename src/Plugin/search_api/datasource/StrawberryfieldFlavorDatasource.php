@@ -30,6 +30,12 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements St
   use LoggerTrait;
 
   /**
+   * The Key Value Collection used to store temp values for Items
+   */
+  public const SBFL_KEY_COLLECTION = 'Strawberryfield_flavor_datasource_temp';
+
+
+  /**
    * The entity type manager.
    *
    * @var \Drupal\Core\Entity\EntityTypeManagerInterface|null
@@ -516,7 +522,7 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements St
     // This is the structure of one of our ids
     // Means one $entity_ids_splitted will contain this splitted
     // $id = $entity->id() . ':'.$sequence .':'.$translation_id.':'.$file->uuid().':'.$data->plugin_config_entity_id;
-    $keyvalue_collection = 'Strawberryfield_flavor_datasource_temp';
+    $keyvalue_collection = self::SBFL_KEY_COLLECTION;
 
     foreach ($this->getEntityStorage()->loadMultiple($entity_ids) as $entity_id => $entity) {
       foreach ($entity_ids_splitted[$entity_id] as $item_id => $splitted_id_for_node) {
@@ -587,7 +593,6 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements St
         }
       }
     }
-
     return $documents;
   }
 
