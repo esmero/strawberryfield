@@ -194,7 +194,6 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
     // @WARNING Never call this function inside any field based hook
     // Chances are the hook will be called invoked inside ::getFieldDefinitions
     // All you will find yourself inside a SUPER ETERNAL LOOP. You are adviced.
-    $fieldefinitions = [];
     $all_bundled_fields = $this->entityFieldManager->getFieldDefinitions('node', $bundle);
     $all_sbf_fields = $this->getStrawberryfieldMachineNames();
     $all_sbf_fields = array_flip($all_sbf_fields);
