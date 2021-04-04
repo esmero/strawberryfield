@@ -334,10 +334,15 @@ function strawberryfield_s3fs_url_settings_alter(array &$url_settings, $s3_file_
  * accordingly.
  */
 function strawberryfield_search_api_solr_query_alter(SolariumQueryInterface $solarium_query, QueryInterface $query) {
-  // To get a list of solrium events:
+  // To get a list of solarium events:
   // @see http://solarium.readthedocs.io/en/stable/customizing-solarium/#plugin-system
-  // If the Search API query has a 'my_custom_boost' option, use the edsimax
-  // query handler and add some boost queries.
+  if ($query->getOption('no_highlight')) {
+    $solarium_query->addParam('hl', 'false');
+    /* @var \Solarium\Component\Highlighting\Highlighting $hl */
+    $hl = $solarium_query->getHighlighting();
+    $hl->clearFields();
+  }
+
   if ($query->getOption('ocr_highlight')) {
     // $solr_field_names maps search_api field names to real field names in
     // the Solr index.
