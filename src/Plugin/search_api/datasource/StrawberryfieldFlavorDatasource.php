@@ -2,8 +2,10 @@
 
 namespace Drupal\strawberryfield\Plugin\search_api\datasource;
 
+use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityDisplayRepositoryInterface;
+use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\TypedData\ComplexDataInterface;
 use Drupal\search_api\Datasource\DatasourcePluginBase;
 use Drupal\search_api\LoggerTrait;
@@ -34,6 +36,13 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements St
    */
   public const SBFL_KEY_COLLECTION = 'Strawberryfield_flavor_datasource_temp';
 
+  /**
+   * An MINI OCR XML defined for empty pages.
+   */
+  public const EMPTY_MINIOCR_XML = <<<'XML'
+<?xml version="1.0" encoding="UTF-8"?>
+<ocr><p xml:id="empty_sequence" wh="100 100"><b><l><w x="0 0 0 0"> </w></l></b></p></ocr>
+XML;
 
   /**
    * The entity type manager.
@@ -197,6 +206,19 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements St
    */
   public function getItemIds($page = NULL) {
     return $this->getPartialItemIds($page);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getItemAccessResult(ComplexDataInterface $item, AccountInterface $account = NULL) {
+    $entity = $this->getEntity($item);
+    if ($entity) {
+      return $this->getEntityTypeManager()
+        ->getAccessControlHandler($this->getEntityTypeId())
+        ->access($entity, 'view', $account, TRUE);
+    }
+    return AccessResult::neutral('Item is not an entity, so cannot check access');
   }
 
   /**
