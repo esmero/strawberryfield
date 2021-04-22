@@ -156,7 +156,7 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
           ) ? $for_from_as : [$for_from_as];
 
           $fullvalues = $this->cleanUpEntityMappingStructure($fullvalues, $for_from_as);
-          // 'ap:entitymapping' will always exists of ::cleanUpEntityMappingStructure
+          // 'ap:entitymapping' will always exists because of ::cleanUpEntityMappingStructure
           $entity_mapping_structure = $fullvalues['ap:entitymapping'];
           $allprocessedAsValues = [];
           // All fids we have in this doc.
@@ -264,7 +264,7 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
    *    This may not exist of course and be an empty array.
    *
    * @return array
-   *   The cleaned/up $entityMapping
+   *   The cleaned/up $entityMapping or empty array if nothing.
    */
   private function cleanUpEntityMappingStructure(array $fullvalues, array $for_from_as = []) {
 
@@ -316,6 +316,9 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
         // but will do our best to clean all.
       }
       $fullvalues['ap:entitymapping'] = $entityMapping;
+    }
+    else {
+      $fullvalues['ap:entitymapping'] = [];
     }
     return $fullvalues;
   }
