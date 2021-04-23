@@ -20,8 +20,8 @@
         "swaggest/json-schema":"^0.12.29",
         "swaggest/json-diff":"^3.7.5",
         "frictionlessdata/datapackage": "dev-master",
-        "drupal/search_api": "~1.17",
-        "drupal/search_api_solr": "^4.1.4",
+        "drupal/search_api": "~1.19",
+        "drupal/search_api_solr": "^4.1.10",
         "professional-wiki/edtf": "0.1.x-dev"
     },
     "minimum-stability": "dev",
