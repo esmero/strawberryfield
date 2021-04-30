@@ -135,7 +135,34 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
 
     }
     else {
-      return new JsonResponse([]);
+      $indexes = StrawberryfieldFlavorDatasource::getValidIndexes();
+      $snippets = $this->miniocrfromSolrIndex(
+        $node->id(),
+        $processor,
+        $fileuuid,
+        $indexes,
+        $page
+      );
+
+      $response = new CacheableResponse(
+        $snippets,
+        200,
+        ['content-type' => 'application/xml'],
+        TRUE
+      );
+
+
+      if ($response) {
+        // Set CORS. IIIF and others will assume this is true.
+        $response->headers->set('access-control-allow-origin', '*');
+        $response->addCacheableDependency($node);
+        if ($callback = $request->query->get('callback')) {
+          $response->setCallback($callback);
+        }
+
+      }
+      return $response;
+//      return new JsonResponse(['NODE ID:' . $node->id() . ' Page:' . $page . ' Format:' . $format]);
     }
   }
 
@@ -255,6 +282,94 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
       }
     }
     return ['matches' => $result_snippets];
+  }
+
+
+
+
+
+  protected function miniocrfromSolrIndex($nodeid, $processor, $file_uuid, $indexes, $page) {
+    /* @var \Drupal\search_api\IndexInterface[] $indexes */
+
+    $result_snippets = [];
+    foreach ($indexes as $search_api_index) {
+
+      // Create the query.
+      // How many?
+      $query = $search_api_index->query([
+        'limit' => 1,
+        'offset' => 0,
+      ]);
+
+      $parse_mode = $this->parseModeManager->createInstance('direct');
+      $query->setParseMode($parse_mode);
+      //$query->sort('search_api_relevance', 'DESC');
+      //$query->keys($term);
+
+      //$query->setFulltextFields(['ocr_text']);
+
+      $query->addCondition('parent_id', $nodeid)
+        ->addCondition('search_api_datasource', 'strawberryfield_flavor_datasource')
+        ->addCondition('processor_id', $processor)
+        ->addCondition('sequence_id', $page);
+      // IN the case of multiple files being used in the same IIIF manifest we do not limit
+      // Which file we are loading.
+      // @IDEA. Since the Rendered Twig templates (metadata display) that generate a IIIF manifest are cached
+      // We could also pass arguments that would allow us to fetch that rendered JSON
+      // And preprocess everything here.
+      // Its like having the same Twig template on front and back?
+      // @giancarlobi. Maybe an idea for the future once this "works".
+
+      if ($file_uuid != 'all') {
+        if (Uuid::isValid($file_uuid)) {
+          $query->addCondition('file_uuid', $file_uuid);
+        }
+      }
+
+      $allfields_translated_to_solr = $search_api_index->getServerInstance()
+        ->getBackend()
+        ->getSolrFieldNames($query->getIndex());
+      //if (isset($allfields_translated_to_solr['ocr_text'])) {
+        // Will be used by \strawberryfield_search_api_solr_query_alter
+        //$query->setOption('ocr_highlight', 'on');
+        // We are already checking if the Node can be viewed. Custom Datasources can not depend on Solr node access policies.
+        //$query->setOption('search_api_bypass_access', TRUE);
+      //}
+      //$query->setOption('search_api_retrieved_field_values', ['id']);
+      $query->setOption('search_api_retrieved_field_values', ['ocr_text']);
+      // If we allow Extra processing here Drupal adds Content Access Check
+      // That does not match our Data Source \Drupal\search_api\Plugin\search_api\processor\ContentAccess
+      // we get this filter (see 2nd)
+      /*
+       *   array (
+        0 => 'ss_search_api_id:"strawberryfield_flavor_datasource/2006:1:en:3dccdb09-f79f-478e-81c5-0bb680c3984e:ocr"',
+        1 => 'ss_search_api_datasource:"strawberryfield_flavor_datasource"',
+        2 => '{!tag=content_access,content_access_enabled,content_access_grants}(ss_search_api_datasource:"entity:file" (+(bs_status:"true" bs_status_2:"true") +(sm_node_grants:"node_access_all:0" sm_node_grants:"node_access__all")))',
+        3 => '+index_id:default_solr_index +hash:1evb7z',
+        4 => 'ss_search_api_language:("en" "und" "zxx")',
+      ),
+       */
+
+      //$page_prefix = 'sequence_'; // Optional. XML id=1 is really invalid but if someone wants to use that, OK.
+      //$page_prefix_len = strlen($page_prefix);
+      $query->setProcessingLevel(QueryInterface::PROCESSING_BASIC);
+      //$query->setOption('ocr_highlight','off');
+      //$query->setOption('highlight','off');
+      $results = $query->execute();
+      $extradata = $results->getAllExtraData();
+      // Just in case something goes wrong with the returning region text
+      //$region_text = $term;
+
+      $output = '';
+      foreach ($results as $result) {
+        $value = $result->getField('ocr_text')->getValues();
+        $output = $value[0];
+      }
+      if ($results->getResultCount() >= 1) {
+        return $output;
+      }
+    }
+    return [];
   }
 
   /**
