@@ -88,17 +88,22 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
    * @param \Drupal\Core\Entity\ContentEntityInterface $node
    * @param string $processor
    * @param string $fileuuid
+   * @param string $format
+   * @param string $page
    *
    * @return \Drupal\Core\Cache\CacheableJsonResponse
    */
-  public function search(Request $request, ContentEntityInterface $node, string $fileuuid = 'all', string $processor = 'ocr') {
+  public function search(Request $request, ContentEntityInterface $node, string $fileuuid = 'all', string $processor = 'ocr', string $format = 'json', string $page = 'all') {
 
     if (!Uuid::isValid($fileuuid) && $fileuuid !== 'all') {
       // We do not want to expose the user to errors here?
       // So an empty JSON response is better?
       return new JsonResponse([]);
     }
-    if ($input = $request->query->get('q')) {
+
+    //search for IAB highlight
+    //if format=json, page=all and q not null
+    if (($input = $request->query->get('q')) && ($format == 'json') && ($page == 'all')) {
 
       $indexes = StrawberryfieldFlavorDatasource::getValidIndexes();
       $snippets = $this->flavorfromSolrIndex(
@@ -277,4 +282,3 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
   }
 
 }
-
