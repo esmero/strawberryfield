@@ -134,9 +134,9 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
       return $response;
 
     }
-    else {
+    elseif ((($format == 'miniocr') || ($format == 'djvuxml')) && (is_numeric($page))) {
       $indexes = StrawberryfieldFlavorDatasource::getValidIndexes();
-      $snippets = $this->miniocrfromSolrIndex(
+      $miniocr = $this->miniocrfromSolrIndex(
         $node->id(),
         $processor,
         $fileuuid,
@@ -144,14 +144,19 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
         $page
       );
 
+      if ($format == 'miniocr') {
+        $output = $miniocr;
+      }
+      else {
+        $output = $this->miniocr2djvuxml($miniocr);
+      }
+
       $response = new CacheableResponse(
-        $snippets,
+        $output,
         200,
         ['content-type' => 'application/xml'],
         TRUE
       );
-
-
       if ($response) {
         // Set CORS. IIIF and others will assume this is true.
         $response->headers->set('access-control-allow-origin', '*');
@@ -159,10 +164,11 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
         if ($callback = $request->query->get('callback')) {
           $response->setCallback($callback);
         }
-
       }
       return $response;
-//      return new JsonResponse(['NODE ID:' . $node->id() . ' Page:' . $page . ' Format:' . $format]);
+    }
+    else {
+      return new JsonResponse([]);
     }
   }
 
@@ -370,6 +376,67 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
       }
     }
     return [];
+  }
+
+
+  protected function miniocr2djvuxml($response) {
+
+    $miniocr = simplexml_load_string($response);
+    $internalErrors = libxml_use_internal_errors(TRUE);
+    libxml_clear_errors();
+    libxml_use_internal_errors($internalErrors);
+    if (!$miniocr) {
+      $this->logger->warning('Sorry for this page we could not decode/extract MINIOCR');
+      return NULL;
+    }
+
+    $wh = explode(" ", $miniocr->p[0]['wh']);
+    $pagewidth = (float) $wh[0];
+    $pageheight = (float) $wh[1];
+
+    $djvuxml = new \XMLWriter();
+    $djvuxml->openMemory();
+    $djvuxml->startDocument('1.0', 'UTF-8');
+    $djvuxml->startElement("OBJECT");
+    $djvuxml->writeAttribute("height", $wh[1]);
+    $djvuxml->writeAttribute("width", $wh[0]);
+    foreach ($miniocr->children() as $p) {
+      $djvuxml->startElement("PARAGRAPH");
+      foreach ($p->children() as $b) {
+        foreach ($b->children() as $l) {
+          $djvuxml->startElement("LINE");
+          foreach ($l->children() as $word) {
+            $djvuxml->startElement("WORD");
+            //left top width height (miniocr)
+            //left bottom right top (djvuxml)
+            $wcoos = explode(" ", $word['x']);
+            $left = (float) $wcoos[0] * $pagewidth;
+            $top = (float) $wcoos[1] * $pageheight;
+            $width = (float) $wcoos[2] * $pagewidth;
+            $height = (float) $wcoos[3] * $pageheight;
+            $x0 = sprintf('%d',$left);
+            $y0 = sprintf('%d',$top);
+            $x1 = sprintf('%d',($left + $width));
+            $y1 = sprintf('%d',($top + $height));
+            $djvuxml->writeAttribute("coords", $x0 . ', ' . $y0 . ', ' . $x1 . ', ' . $y1);
+            $text = (string) $word;
+            $djvuxml->text($text);
+            $djvuxml->endElement();
+          }
+          $djvuxml->endElement();
+        }
+      }
+      $djvuxml->endElement();
+    }
+
+
+
+    $djvuxml->endElement();
+    $djvuxml->endDocument();
+    unset($miniocr);
+
+    return $djvuxml->outputMemory(TRUE);
+
   }
 
   /**
