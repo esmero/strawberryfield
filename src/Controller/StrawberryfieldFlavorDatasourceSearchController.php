@@ -317,7 +317,7 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
       $query->addCondition('parent_id', $nodeid)
         ->addCondition('search_api_datasource', 'strawberryfield_flavor_datasource')
         ->addCondition('processor_id', $processor)
-        ->addCondition('sequence_id', $page);
+        ->addCondition('sequence_id', ($page + 1));
       // IN the case of multiple files being used in the same IIIF manifest we do not limit
       // Which file we are loading.
       // @IDEA. Since the Rendered Twig templates (metadata display) that generate a IIIF manifest are cached
@@ -401,9 +401,10 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
     $djvuxml->writeAttribute("height", $wh[1]);
     $djvuxml->writeAttribute("width", $wh[0]);
     foreach ($miniocr->children() as $p) {
-      $djvuxml->startElement("PARAGRAPH");
+          $djvuxml->startElement("PARAGRAPH");
       foreach ($p->children() as $b) {
         foreach ($b->children() as $l) {
+
           $djvuxml->startElement("LINE");
           foreach ($l->children() as $word) {
             $djvuxml->startElement("WORD");
@@ -414,19 +415,20 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
             $top = (float) $wcoos[1] * $pageheight;
             $width = (float) $wcoos[2] * $pagewidth;
             $height = (float) $wcoos[3] * $pageheight;
-            $x0 = sprintf('%d',$left);
-            $y0 = sprintf('%d',$top);
-            $x1 = sprintf('%d',($left + $width));
-            $y1 = sprintf('%d',($top + $height));
+            $x0 = sprintf('%.0f',$left);
+            $y1 = sprintf('%.0f',$top);
+            $x1 = sprintf('%.0f',($left + $width));
+            $y0 = sprintf('%.0f',($top + $height));
             $djvuxml->writeAttribute("coords", $x0 . ', ' . $y0 . ', ' . $x1 . ', ' . $y1);
             $text = (string) $word;
             $djvuxml->text($text);
             $djvuxml->endElement();
           }
           $djvuxml->endElement();
+
         }
       }
-      $djvuxml->endElement();
+$djvuxml->endElement();
     }
 
 
