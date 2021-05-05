@@ -136,6 +136,11 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
     }
     elseif ((($format == 'miniocr') || ($format == 'djvuxml')) && (is_numeric($page))) {
       $indexes = StrawberryfieldFlavorDatasource::getValidIndexes();
+      //as IAB text selection page number starts from 0
+      //and djvuxml is inteded for IAB
+      if ($format == 'djvuxml') {
+        $page += 1;
+      }
       $miniocr = $this->miniocrfromSolrIndex(
         $node->id(),
         $processor,
@@ -317,7 +322,7 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
       $query->addCondition('parent_id', $nodeid)
         ->addCondition('search_api_datasource', 'strawberryfield_flavor_datasource')
         ->addCondition('processor_id', $processor)
-        ->addCondition('sequence_id', ($page + 1));
+        ->addCondition('sequence_id', ($page));
       // IN the case of multiple files being used in the same IIIF manifest we do not limit
       // Which file we are loading.
       // @IDEA. Since the Rendered Twig templates (metadata display) that generate a IIIF manifest are cached
