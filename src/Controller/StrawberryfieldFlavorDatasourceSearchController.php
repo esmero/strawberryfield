@@ -426,10 +426,10 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
             $lastchar = substr($text, -1);
           }
           $djvuxml->endElement();
-          if ($lastchar == '.') {
-            $djvuxml->endElement();
-            $djvuxml->startElement("PARAGRAPH");
-          }
+          //if ($lastchar == '.') {
+            //$djvuxml->endElement();
+            //$djvuxml->startElement("PARAGRAPH");
+          //}
         }
       }
       $djvuxml->endElement();
