@@ -401,7 +401,7 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
     $djvuxml->writeAttribute("height", $wh[1]);
     $djvuxml->writeAttribute("width", $wh[0]);
     foreach ($miniocr->children() as $p) {
-          $djvuxml->startElement("PARAGRAPH");
+      $djvuxml->startElement("PARAGRAPH");
       foreach ($p->children() as $b) {
         foreach ($b->children() as $l) {
 
@@ -423,12 +423,16 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
             $text = (string) $word;
             $djvuxml->text($text);
             $djvuxml->endElement();
+            $lastchar = substr($text, -1);
           }
           $djvuxml->endElement();
-
+          if ($lastchar == '.') {
+            $djvuxml->endElement();
+            $djvuxml->startElement("PARAGRAPH");
+          }
         }
       }
-$djvuxml->endElement();
+      $djvuxml->endElement();
     }
 
 
