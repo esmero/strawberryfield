@@ -22,7 +22,7 @@
         "frictionlessdata/datapackage": "dev-master",
         "drupal/search_api": "~1.19",
         "drupal/search_api_solr": "^4.1.10",
-        "professional-wiki/edtf": "0.1.x-dev"
+        "professional-wiki/edtf": "~2.0"
     },
     "minimum-stability": "dev",
     "prefer-stable": true,
