@@ -517,7 +517,6 @@ class StrawberryfieldFilePersisterService {
     // Final iteration
     // Only do this if file was not previously processed and stored.
     foreach ($to_process as $askey => $files) {
-      $newforsorting = FALSE;
       foreach ($files as $file) {
         $uri = $file->getFileUri();
 
@@ -537,7 +536,6 @@ class StrawberryfieldFilePersisterService {
         // Add exception here for PDFs. We need the number of pages
         // @TODO add a mime type based hook/plugin or event. Idea is to allow modules
         // to intercept this
-
 
         $fileinfo = [
           'type' => ucfirst($askey),
@@ -578,30 +576,66 @@ class StrawberryfieldFilePersisterService {
         //The node save hook will deal with moving data.
         // We don't need the key here but makes cleaning easier
         $fileinfo_bytype_many[self::AS_TYPE_PREFIX . $askey][self::FILE_IRI_PREFIX . $uuid] = $fileinfo;
-        $newforsorting = TRUE;
         // Side effect of this is that if the same file id is referenced twice
         // by different fields, as:something will contain it once only.
         // Not bad, just saying.
         // @TODO see if having the same file in different keys is even
         // a good idea.
       }
-      // Natural Order Sort.
-      // @TODO how should we deal with manually ordered files?
-      // This will always reorder everything based on filenames only if the original order is still that one
-      // So, here is how things go:
-      // We sort anyway, faster than dividing and thingking too much.
-      // But, we assign new sequence only to newer ones. So never (for now) to existing ones
-      // with one exception. If the sequence matches the new order, which basically means
-      // we are good.
+    }
+    return $fileinfo_bytype_many;
+  }
 
-      uasort(
-        $fileinfo_bytype_many[self::AS_TYPE_PREFIX . $askey],
-        [$this, 'sortByFileName']
-      );
-      $max_sequence = 0;
-      // Let's get the max sequence first.
+  /**
+   * Adds sequence key for a single as: file type (askey)
+   *
+   * @param array $fileinfo
+   *    Contains as:document, etc key with all file data for that type.
+   * @param array $flipped_json_keys_with_filenumids
+   *    Contains the original JSON Key values with file ids but flipped.
+   * @param string $sortmode
+   *    Sort mode can be either 'natural' or 'index'
+   *    - 'natural' will use the filenames to sort.
+   *    - 'index' will respect the order of appearance.
+   *    - 'manual' will just add new files at the end.
+   * @param bool $force
+   *    Force will reorder without respecting manual sequences.
+   *
+   * @return array
+   */
+  public function sortFileStructure(array $fileinfo, array $flipped_json_keys_with_filenumids, $sortmode = 'natural', bool $force = TRUE) {
+
+    // So, here is how things go:
+    // We sort anyway, faster than dividing and thinking too much.
+    // But, we assign new sequence only to newer ones. So never (for now) to existing ones
+    // with one exception. If the sequence matches the new order, which basically means
+    // we are good.
+
+    // 'manual' will always disabled force so we can add to the end
+    $force = $sortmode == 'manual' ? FALSE : $force;
+
+    if ($sortmode == 'natural') {
+      uasort($fileinfo, [$this, 'sortByFileName']);
+    }
+    else {
+      // Use the ingest order of the files, namely the order in which
+      // The file IDs appear in each dr:for key
+      // This applies for 'manual' and 'index' sort mode
+      uasort($fileinfo,
+        function ($a, $b) use ($flipped_json_keys_with_filenumids) {
+          $source_field_a = $a['dr:for'];
+          $source_field_b = $b['dr:for'];
+          // In case this is totally wrong and we have no source Field at all, give it a large number so it gets pushed to the end.
+          $comp_a = $flipped_json_keys_with_filenumids[$source_field_a][$a['dr:fid']] ?? 100000;
+          $comp_b = $flipped_json_keys_with_filenumids[$source_field_b][$b['dr:fid']] ?? 100000;
+          return $comp_a > $comp_b ? 1 : -1;
+        });
+    }
+    $max_sequence = 0;
+    // Let's get the max sequence first but only if not forcing a reorder.
+    if (!$force) {
       $max_sequence = array_reduce(
-        $fileinfo_bytype_many[self::AS_TYPE_PREFIX . $askey],
+        $fileinfo,
         function ($a, $b) {
           if (isset($b['sequence'])) {
             return max($a, (int) $b['sequence']);
@@ -610,39 +644,26 @@ class StrawberryfieldFilePersisterService {
             return $a;
           }
         },
-        1
+        0
       );
-
-      // For each always wins over array_walk
-      $i = 0;
-      $j = 0;
-      foreach ($fileinfo_bytype_many[self::AS_TYPE_PREFIX . $askey] as &$item) {
-        $i++;
-        //Order is already given by uasort but not trustable in JSON
-        //So we set sequence number but let's check first what we got
-        if (isset($item['sequence'])) {
-          if ($item['sequence'] != $i) {
-            // means this was ordered manually. Preserve this.
-            // @TODO program some exception?
-          }
-          else {
-            // Means new order matches expected order
-            // @TODO means we can simply avoid the offset totally
-          }
-        }
-        else {
-          // Why $j and no $i? Because i want to only count ones without a sequence
-          $j++;
-          // Why -1? Because we want to offset new sequence elements
-          $item['sequence'] = $j + ($max_sequence);
-        }
-
-      }
-
-
     }
 
-    return $fileinfo_bytype_many;
+    // For each always wins over array_walk
+    $i = 0;
+    $j = 0;
+    foreach ($fileinfo as &$item) {
+      $i++;
+      //Order is already given by uasort but not trustable in JSON
+      //So we set sequence number but let's check first what we got
+      if (!isset($item['sequence']) || $force) {
+        // Why $j and no $i? Because i want to only count ones without a sequence
+        // And keep old sequence numbers if not forced (e.g 'manual');
+        $j++;
+        $item['sequence'] = $j + ($max_sequence);
+      }
+    }
+
+    return $fileinfo;
   }
 
   /**

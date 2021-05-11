@@ -159,21 +159,26 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
           // 'ap:entitymapping' will always exists because of ::cleanUpEntityMappingStructure
           $entity_mapping_structure = $fullvalues['ap:entitymapping'];
           $allprocessedAsValues = [];
+          $flipped_json_keys_with_filenumids = [];
           // All fids we have in this doc.
           $all_fids = [];
+          $sortmode = 'natural';
           if (isset($entity_mapping_structure['entity:file'])) {
             foreach ($entity_mapping_structure['entity:file'] as $jsonkey_with_filenumids) {
               // Here each $jsonkey_with_filenumids is a json key that holds file ids
               // Also $fullvalues[$jsonkeys_with_filenumids] will be there because
               // ::cleanUpEntityMappingStructure. Still, double check please?
               $fullvalues[$jsonkey_with_filenumids] = isset($fullvalues[$jsonkey_with_filenumids]) ? $fullvalues[$jsonkey_with_filenumids] : [];
+
               // make even single files an array
               $fids = (is_array($fullvalues[$jsonkey_with_filenumids])) ? $fullvalues[$jsonkey_with_filenumids] : [$fullvalues[$jsonkey_with_filenumids]];
               // Only keep ids that can be actually entity ids or uuids
+
               $fids = array_filter(
                 $fids,
                 [$this, 'isEntityId']
               );
+
               // NOTE. If no files are passed no processing will be done
               // Does not mean we actually cleaned left overs from a previous
               // Revision and we are not handling that here!
@@ -181,6 +186,10 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
 
               if (is_array($fids) && !empty($fids)) {
                 $fids = array_unique($fids);
+
+                // We will use this for Key based Ordering.
+                $flipped_json_keys_with_filenumids[$jsonkey_with_filenumids] = array_flip($fids);
+
                 // @TODO. If UUID the loader needs to be different.
                 $processedAsValuesForKey = $this->strawberryfilepersister
                   ->generateAsFileStructure(
@@ -222,13 +231,22 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
               // Could come from another URL only field or added manually by some
               // Advanced user. New INFO will always win, old entries only added if they did not exist.
               $new_info = $info + $previous_info;
+
+              // Only if we have files
               if (count($new_info) > 0) {
                 $fullvalues[$askey] = $new_info;
-              } else {
+                // Now Sort Files here, after all the cleanup and removing of old files
+                $sortmode = $fullvalues['ap:tasks']['ap:sortfiles'] ?? 'natural';
+                $sortmode = in_array($sortmode, ['natural','index', 'manual']) ? $sortmode : 'natural';
+                $fullvalues[$askey] = $this->strawberryfilepersister->sortFileStructure($fullvalues[$askey], $flipped_json_keys_with_filenumids, $sortmode);
+              }
+              else {
                 // Do not leave empty keys around
                 unset($fullvalues[$askey]);
               }
             }
+
+            $fullvalues['ap:tasks']['ap:sortfiles'] = $sortmode;
             if (!$itemfield->setMainValueFromArray((array) $fullvalues)) {
               $this->messenger->addError($this->t('We could not persist file classification. Please contact the site admin.'));
             }
@@ -286,7 +304,6 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
         ARRAY_FILTER_USE_KEY
       );
       // We can not have an array of arrays.
-
       foreach ($entityMapping as $entity_type_key => $jsonkeys_with_fileids) {
         if (is_array($jsonkeys_with_fileids)) {
           $jsonkeys_with_fileids_clean = array_filter(
