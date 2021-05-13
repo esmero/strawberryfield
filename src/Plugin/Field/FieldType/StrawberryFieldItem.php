@@ -238,7 +238,7 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
      }
      elseif ($this->validate()->count() == 0) {
        $mainproperty = $this->mainPropertyName();
-       $jsonArray = json_decode($this->{$mainproperty}, $assoc, 50);
+       $jsonArray = json_decode($this->{$mainproperty}, $assoc, 64);
      }
      return $jsonArray;
    }
