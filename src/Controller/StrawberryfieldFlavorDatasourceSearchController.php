@@ -134,14 +134,14 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
       return $response;
 
     }
-    elseif ((($format == 'miniocr') || ($format == 'djvuxml')) && (is_numeric($page))) {
+    elseif ((($format == 'originalocr') || ($format == 'djvuxml')) && (is_numeric($page))) {
       $indexes = StrawberryfieldFlavorDatasource::getValidIndexes();
       //as IAB text selection page number starts from 0
       //and djvuxml is inteded for IAB
       if ($format == 'djvuxml') {
         $page += 1;
       }
-      $miniocr = $this->miniocrfromSolrIndex(
+      $originalocr = $this->originalocrfromSolrIndex(
         $node->id(),
         $processor,
         $fileuuid,
@@ -149,11 +149,11 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
         $page
       );
 
-      if ($format == 'miniocr') {
-        $output = $miniocr;
+      if ($format == 'originalocr') {
+        $output = $originalocr;
       }
       else {
-        $output = $this->miniocr2djvuxml($miniocr);
+        $output = $this->originalocr2djvuxml($originalocr);
       }
 
       $response = new CacheableResponse(
@@ -246,7 +246,6 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
       $extradata = $results->getAllExtraData();
       // Just in case something goes wrong with the returning region text
       $region_text = $term;
-
       if ($results->getResultCount() >= 1) {
         if (isset($extradata['search_api_solr_response']['ocrHighlighting']) && count(
             $extradata['search_api_solr_response']['ocrHighlighting']
@@ -264,6 +263,13 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
                 // Just some check in case something goes wrong and page number is 0 or negative?
                 // and rebase page number starting with 0
                 $page_number = ($page_number > 0) ? (int) ($page_number - 1) : 0;
+
+                //We assume that if coords <1 (i.e. .123) => MINIOCR else ALTO
+                //As ALTO are absolute to be compatible with current logic we have to transform to relative
+                //To convert we need page width/height
+                $page_width = (float) $snippet['pages'][0]['width'];
+                $page_height = (float) $snippet['pages'][0]['height'];
+
                 $result_snippets_base = [
                   'par' => [
                     [
@@ -279,13 +285,33 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
                     ['{{{', '}}}'],
                     $snippet['regions'][$highlight[0]['parentRegionIdx']]['text']
                   );
-                  $result_snippets_base['par'][0]['boxes'][] = [
-                    'l' => $highlight[0]['ulx'],
-                    't' => $highlight[0]['uly'],
-                    'r' => $highlight[0]['lrx'],
-                    'b' => $highlight[0]['lry'],
-                    'page' => $page_number,
-                  ];
+
+                  //check if coord >=1 (ALTO)
+                  // else between 0 and <1 (MINIOCR)
+                  if ( ((int) $highlight[0]['lrx']) > 0  ){
+                    //ALTO so coords need to be relative
+                    $left = sprintf('%.3f',((float) $highlight[0]['ulx'] / $page_width));
+                    $top = sprintf('%.3f',((float) $highlight[0]['uly'] / $page_height));
+                    $right = sprintf('%.3f',((float) $highlight[0]['lrx'] / $page_width));
+                    $bottom = sprintf('%.3f',((float) $highlight[0]['lry'] / $page_height));
+                    $result_snippets_base['par'][0]['boxes'][] = [
+                      'l' => $left,
+                      't' => $top,
+                      'r' => $right,
+                      'b' => $bottom,
+                      'page' => $page_number,
+                    ];
+                  }
+                  else {
+                    //MINIOCR coords already relative
+                    $result_snippets_base['par'][0]['boxes'][] = [
+                      'l' => $highlight[0]['ulx'],
+                      't' => $highlight[0]['uly'],
+                      'r' => $highlight[0]['lrx'],
+                      'b' => $highlight[0]['lry'],
+                      'page' => $page_number,
+                    ];
+                  }
                 }
               }
               $result_snippets_base['text'] = $region_text;
@@ -303,7 +329,7 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
 
 
 
-  protected function miniocrfromSolrIndex($nodeid, $processor, $file_uuid, $indexes, $page) {
+  protected function originalocrfromSolrIndex($nodeid, $processor, $file_uuid, $indexes, $page) {
     /* @var \Drupal\search_api\IndexInterface[] $indexes */
 
     $result_snippets = [];
@@ -388,7 +414,7 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
   }
 
 
-  protected function miniocr2djvuxml($response) {
+  protected function originalocr2djvuxml($response) {
 
     $miniocr = simplexml_load_string($response);
     $internalErrors = libxml_use_internal_errors(TRUE);
