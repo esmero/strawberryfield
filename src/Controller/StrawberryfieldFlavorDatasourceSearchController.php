@@ -237,8 +237,10 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
       ),
        */
 
-      $page_prefix = 'sequence_'; // Optional. XML id=1 is really invalid but if someone wants to use that, OK.
-      $page_prefix_len = strlen($page_prefix);
+      // We have to get page number from different ID (sequence_12, Page12, page_12)
+      // so better use $str = preg_replace('/\D/', '', $str); to get page number integer from ID
+      //$page_prefix = 'sequence_'; // Optional. XML id=1 is really invalid but if someone wants to use that, OK.
+      //$page_prefix_len = strlen($page_prefix);
       $query->setProcessingLevel(QueryInterface::PROCESSING_BASIC);
       $results = $query->execute();
       $extradata = $results->getAllExtraData();
@@ -254,11 +256,13 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
             if (isset($field[$allfields_translated_to_solr['ocr_text']]['snippets'])) {
               foreach ($field[$allfields_translated_to_solr['ocr_text']]['snippets'] as $snippet) {
                 // IABR uses 0 to N-1. We may want to reprocess this for other endpoints.
-                $page_number = strpos($snippet['pages'][0]['id'], $page_prefix) === 0 ? (int) substr(
-                  $snippet['pages'][0]['id'],
-                  $page_prefix_len
-                ) : (int) $snippet['pages'][0]['id'];
+                //$page_number = strpos($snippet['pages'][0]['id'], $page_prefix) === 0 ? (int) substr(
+                //  $snippet['pages'][0]['id'],
+                //  $page_prefix_len
+                //) : (int) $snippet['pages'][0]['id'];
+                $page_number = preg_replace('/\D/', '', $snippet['pages'][0]['id']);
                 // Just some check in case something goes wrong and page number is 0 or negative?
+                // and rebase page number starting with 0
                 $page_number = ($page_number > 0) ? (int) ($page_number - 1) : 0;
                 $result_snippets_base = [
                   'par' => [
