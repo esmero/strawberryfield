@@ -416,67 +416,147 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
 
   protected function originalocr2djvuxml($response) {
 
-    $miniocr = simplexml_load_string($response);
-    $internalErrors = libxml_use_internal_errors(TRUE);
-    libxml_clear_errors();
-    libxml_use_internal_errors($internalErrors);
-    if (!$miniocr) {
-      $this->logger->warning('Sorry for this page we could not decode/extract MINIOCR');
-      return NULL;
-    }
+    $originalocr = simplexml_load_string($response);
+    $namespaces = $originalocr->getDocNamespaces();
+    if (in_array("http://www.loc.gov/standards/alto/ns-v3#", $namespaces)) {
 
-    $wh = explode(" ", $miniocr->p[0]['wh']);
-    $pagewidth = (float) $wh[0];
-    $pageheight = (float) $wh[1];
 
-    $djvuxml = new \XMLWriter();
-    $djvuxml->openMemory();
-    $djvuxml->startDocument('1.0', 'UTF-8');
-    $djvuxml->startElement("OBJECT");
-    $djvuxml->writeAttribute("height", $wh[1]);
-    $djvuxml->writeAttribute("width", $wh[0]);
-    foreach ($miniocr->children() as $p) {
-      $djvuxml->startElement("PARAGRAPH");
-      foreach ($p->children() as $b) {
-        foreach ($b->children() as $l) {
+      $alto = $originalocr;
+      unset($originalocr);
+      $internalErrors = libxml_use_internal_errors(TRUE);
+      libxml_clear_errors();
+      libxml_use_internal_errors($internalErrors);
+      if (!$alto) {
+        //$this->logger->warning('Sorry for this page we could not decode/extract MINIOCR');
+        return NULL;
+      }
 
-          $djvuxml->startElement("LINE");
-          foreach ($l->children() as $word) {
-            $djvuxml->startElement("WORD");
-            //left top width height (miniocr)
-            //left bottom right top (djvuxml)
-            $wcoos = explode(" ", $word['x']);
-            $left = (float) $wcoos[0] * $pagewidth;
-            $top = (float) $wcoos[1] * $pageheight;
-            $width = (float) $wcoos[2] * $pagewidth;
-            $height = (float) $wcoos[3] * $pageheight;
-            $x0 = sprintf('%.0f',$left);
-            $y1 = sprintf('%.0f',$top);
-            $x1 = sprintf('%.0f',($left + $width));
-            $y0 = sprintf('%.0f',($top + $height));
-            $djvuxml->writeAttribute("coords", $x0 . ', ' . $y0 . ', ' . $x1 . ', ' . $y1);
-            $text = (string) $word;
-            $djvuxml->text($text);
-            $djvuxml->endElement();
-            $lastchar = substr($text, -1);
+      $djvuxml = new \XMLWriter();
+      $djvuxml->openMemory();
+      $djvuxml->startDocument('1.0', 'UTF-8');
+
+      foreach ($alto->Layout->children() as $page) {
+
+        $pageWidthPts = (float) $page['WIDTH'];
+        $pageHeightPts = (float) $page['HEIGHT'];
+
+
+        $djvuxml->startElement("OBJECT");
+        $djvuxml->writeAttribute("height", sprintf('%.0f',$pageHeightPts));
+        $djvuxml->writeAttribute("width", sprintf('%.0f',$pageWidthPts));
+
+
+
+        $page->registerXPathNamespace('ns', 'http://www.loc.gov/standards/alto/ns-v3#');
+        foreach ($page->xpath('.//ns:TextBlock') as $block) {
+
+          $djvuxml->startElement("PARAGRAPH");
+
+
+          foreach ($block->children() as $line) {
+            $djvuxml->startElement("LINE");
+
+            foreach ($line->children() as $child_name=>$child_node) {
+              if ($child_name == 'SP') {
+                //nothing
+              }
+              elseif ($child_name == 'String') {
+                $djvuxml->startElement("WORD");
+
+                $left = (float) $child_node['HPOS'];
+                $top = (float) $child_node['VPOS'];
+                $width = (float) $child_node['WIDTH'];
+                $height = (float) $child_node['HEIGHT'];
+                $x0 = sprintf('%.0f',$left);
+                $y1 = sprintf('%.0f',$top);
+                $x1 = sprintf('%.0f',($left + $width));
+                $y0 = sprintf('%.0f',($top + $height));
+                $djvuxml->writeAttribute("coords", $x0 . ', ' . $y0 . ', ' . $x1 . ', ' . $y1);
+                $djvuxml->text($child_node['CONTENT']);
+                $djvuxml->endElement(); //WORD
+              }
+            }
+
+            $djvuxml->endElement(); //LINE
           }
-          $djvuxml->endElement();
-          //if ($lastchar == '.') {
-            //$djvuxml->endElement();
-            //$djvuxml->startElement("PARAGRAPH");
-          //}
+
+          $djvuxml->endElement(); //PARAGRAPH
         }
+
+
+
+        $djvuxml->endElement(); //OBJECT
+      }
+
+
+      $djvuxml->endDocument();
+      unset($alto);
+
+      return $djvuxml->outputMemory(TRUE);
+
+    }
+    else {
+
+      $miniocr = $originalocr;
+      unset($originalocr);
+      $internalErrors = libxml_use_internal_errors(TRUE);
+      libxml_clear_errors();
+      libxml_use_internal_errors($internalErrors);
+      if (!$miniocr) {
+        //$this->logger->warning('Sorry for this page we could not decode/extract MINIOCR');
+        return NULL;
+      }
+
+      $wh = explode(" ", $miniocr->p[0]['wh']);
+      $pagewidth = (float) $wh[0];
+      $pageheight = (float) $wh[1];
+
+      $djvuxml = new \XMLWriter();
+      $djvuxml->openMemory();
+      $djvuxml->startDocument('1.0', 'UTF-8');
+      $djvuxml->startElement("OBJECT");
+      $djvuxml->writeAttribute("height", $wh[1]);
+      $djvuxml->writeAttribute("width", $wh[0]);
+      foreach ($miniocr->children() as $p) {
+        $djvuxml->startElement("PARAGRAPH");
+        foreach ($p->children() as $b) {
+          foreach ($b->children() as $l) {
+
+            $djvuxml->startElement("LINE");
+            foreach ($l->children() as $word) {
+              $djvuxml->startElement("WORD");
+              //left top width height (miniocr)
+              //left bottom right top (djvuxml)
+              $wcoos = explode(" ", $word['x']);
+              $left = (float) $wcoos[0] * $pagewidth;
+              $top = (float) $wcoos[1] * $pageheight;
+              $width = (float) $wcoos[2] * $pagewidth;
+              $height = (float) $wcoos[3] * $pageheight;
+              $x0 = sprintf('%.0f',$left);
+              $y1 = sprintf('%.0f',$top);
+              $x1 = sprintf('%.0f',($left + $width));
+              $y0 = sprintf('%.0f',($top + $height));
+              $djvuxml->writeAttribute("coords", $x0 . ', ' . $y0 . ', ' . $x1 . ', ' . $y1);
+              $text = (string) $word;
+              $djvuxml->text($text);
+              $djvuxml->endElement();
+              $lastchar = substr($text, -1);
+            }
+            $djvuxml->endElement();
+            //if ($lastchar == '.') {
+              //$djvuxml->endElement();
+              //$djvuxml->startElement("PARAGRAPH");
+            //}
+          }
+        }
+        $djvuxml->endElement();
       }
       $djvuxml->endElement();
+      $djvuxml->endDocument();
+      unset($miniocr);
+
+      return $djvuxml->outputMemory(TRUE);
     }
-
-
-
-    $djvuxml->endElement();
-    $djvuxml->endDocument();
-    unset($miniocr);
-
-    return $djvuxml->outputMemory(TRUE);
 
   }
 
