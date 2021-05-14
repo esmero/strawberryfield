@@ -327,7 +327,7 @@ JSON;
     $base_url = $this->input()->getOption('uri');
     $fileurlpost = $base_url . '/jsonapi/node/' . $bundle . '/field_file_drop';
     $nodeurlpost = $base_url . '/jsonapi/node/' . $bundle;
-
+    $files = [];
     // Check if files is passed and if file or folder
     if ($options['files']) {
       if (is_dir($options['files'])) {
@@ -353,7 +353,6 @@ JSON;
       }
       else {
         $this->output()->writeln(dt('No files provided'));
-
       }
     }
 
