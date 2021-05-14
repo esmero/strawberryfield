@@ -417,6 +417,10 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
   protected function originalocr2djvuxml($response) {
 
     $originalocr = simplexml_load_string($response);
+    if (!$originalocr) {
+      //$this->logger->warning('Sorry for this page we could not decode/extract OCR');
+      return NULL;
+    }
     $namespaces = $originalocr->getDocNamespaces();
     if (in_array("http://www.loc.gov/standards/alto/ns-v3#", $namespaces)) {
 
@@ -426,10 +430,7 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
       $internalErrors = libxml_use_internal_errors(TRUE);
       libxml_clear_errors();
       libxml_use_internal_errors($internalErrors);
-      if (!$alto) {
-        //$this->logger->warning('Sorry for this page we could not decode/extract MINIOCR');
-        return NULL;
-      }
+
 
       $djvuxml = new \XMLWriter();
       $djvuxml->openMemory();
@@ -502,10 +503,6 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
       $internalErrors = libxml_use_internal_errors(TRUE);
       libxml_clear_errors();
       libxml_use_internal_errors($internalErrors);
-      if (!$miniocr) {
-        //$this->logger->warning('Sorry for this page we could not decode/extract MINIOCR');
-        return NULL;
-      }
 
       $wh = explode(" ", $miniocr->p[0]['wh']);
       $pagewidth = (float) $wh[0];
