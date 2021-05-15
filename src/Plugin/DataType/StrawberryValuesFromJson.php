@@ -36,7 +36,7 @@ class StrawberryValuesFromJson extends ItemList {
    */
   protected $list = [];
   public function getValue() {
-    if ($this->processed == NULL) {
+    if ($this->processed === NULL) {
       $this->process();
     }
     $values = [];
@@ -79,6 +79,7 @@ class StrawberryValuesFromJson extends ItemList {
         $values[] = trim($flattened[$needle]);
       }
       $this->processed = array_values($values);
+      $this->list = [];
       foreach ($this->processed as $delta => $item) {
         $this->list[$delta] = $this->createItem($delta, $item);
       }

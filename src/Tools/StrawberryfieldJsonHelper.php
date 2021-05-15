@@ -351,8 +351,6 @@ class StrawberryfieldJsonHelper {
     return false;
   }
 
-
-
   /**
    *
    *
@@ -363,9 +361,30 @@ class StrawberryfieldJsonHelper {
    * @return mixed|null Returns the matching data or null
    */
   public static function searchJson($expression, array $sourcearray =  []) {
-    return JmesPath::search($expression, $sourcearray);
+    if (!static::jmesPathIsKey($expression)){
+      return JmesPath::search($expression, $sourcearray);
+    }
+    else {
+      $key = trim($expression,'"');
+      return $sourcearray[$key] ?? NULL;
+    }
   }
 
+  /**
+   * Checks if a JMESPath expression is an array key in disguise.
+   * @param $expression
+   *
+   * @return bool
+   */
+  public static function jmesPathIsKey($expression) {
+    $expression = trim($expression, '"');
+     if (preg_match("/(\[|\.|\*)/", $expression)) {
+      return FALSE;
+    }
+    else {
+      return TRUE;
+    }
+  }
 
   /**
    * Takes an array and generates a JMESPath Filter expression
