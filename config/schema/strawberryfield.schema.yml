@@ -50,7 +50,10 @@ strawberryfield.strawberry_keynameprovider.jmespath:
   mapping:
     source_key:
       type: string
-      label: 'A Comma separated string containing one or more JMESPaths '
+      label: 'A Comma separated string containing one or more JMESPaths'
+    is_date:
+      type: boolean
+      label: 'If the value should be considered and validated as a date'
     exposed_key:
       type: string
       label: 'The field property we expose for the Strawberryfield'
