@@ -9,6 +9,7 @@ namespace Drupal\strawberryfield\Plugin\DataType;
 use Drupal\Core\TypedData\Plugin\DataType\ItemList;
 use Drupal\strawberryfield\Plugin\Field\FieldType\StrawberryFieldItem;
 use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
+use EDTF\EdtfFactory;
 
 class StrawberryValuesViaJmesPathFromJson extends ItemList {
   /**
@@ -29,6 +30,7 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
    * @var \Drupal\Core\TypedData\TypedDataInterface[]
    */
   protected $list = [];
+
   public function getValue() {
     if ($this->processed == NULL) {
       $this->process();
@@ -48,52 +50,67 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
     if ($this->computed == TRUE) {
       return;
     }
-    $values = [];
     $item = $this->getParent();
     if (!empty($item->value)) {
       /* @var $item StrawberryFieldItem */
-      $flattened = $item->provideFlatten(FALSE);
       $definition = $this->getDataDefinition();
       // This key is passed by the property definition in the field class
       // jsonkey in this context is a string containing one or more
       // jmespath's separated by comma.
       $jmespaths = $definition['settings']['jsonkey'];
+      $is_date = $definition['settings']['is_date'] ?? FALSE;
       $jmespath_array = array_map('trim', explode(',', $jmespaths));
       $jmespath_result = [];
       foreach ($jmespath_array as $jmespath) {
         $jmespath_result[] = $item->searchPath(trim($jmespath),FALSE);
       }
       $jmespath_result_to_expose = [];
-
-        foreach ($jmespath_result as $item) {
-          if (is_array($item)) {
-            if (StrawberryfieldJsonHelper::arrayIsMultiSimple($item)) {
-              // @TODO should we allow unicode directly?
-              // If its multidimensional simple json encode as a string.
-              // We could also just get the first order values?
-              // @TODO, ask the team.
-              $jmespath_result_to_expose[] = json_encode($item, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
-            } else {
-              $jmespath_result_to_expose = array_merge($jmespath_result_to_expose, $item);
-            }
-
-          }
-          else {
-            // If a single value, simply cast to array
-            $jmespath_result_to_expose[] = $item;
+      foreach ($jmespath_result as $item) {
+        if (is_array($item)) {
+          if (StrawberryfieldJsonHelper::arrayIsMultiSimple($item)) {
+            // @TODO should we allow unicode directly?
+            // If its multidimensional simple json encode as a string.
+            // We could also just get the first order values?
+            // @TODO, ask the team.
+            $jmespath_result_to_expose[] = json_encode($item, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
+          } else {
+            $jmespath_result_to_expose = array_merge($jmespath_result_to_expose, $item);
           }
         }
-        // This is an array, don't double nest to make the normalizer happy.
-        $values = array_map('trim', $jmespath_result_to_expose);
-        $values = array_map('stripslashes', $values);
-
-      $this->processed = array_values($values);
+        else {
+          // If a single value, simply cast to array
+          $jmespath_result_to_expose[] = $item;
+        }
+      }
+      // This is an array, don't double nest to make the normalizer happy.
+      $jmespath_result_to_expose = array_filter($jmespath_result_to_expose);
+      $values = array_map('trim', $jmespath_result_to_expose);
+      $values = array_map('stripslashes', $values);
+      if ($is_date) {
+        $values_parsed = [];
+        $parser = EdtfFactory::newParser();
+        foreach ($values as $value) {
+          $result = $parser->parse($value);
+          if ($result->isValid()) {
+            $date_ini = $result->getEdtfValue()->getMin();
+            $date_max = $result->getEdtfValue()->getMax();
+            $date_ini = date('c', $date_ini);
+            $date_max = date('c', $date_max);
+            $values_parsed[] = $date_ini;
+            $values_parsed[] = $date_max;
+          }
+        }
+        $values = array_unique($values_parsed);
+      }
+      $this->processed = array_filter(array_values($values));
+      $this->list = [];
       foreach ($this->processed as $delta => $item) {
         $this->list[$delta] = $this->createItem($delta, $item);
       }
     }
     else {
       $this->processed = [];
+      $this->list = [];
     }
     $this->computed = TRUE;
   }
@@ -126,7 +143,7 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
       throw new \InvalidArgumentException('Unable to get a value with a non-numeric delta in a list.');
     }
     $this->ensureComputedValue();
-    return isset($this->list[$index]) ? $this->list[$index] : NULL;
+    return !empty($this->list[$index]) ? $this->list[$index] : NULL;
   }
   /**
    * {@inheritdoc}

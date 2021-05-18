@@ -181,6 +181,7 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
                ->setReadOnly(TRUE);
            }
            else {
+             $is_date = $plugin_config_entity_configs[$processor_class][$property]['is_date'] ?? FALSE;
              $properties[$property] = ListDataDefinition::create(
                $item_types[$processor_class]
              )
@@ -189,6 +190,7 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
                ->setClass($processor_class)
                ->setInternal(TRUE)
                ->setSetting('jsonkey', $keyname)
+               ->setSetting('is_date', $is_date)
                ->setReadOnly(TRUE);
            }
          }
@@ -324,7 +326,7 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
      else {
        if ($this->jsonjmesresults == NULL || !isset($this->jsonjmesresults[$expression]) || $force) {
          $mainproperty = $this->mainPropertyName();
-         $jsonArray = json_decode($this->{$mainproperty}, TRUE, 50);
+         $jsonArray = json_decode($this->{$mainproperty}, TRUE, 64);
          $searchresult = StrawberryfieldJsonHelper::searchJson($expression, $jsonArray);
          $this->jsonjmesresults[$expression] = $searchresult;
          return $searchresult;
