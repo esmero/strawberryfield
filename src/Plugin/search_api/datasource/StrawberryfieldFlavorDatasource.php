@@ -565,12 +565,15 @@ XML;
           );
           // Put the package File ID / Package.
           $fulltext = isset($processed_data->fulltext) ? (string) $processed_data->fulltext : '';
+          $label = isset($processed_data->label) ? (string) $processed_data->label : "Sequence {$sequence_id}";
           $plaintext = isset($processed_data->plaintext) ? (string) $processed_data->plaintext : '';
+          $metadata = isset($processed_data->metadata) ? (array) $processed_data->metadata : [];
           $checksum = isset($processed_data->checksum) ? (string) $processed_data->checksum : NULL;
           $sequence_total = isset($processed_data->sequence_total) ? (string) $processed_data->sequence_total : $sequence_id;
           if ($checksum) {
             $data = [
               'item_id' => $item_id,
+              'label' =>$label,
               'sequence_id' => $sequence_id,
               'sequence_total' => $sequence_total,
               'target_id' => $splitted_id_for_node[0],
@@ -580,6 +583,7 @@ XML;
               'processor_id' => $plugin_id,
               'fulltext' => '',
               'plaintext' => '',
+              'metadata' => $metadata,
               'checksum' => $checksum,
             ];
             // This will then always create a new Index document, even if empty.

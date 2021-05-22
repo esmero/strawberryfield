@@ -7,6 +7,7 @@ use Drupal\Core\TypedData\DataDefinition;
 use Drupal\Core\TypedData\DataReferenceTargetDefinition;
 use Drupal\Core\Entity\TypedData\EntityDataDefinition;
 use Drupal\Core\TypedData\DataReferenceDefinition;
+use Drupal\Core\TypedData\ListDataDefinition;
 
 /**
  * A typed data definition class for describing SBF Flavor Data Sources .
@@ -20,6 +21,7 @@ class StrawberryfieldFlavorDataDefinition extends ComplexDataDefinitionBase {
     if(!isset($this->propertyDefinitions)){
       $info = &$this->propertyDefinitions;
       $info['item_id'] = DataDefinition::create('string')->setLabel('Item ID');
+      $info['label'] = DataDefinition::create('string')->setLabel('A Label');
       $info['sequence_id'] = DataDefinition::create('string')->setLabel('Sequence ID');
       $info['sequence_total'] = DataDefinition::create('string')->setLabel('Expected total sequence count');
       $info['uri'] = DataDefinition::create('string')->setLabel('A source or related Uri/URL');
@@ -42,6 +44,7 @@ class StrawberryfieldFlavorDataDefinition extends ComplexDataDefinitionBase {
         ->addConstraint('EntityType', 'file');
       $info['fulltext'] = DataDefinition::create('string')->setLabel('Unmodified data body');
       $info['plaintext'] = DataDefinition::create('string')->setLabel('Data body containing un formatted text from fulltext');
+      $info['metadata'] = ListDataDefinition::create('string')->setLabel('Ordered list of additional metadata');
       //§/ required by Content Access processor , maybe we can disable it in some manner
       $info['status'] = DataDefinition::create('boolean')->setLabel('Status');
       $info['uid'] = DataDefinition::create('integer')->setLabel('UID');
