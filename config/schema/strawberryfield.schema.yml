@@ -50,7 +50,10 @@ strawberryfield.strawberry_keynameprovider.jmespath:
   mapping:
     source_key:
       type: string
-      label: 'A Comma separated string containing one or more JMESPaths '
+      label: 'A Comma separated string containing one or more JMESPaths'
+    is_date:
+      type: boolean
+      label: 'If the value should be considered and validated as a date'
     exposed_key:
       type: string
       label: 'The field property we expose for the Strawberryfield'
@@ -61,10 +64,13 @@ strawberryfield.strawberry_keynameprovider.entityjmespath:
   mapping:
     source_key:
       type: string
-      label: 'A Comma separated string containing one or more JMESPaths pointing to JSON key with NODE ids.'
+      label: 'A Comma separated string containing one or more JMESPaths pointing to JSON keys containing Entity IDs or UUIDs. All need to share the same Entity Type.'
     exposed_key:
       type: string
       label: 'The field property we expose for the Strawberryfield'
+    entity_type:
+      type: string
+      label: 'The entity type that will be used to load the IDs present in the JSON Keys.'
 
 strawberryfield.storage_settings:
   type: config_object
@@ -128,6 +134,10 @@ plugin.plugin_configuration.search_api_datasource.strawberryfield_flavor_datasou
           sequence:
             type: string
             label: 'A language code'
+    metadatadisplayentity_source:
+      type: string
+      label: "Metadata Display Entity to be used to Display the results"
+
 field.widget.settings.strawberry_textarea:
   type: config_object
   label: 'Strawberry Textarea Widget Schema'
@@ -182,7 +192,7 @@ field.formatter.settings.strawberry_default_formatter:
       type: string
       label: 'Access level the user needs on a bundle to be able to see it rendered, defaults to "edit"'
 
-# Multiple JSON type / View Mode Mappings
+# Hydroponics schema
 strawberryfield.hydroponics_settings:
   type: config_object
   label: 'Queues enabled to be processed by the Hydroponics Service'
@@ -202,3 +212,12 @@ strawberryfield.hydroponics_settings:
       sequence:
         type: string
         label: 'Queue Names'
+    processing_type:
+      type: string
+      label: 'Type of Processing to do, either mono or multi child'
+    processing_monotime:
+      type: integer
+      label: 'Time for the mono process to lease a queue item'
+    processing_multinumber:
+      type: integer
+      label: 'Number of Child processes for the multiqueue'

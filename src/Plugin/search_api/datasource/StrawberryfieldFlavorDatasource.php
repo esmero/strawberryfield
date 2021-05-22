@@ -2,19 +2,20 @@
 
 namespace Drupal\strawberryfield\Plugin\search_api\datasource;
 
+use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityDisplayRepositoryInterface;
+use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\TypedData\ComplexDataInterface;
 use Drupal\search_api\Datasource\DatasourcePluginBase;
-use Drupal\search_api\Entity\Index;
+use Drupal\search_api\LoggerTrait;
 use Drupal\strawberryfield\TypedData\StrawberryfieldFlavorDataDefinition;
 use Drupal\Core\Language\LanguageInterface;
 use Drupal\search_api\Utility\Utility;
 use Drupal\search_api\Plugin\PluginFormTrait;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\Core\Plugin\PluginFormInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
-
+use Drupal\Core\Plugin\PluginDependencyTrait;
 
 /**
  * Represents a datasource which exposes flavors.
@@ -24,9 +25,24 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  *   label = @Translation("Strawberryfield Flavor Datasource")
  * )
  */
-class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements PluginFormInterface {
+class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements StrawberryfieldFlavorDatasourceInterface {
 
   use PluginFormTrait;
+  use PluginDependencyTrait;
+  use LoggerTrait;
+
+  /**
+   * The Key Value Collection used to store temp values for Items
+   */
+  public const SBFL_KEY_COLLECTION = 'Strawberryfield_flavor_datasource_temp';
+
+  /**
+   * An MINI OCR XML defined for empty pages.
+   */
+  public const EMPTY_MINIOCR_XML = <<<'XML'
+<?xml version="1.0" encoding="UTF-8"?>
+<ocr><p xml:id="empty_sequence" wh="100 100"><b><l><w x="0 0 0 0"> </w></l></b></p></ocr>
+XML;
 
   /**
    * The entity type manager.
@@ -88,12 +104,7 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
   /**
    * {@inheritdoc}
    */
-  public static function create(
-    ContainerInterface $container,
-    array $configuration,
-    $plugin_id,
-    $plugin_definition
-  ) {
+  public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
     /** @var static $datasource */
     $datasource = parent::create(
       $container,
@@ -104,9 +115,7 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
 
     $datasource->entityTypeManager = $container->get('entity_type.manager');
     $datasource->entityFieldManager = $container->get('entity_field.manager');
-    $datasource->entityTypeBundleInfo = $container->get(
-      'entity_type.bundle.info'
-    );
+    $datasource->entityTypeBundleInfo = $container->get('entity_type.bundle.info');
     $datasource->typedDataManager = $container->get('typed_data_manager');
     $datasource->languageManager = $container->get('language_manager');
     $datasource->keyValue = $container->get('keyvalue');
@@ -118,17 +127,13 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
    * {@inheritdoc}
    */
   public function getPropertyDefinitions() {
-    return $this->typedDataManager->createDataDefinition(
-      'strawberryfield_flavor_data'
-    )->getPropertyDefinitions();
+    return $this->typedDataManager
+      ->createDataDefinition('strawberryfield_flavor_data')
+      ->getPropertyDefinitions();
   }
 
-
   /**
-   * Returns an associative array with bundles that have a SBF.
-   *
-   * @return array
-   * An associative array of SBF field names keyed by the bundle name.
+   * {@inheritdoc}
    */
   public function getApplicableBundlesWithSbfField() {
     $listFields = [];
@@ -152,10 +157,13 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
     return $listFields;
   }
 
-
   /**
    * {@inheritdoc}
    */
+  public function canContainEntityReferences(): bool {
+    return TRUE;
+  }
+
   public function getItemId(ComplexDataInterface $item) {
     // @TODO This id is not the one for a particular flavor
     // but the one from the source, which in this case is a node
@@ -203,11 +211,61 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
   /**
    * {@inheritdoc}
    */
-  public function getPartialItemIds(
-    $page = NULL,
-    array $bundles = NULL,
-    array $languages = NULL
-  ) {
+  public function getItemAccessResult(ComplexDataInterface $item, AccountInterface $account = NULL) {
+    $entity = $this->getEntity($item);
+    if ($entity) {
+      return $this->getEntityTypeManager()
+        ->getAccessControlHandler($this->getEntityTypeId())
+        ->access($entity, 'view', $account, TRUE);
+    }
+    return AccessResult::neutral('Item is not an entity, so cannot check access');
+  }
+
+  /**
+   * Retrieves a scalar field value from a result item.
+   *
+   * @param \Drupal\Core\TypedData\ComplexDataInterface $item
+   *   The result item.
+   * @param string $config_key
+   *   The key in the configuration.
+   *
+   * @return mixed|null
+   *   The scalar value of the specified field (first value for multi-valued
+   *   fields), if it exists; NULL otherwise.
+   *
+   * @throws \Drupal\Core\TypedData\Exception\MissingDataException
+   */
+  protected function getFieldValue(ComplexDataInterface $item, $config_key) {
+    if (empty($this->configuration[$config_key])) {
+      return NULL;
+    }
+    $values = $item->get($this->configuration[$config_key])->getValue();
+    if (is_array($values)) {
+      $values = $values ? reset($values) : NULL;
+    }
+    return $values ?: NULL;
+  }
+  /**
+   * {@inheritdoc}
+   *
+   * @throws \Drupal\Core\TypedData\Exception\MissingDataException
+   */
+  public function getItemLabel(ComplexDataInterface $item) {
+    if ($this->getFieldValue($item, 'label_field')) {
+      return $this->getFieldValue($item, 'label_field');
+    }
+    elseif ($entity = $this->getEntity($item)) {
+      return $entity->label();
+    }
+    else {
+      return NULL;
+    }
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getPartialItemIds($page = NULL, array $bundles = NULL, array $languages = NULL) {
     $select = $this->getEntityTypeManager()
       ->getStorage($this->getEntityTypeId())
       ->getQuery();
@@ -316,102 +374,10 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
   }
 
   /**
-   * Retrieves the entity type manager.
-   *
-   * @return \Drupal\Core\Entity\EntityTypeManagerInterface
-   *   The entity type manager.
-   */
-  public function getEntityTypeManager() {
-    return $this->entityTypeManager ?: \Drupal::entityTypeManager();
-  }
-
-  /**
    * {@inheritdoc}
    */
   public function getEntityTypeId() {
     return 'node';
-  }
-
-  /**
-   * Determines whether the entity type supports bundles.
-   *
-   * @return bool
-   *   TRUE if the entity type supports bundles, FALSE otherwise.
-   */
-  protected function hasBundles() {
-    return $this->getEntityType()->hasKey('bundle');
-  }
-
-  /**
-   * Retrieves all bundles of this datasource's entity type.
-   *
-   * @return array
-   *   An associative array of bundle infos, keyed by the bundle names.
-   */
-  protected function getEntityBundles() {
-    return $this->hasBundles() ? $this->entityTypeBundleInfo->getBundleInfo(
-      $this->getEntityTypeId()
-    ) : [];
-  }
-
-
-  /**
-   * Returns the definition of this datasource's entity type.
-   *
-   * @return \Drupal\Core\Entity\EntityTypeInterface
-   *   The entity type definition.
-   */
-  protected function getEntityType() {
-    return $this->getEntityTypeManager()
-      ->getDefinition($this->getEntityTypeId());
-  }
-
-  /**
-   * Retrieves the config value for a certain key in the Search API settings.
-   *
-   * @param string $key
-   *   The key whose value should be retrieved.
-   *
-   * @return mixed
-   *   The config value for the given key.
-   */
-  protected function getConfigValue($key) {
-    return $this->getConfigFactory()->get('search_api.settings')->get($key);
-  }
-
-  /**
-   * Retrieves the config factory.
-   *
-   * @return \Drupal\Core\Config\ConfigFactoryInterface
-   *   The config factory.
-   */
-  public function getConfigFactory() {
-    return $this->configFactory ?: \Drupal::configFactory();
-  }
-
-  /**
-   * Retrieves the enabled languages.
-   *
-   * @return \Drupal\Core\Language\LanguageInterface[]
-   *   All languages that are enabled for this datasource, keyed by language
-   *   code.
-   */
-  protected function getLanguages() {
-    $all_languages = $this->getLanguageManager()->getLanguages();
-
-    if ($this->isTranslatable()) {
-      $selected_languages = array_flip(
-        $this->configuration['languages']['selected']
-      );
-      if ($this->configuration['languages']['default']) {
-        return array_diff_key($all_languages, $selected_languages);
-      }
-      else {
-        return array_intersect_key($all_languages, $selected_languages);
-      }
-    }
-
-    return $all_languages;
   }
 
   /**
@@ -445,37 +411,6 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
   }
 
   /**
-   * Retrieves the language manager.
-   *
-   * @return \Drupal\Core\Language\LanguageManagerInterface
-   *   The language manager.
-   */
-  public function getLanguageManager() {
-    return $this->languageManager ?: \Drupal::languageManager();
-  }
-
-  /**
-   * Determines whether the entity type supports translations.
-   *
-   * @return bool
-   *   TRUE if the entity is translatable, FALSE otherwise.
-   */
-  protected function isTranslatable() {
-    return $this->getEntityType()->isTranslatable();
-  }
-
-  /**
-   * Retrieves the entity storage.
-   *
-   * @return \Drupal\Core\Entity\EntityStorageInterface
-   *   The entity storage.
-   */
-  protected function getEntityStorage() {
-    return $this->getEntityTypeManager()->getStorage($this->getEntityTypeId());
-  }
-
-
-  /**
    * {@inheritdoc}
    */
   public function defaultConfiguration() {
@@ -495,16 +430,15 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
       ];
     }
 
+    $default_configuration['metadatadisplayentity_source'] = NULL;
+
     return $default_configuration;
   }
 
   /**
    * {@inheritdoc}
    */
-  public function buildConfigurationForm(
-    array $form,
-    FormStateInterface $form_state
-  ) {
+  public function buildConfigurationForm(array $form, FormStateInterface $form_state) {
     if ($this->hasBundles() && ($bundles = $this->getEntityBundleOptions())) {
       $form['bundles'] = [
         '#type' => 'details',
@@ -555,49 +489,42 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
         '#multiple' => TRUE,
       ];
     }
+    if ($this->moduleHandler()->moduleExists('format_strawberryfield')) {
 
+      $entity = NULL;
+      if ($this->configuration['metadatadisplayentity_source']) {
+        $entity = $this->entityTypeManager->getStorage(
+          'metadatadisplay_entity'
+        )->load($this->configuration['metadatadisplayentity_source']);
+      }
+      $form['metadatadisplayentity_source'] = [
+        '#title' => $this->t('A Metadata Display entity (Twig Template) to be used to Render a single Item.'),
+        '#type' => 'entity_autocomplete',
+        '#target_type' => 'metadatadisplay_entity',
+        '#selection_handler' => 'default:metadatadisplay',
+        '#validate_reference' => FALSE,
+        '#default_value' => $entity,
+        '#states' => [
+          'visible' => [
+            ':input[data-formatter-selector="mediasource"]' => ['value' => 'metadatadisplayentity'],
+          ],
+        ],
+      ];
+    }
+    else {
+      $form['metadatadisplayentity_source'] = [
+        '#type' => 'value',
+        '#default_value' => NULL,
+      ];
+    }
     return $form;
   }
 
-  /**
-   * Retrieves the available bundles of this entity type as an options list.
-   *
-   * @return array
-   *   An associative array of bundle labels, keyed by the bundle name.
-   */
-  protected function getEntityBundleOptions() {
-    $options = [];
-    // returns an array with bundles and SBF field names
-    $possiblebundles = $this->getApplicableBundlesWithSbfField();
-    if ($bundles = $this->getEntityBundles()) {
-      $bundles = array_intersect_key($bundles, $possiblebundles);
-      // Filter against the bundles we can process
-      foreach ($bundles as $bundle => $bundle_info) {
-        $options[$bundle] = Utility::escapeHtml($bundle_info['label']);
-      }
-    }
-    return $options;
-  }
-
-  /**
-   * Retrieves the available languages of this entity type as an options list.
-   *
-   * @return array
-   *   An associative array of language labels, keyed by the language name.
-   */
-  protected function getTranslationOptions() {
-    $options = [];
-    foreach ($this->getLanguageManager()->getLanguages() as $language) {
-      $options[$language->getId()] = $language->getName();
-    }
-    return $options;
-  }
 
 
   /**
    * {@inheritdoc}
    */
-
   public function loadMultiple(array $ids) {
     $documents = [];
     $sbfflavordata_definition = StrawberryfieldFlavorDataDefinition::create(
@@ -617,12 +544,11 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
     // This is the structure of one of our ids
     // Means one $entity_ids_splitted will contain this splitted
     // $id = $entity->id() . ':'.$sequence .':'.$translation_id.':'.$file->uuid().':'.$data->plugin_config_entity_id;
-    $keyvalue_collection = 'Strawberryfield_flavor_datasource_temp';
+    $keyvalue_collection = self::SBFL_KEY_COLLECTION;
 
-    foreach ($this->getEntityStorage()->loadMultiple(
-      $entity_ids
-    ) as $entity_id => $entity) {
+    foreach ($this->getEntityStorage()->loadMultiple($entity_ids) as $entity_id => $entity) {
       foreach ($entity_ids_splitted[$entity_id] as $item_id => $splitted_id_for_node) {
+        $sequence_id = !empty($splitted_id_for_node[1]) ? $splitted_id_for_node[1] : 1;
         $fid_uuid = isset($splitted_id_for_node[3]) ? $splitted_id_for_node[3] : NULL;
         $plugin_id = isset($splitted_id_for_node[4]) ? $splitted_id_for_node[4] : NULL;
         // probably we will want to add the module/class namespace for the plugin id?
@@ -639,17 +565,21 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
           );
           // Put the package File ID / Package.
           $fulltext = isset($processed_data->fulltext) ? (string) $processed_data->fulltext : '';
+          $plaintext = isset($processed_data->plaintext) ? (string) $processed_data->plaintext : '';
           $checksum = isset($processed_data->checksum) ? (string) $processed_data->checksum : NULL;
+          $sequence_total = isset($processed_data->sequence_total) ? (string) $processed_data->sequence_total : $sequence_id;
           if ($checksum) {
             $data = [
               'item_id' => $item_id,
-              'sequence_id' => $splitted_id_for_node[1],
+              'sequence_id' => $sequence_id,
+              'sequence_total' => $sequence_total,
               'target_id' => $splitted_id_for_node[0],
               'parent_id' => $splitted_id_for_node[0],
               'file_uuid' => $fid_uuid,
               'target_fileid' => $file->id(),
               'processor_id' => $plugin_id,
               'fulltext' => '',
+              'plaintext' => '',
               'checksum' => $checksum,
             ];
             // This will then always create a new Index document, even if empty.
@@ -658,6 +588,16 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
             if (!empty(trim($fulltext))) {
               $data['fulltext'] = trim($fulltext);
             }
+            if (!empty(trim($plaintext))) {
+              $data['plaintext'] = trim($plaintext);
+            }
+            elseif (!empty($data['fulltext'])) {
+              // This assumes miniOCR and is only meant for backwards compat
+              // for existing Solr Documents/ Data Sources.
+              $data['plaintext'] = str_replace("<w>", "<w> ", $data['fulltext']);
+              $data['plaintext'] = strip_tags(str_replace("<l>", PHP_EOL . "<l> ", $data['plaintext']));
+            }
+
             $documents[$item_id] = $this->typedDataManager->create(
               $sbfflavordata_definition
             );
@@ -665,14 +605,16 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
           }
         }
         else {
-          //@TODO replace with an actual verbose Logger Entry
-          error_log(
-            'passed Data Source ID for Strawberryfield_flavor_datasource had NULL elements in its path or a source file does no longer exists'
-          );
+          //@TODO should we untrack when this is the case?
+          $this->getLogger()
+            ->warning('Passed Data Source with ID  @id for Strawberryfield_flavor_datasource had NULL elements in its path or a source file does no longer exists',
+              [
+                '@id' => $item_id,
+              ]
+            );
         }
       }
     }
-
     return $documents;
   }
 
@@ -683,7 +625,9 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
     $datasource_id = 'strawberryfield_flavor_datasource';
 
     /** @var \Drupal\search_api\IndexInterface[] $indexes */
-    $indexes = Index::loadMultiple();
+    $indexes = \Drupal::entityTypeManager()
+      ->getStorage('search_api_index')
+      ->loadMultiple();
 
     foreach ($indexes as $index_id => $index) {
       // Filter out indexes that don't contain the datasource in question.
@@ -695,7 +639,6 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
     }
   }
 
-
   /**
    * {@inheritdoc}
    */
@@ -706,23 +649,13 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
   /**
    * {@inheritdoc}
    */
-  public function viewItem(
-    ComplexDataInterface $item,
-    $view_mode,
-    $langcode = NULL
-  ) {
-
+  public function viewItem(ComplexDataInterface $item, $view_mode, $langcode = NULL) {
     return [];
   }
-
   /**
    * {@inheritdoc}
    */
-  public function viewMultipleItems(
-    array $items,
-    $view_mode,
-    $langcode = NULL
-  ) {
+  public function viewMultipleItems(array $items, $view_mode, $langcode = NULL) {
     try {
       $view_builder = $this->getEntityTypeManager()
         ->getViewBuilder($this->getEntityTypeId());
@@ -771,7 +704,7 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
    * @return \Drupal\Core\Entity\EntityDisplayRepositoryInterface
    *   The entity entity display repository.
    */
-  public function getEntityDisplayRepository() {
+  protected function getEntityDisplayRepository() {
     return $this->entityDisplayRepository ?: \Drupal::service(
       'entity_display.repository'
     );
@@ -785,12 +718,165 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements Pl
    *
    * @return $this
    */
-  public function setEntityDisplayRepository(
-    EntityDisplayRepositoryInterface $entity_display_repository
-  ) {
+  protected function setEntityDisplayRepository(EntityDisplayRepositoryInterface $entity_display_repository) {
     $this->entityDisplayRepository = $entity_display_repository;
     return $this;
   }
 
+  /**
+   * Retrieves the config factory.
+   *
+   * @return \Drupal\Core\Config\ConfigFactoryInterface
+   *   The config factory.
+   */
+  protected function getConfigFactory() {
+    return $this->configFactory ?: \Drupal::configFactory();
+  }
+
+  /**
+   * Retrieves the entity storage.
+   *
+   * @return \Drupal\Core\Entity\EntityStorageInterface
+   *   The entity storage.
+   */
+  protected function getEntityStorage() {
+    return $this->getEntityTypeManager()->getStorage($this->getEntityTypeId());
+  }
+
+  /**
+   * Retrieves the entity type manager.
+   *
+   * @return \Drupal\Core\Entity\EntityTypeManagerInterface
+   *   The entity type manager.
+   */
+  protected function getEntityTypeManager() {
+    return $this->entityTypeManager ?: \Drupal::entityTypeManager();
+  }
+
+  /**
+   * Retrieves the language manager.
+   *
+   * @return \Drupal\Core\Language\LanguageManagerInterface
+   *   The language manager.
+   */
+  protected function getLanguageManager() {
+    return $this->languageManager ?: \Drupal::languageManager();
+  }
+
+  /**
+   * Determines whether the entity type supports translations.
+   *
+   * @return bool
+   *   TRUE if the entity is translatable, FALSE otherwise.
+   */
+  protected function isTranslatable() {
+    return $this->getEntityType()->isTranslatable();
+  }
+
+  /**
+   * Retrieves the available bundles of this entity type as an options list.
+   *
+   * @return array
+   *   An associative array of bundle labels, keyed by the bundle name.
+   */
+  protected function getEntityBundleOptions() {
+    $options = [];
+    // returns an array with bundles and SBF field names
+    $possiblebundles = $this->getApplicableBundlesWithSbfField();
+    if ($bundles = $this->getEntityBundles()) {
+      $bundles = array_intersect_key($bundles, $possiblebundles);
+      // Filter against the bundles we can process
+      foreach ($bundles as $bundle => $bundle_info) {
+        $options[$bundle] = Utility::escapeHtml($bundle_info['label']);
+      }
+    }
+    return $options;
+  }
+
+  /**
+   * Retrieves the available languages of this entity type as an options list.
+   *
+   * @return array
+   *   An associative array of language labels, keyed by the language name.
+   */
+  protected function getTranslationOptions() {
+    $options = [];
+    foreach ($this->getLanguageManager()->getLanguages() as $language) {
+      $options[$language->getId()] = $language->getName();
+    }
+    return $options;
+  }
+
+  /**
+   * Determines whether the entity type supports bundles.
+   *
+   * @return bool
+   *   TRUE if the entity type supports bundles, FALSE otherwise.
+   */
+  protected function hasBundles() {
+    return $this->getEntityType()->hasKey('bundle');
+  }
+
+  /**
+   * Retrieves all bundles of this datasource's entity type.
+   *
+   * @return array
+   *   An associative array of bundle infos, keyed by the bundle names.
+   */
+  protected function getEntityBundles() {
+    return $this->hasBundles() ? $this->entityTypeBundleInfo->getBundleInfo(
+      $this->getEntityTypeId()
+    ) : [];
+  }
+
+
+  /**
+   * Returns the definition of this datasource's entity type.
+   *
+   * @return \Drupal\Core\Entity\EntityTypeInterface
+   *   The entity type definition.
+   */
+  protected function getEntityType() {
+    return $this->getEntityTypeManager()
+      ->getDefinition($this->getEntityTypeId());
+  }
+
+  /**
+   * Retrieves the config value for a certain key in the Search API settings.
+   *
+   * @param string $key
+   *   The key whose value should be retrieved.
+   *
+   * @return mixed
+   *   The config value for the given key.
+   */
+  protected function getConfigValue($key) {
+    return $this->getConfigFactory()->get('search_api.settings')->get($key);
+  }
+
+  /**
+   * Retrieves the enabled languages.
+   *
+   * @return \Drupal\Core\Language\LanguageInterface[]
+   *   All languages that are enabled for this datasource, keyed by language
+   *   code.
+   */
+  protected function getLanguages() {
+    $all_languages = $this->getLanguageManager()->getLanguages();
+
+    if ($this->isTranslatable()) {
+      $selected_languages = array_flip(
+        $this->configuration['languages']['selected']
+      );
+      if ($this->configuration['languages']['default']) {
+        return array_diff_key($all_languages, $selected_languages);
+      }
+      else {
+        return array_intersect_key($all_languages, $selected_languages);
+      }
+    }
+
+    return $all_languages;
+  }
 
 }

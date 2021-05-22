@@ -28,11 +28,7 @@ use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\strawberryfield\Event\StrawberryfieldJsonProcessEvent;
 use Drupal\Core\StreamWrapper\StreamWrapperInterface;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
-use Drupal\strawberryfield\StrawberryfieldUtilityService;
-use Drupal\Core\Config\ImmutableConfig;
-use Drupal\strawberryfield\StrawberryfieldEventType;
-use Symfony\Component\Process\Exception\ProcessFailedException;
-use Symfony\Component\Process\Process;
+use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
 use Drupal\Core\Url;
 
 
@@ -287,10 +283,25 @@ class StrawberryfieldFilePersisterService {
         $current_uri,
         PATHINFO_FILENAME
       );
+
       $file_parts['destination_extension'] = pathinfo(
         $current_uri,
         PATHINFO_EXTENSION
       );
+      // Check if the file may have a secondary extension
+
+      $file_parts['destination_extension_secondary'] = pathinfo(
+        $file_parts['destination_filename'],
+        PATHINFO_EXTENSION
+      );
+      // Deal with 2 part extension problem.
+      if (!empty($file_parts['destination_extension_secondary']) &&
+        strlen($file_parts['destination_extension_secondary'])<=4 &&
+        strlen($file_parts['destination_extension_secondary']) > 0
+      ) {
+        $file_parts['destination_extension'] = $file_parts['destination_extension_secondary'].'.'.$file_parts['destination_extension'];
+      }
+
       $file_parts['destination_scheme'] = $this->streamWrapperManager
         ->getScheme($current_uri);
 
@@ -462,7 +473,7 @@ class StrawberryfieldFilePersisterService {
       // Real use case since the file DB gets never reprocessed once saved.
       // And we could have update/upgraded our mappings.
       $uri = $file->getFileUri();
-      $mimetype = \Drupal::service('file.mime_type.guesser.extension')->guess(
+      $mimetype = \Drupal::service('strawberryfield.mime_type.guesser.mime')->guess(
         $uri
       );
       if (($file->getMimeType(
@@ -506,7 +517,6 @@ class StrawberryfieldFilePersisterService {
     // Final iteration
     // Only do this if file was not previously processed and stored.
     foreach ($to_process as $askey => $files) {
-      $newforsorting = FALSE;
       foreach ($files as $file) {
         $uri = $file->getFileUri();
 
@@ -526,7 +536,6 @@ class StrawberryfieldFilePersisterService {
         // Add exception here for PDFs. We need the number of pages
         // @TODO add a mime type based hook/plugin or event. Idea is to allow modules
         // to intercept this
-
 
         $fileinfo = [
           'type' => ucfirst($askey),
@@ -567,30 +576,66 @@ class StrawberryfieldFilePersisterService {
         //The node save hook will deal with moving data.
         // We don't need the key here but makes cleaning easier
         $fileinfo_bytype_many[self::AS_TYPE_PREFIX . $askey][self::FILE_IRI_PREFIX . $uuid] = $fileinfo;
-        $newforsorting = TRUE;
         // Side effect of this is that if the same file id is referenced twice
         // by different fields, as:something will contain it once only.
         // Not bad, just saying.
         // @TODO see if having the same file in different keys is even
         // a good idea.
       }
-      // Natural Order Sort.
-      // @TODO how should we deal with manually ordered files?
-      // This will always reorder everything based on filenames only if the original order is still that one
-      // So, here is how things go:
-      // We sort anyway, faster than dividing and thingking too much.
-      // But, we assign new sequence only to newer ones. So never (for now) to existing ones
-      // with one exception. If the sequence matches the new order, which basically means
-      // we are good.
+    }
+    return $fileinfo_bytype_many;
+  }
 
-      uasort(
-        $fileinfo_bytype_many[self::AS_TYPE_PREFIX . $askey],
-        [$this, 'sortByFileName']
-      );
-      $max_sequence = 0;
-      // Let's get the max sequence first.
+  /**
+   * Adds sequence key for a single as: file type (askey)
+   *
+   * @param array $fileinfo
+   *    Contains as:document, etc key with all file data for that type.
+   * @param array $flipped_json_keys_with_filenumids
+   *    Contains the original JSON Key values with file ids but flipped.
+   * @param string $sortmode
+   *    Sort mode can be either 'natural' or 'index'
+   *    - 'natural' will use the filenames to sort.
+   *    - 'index' will respect the order of appearance.
+   *    - 'manual' will just add new files at the end.
+   * @param bool $force
+   *    Force will reorder without respecting manual sequences.
+   *
+   * @return array
+   */
+  public function sortFileStructure(array $fileinfo, array $flipped_json_keys_with_filenumids, $sortmode = 'natural', bool $force = TRUE) {
+
+    // So, here is how things go:
+    // We sort anyway, faster than dividing and thinking too much.
+    // But, we assign new sequence only to newer ones. So never (for now) to existing ones
+    // with one exception. If the sequence matches the new order, which basically means
+    // we are good.
+
+    // 'manual' will always disabled force so we can add to the end
+    $force = $sortmode == 'manual' ? FALSE : $force;
+
+    if ($sortmode == 'natural') {
+      uasort($fileinfo, [$this, 'sortByFileName']);
+    }
+    else {
+      // Use the ingest order of the files, namely the order in which
+      // The file IDs appear in each dr:for key
+      // This applies for 'manual' and 'index' sort mode
+      uasort($fileinfo,
+        function ($a, $b) use ($flipped_json_keys_with_filenumids) {
+          $source_field_a = $a['dr:for'];
+          $source_field_b = $b['dr:for'];
+          // In case this is totally wrong and we have no source Field at all, give it a large number so it gets pushed to the end.
+          $comp_a = $flipped_json_keys_with_filenumids[$source_field_a][$a['dr:fid']] ?? 100000;
+          $comp_b = $flipped_json_keys_with_filenumids[$source_field_b][$b['dr:fid']] ?? 100000;
+          return $comp_a > $comp_b ? 1 : -1;
+        });
+    }
+    $max_sequence = 0;
+    // Let's get the max sequence first but only if not forcing a reorder.
+    if (!$force) {
       $max_sequence = array_reduce(
-        $fileinfo_bytype_many[self::AS_TYPE_PREFIX . $askey],
+        $fileinfo,
         function ($a, $b) {
           if (isset($b['sequence'])) {
             return max($a, (int) $b['sequence']);
@@ -599,39 +644,26 @@ class StrawberryfieldFilePersisterService {
             return $a;
           }
         },
-        1
+        0
       );
-
-      // For each always wins over array_walk
-      $i = 0;
-      $j = 0;
-      foreach ($fileinfo_bytype_many[self::AS_TYPE_PREFIX . $askey] as &$item) {
-        $i++;
-        //Order is already given by uasort but not trustable in JSON
-        //So we set sequence number but let's check first what we got
-        if (isset($item['sequence'])) {
-          if ($item['sequence'] != $i) {
-            // means this was ordered manually. Preserve this.
-            // @TODO program some exception?
-          }
-          else {
-            // Means new order matches expected order
-            // @TODO means we can simply avoid the offset totally
-          }
-        }
-        else {
-          // Why $j and no $i? Because i want to only count ones without a sequence
-          $j++;
-          // Why -1? Because we want to offset new sequence elements
-          $item['sequence'] = $j + ($max_sequence);
-        }
-
-      }
-
-
     }
 
-    return $fileinfo_bytype_many;
+    // For each always wins over array_walk
+    $i = 0;
+    $j = 0;
+    foreach ($fileinfo as &$item) {
+      $i++;
+      //Order is already given by uasort but not trustable in JSON
+      //So we set sequence number but let's check first what we got
+      if (!isset($item['sequence']) || $force) {
+        // Why $j and no $i? Because i want to only count ones without a sequence
+        // And keep old sequence numbers if not forced (e.g 'manual');
+        $j++;
+        $item['sequence'] = $j + ($max_sequence);
+      }
+    }
+
+    return $fileinfo;
   }
 
   /**
@@ -781,7 +813,7 @@ class StrawberryfieldFilePersisterService {
    * @param array $file_id_list
    * @param array $originaljson
    *
-   * @param int $nodeid
+   * @param ContentEntityInterface $entity
    *
    * @return array
    * @throws \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException
@@ -789,9 +821,9 @@ class StrawberryfieldFilePersisterService {
    * @throws \Drupal\Core\Entity\EntityStorageException
    */
   public function removefromAsFileStructure(
-    array $file_id_list = [],
+    array $file_id_list,
     array $originaljson,
-    int $nodeid
+    ContentEntityInterface $entity
   ) {
 
     /** @var \Drupal\file\FileInterface[] $files */
@@ -809,13 +841,15 @@ class StrawberryfieldFilePersisterService {
     } catch (PluginNotFoundException $e) {
       $this->messenger()->addError(
         $this->t(
-          'Sorry, we had real issues loading your files during cleanup/removal. File Plugin not Found'
+          'Sorry, we had real issues loading your files during cleanup/removal. File Plugin not Found.'
         )
       );
       return $originaljson;
     }
+    $existing_ids = [];
     // Iterate and classify by as: type
     foreach ($files as $file) {
+      $existing_ids[] = $file->id();
       $as_file_type = $this->calculateAsKeyFromFile($file);
       $uuid = $file->uuid();
       if (isset($originaljson[self::AS_TYPE_PREFIX . $as_file_type][self::FILE_IRI_PREFIX . $uuid])) {
@@ -824,7 +858,46 @@ class StrawberryfieldFilePersisterService {
           $originaljson[self::AS_TYPE_PREFIX . $as_file_type][self::FILE_IRI_PREFIX . $uuid]['dr:fid'] == $file->id(
           )) {
           unset($originaljson[self::AS_TYPE_PREFIX . $as_file_type][self::FILE_IRI_PREFIX . $uuid]);
-          $this->remove_file_usage($file, $nodeid, 'node', 1);
+          // We can only remove usage for already saved content entities.
+          if (!$entity->isNew()) {
+            $this->remove_file_usage($file, $entity->id(), 'node', 1);
+          }
+        }
+      }
+    }
+
+    $not_existing = array_diff($file_id_list, $existing_ids);
+
+    // means we have left over files (coming from dr:fid that DO not longer
+    // exist inside Drupal as entities. Clean this up but in a costly way.
+    if (count($not_existing) > 0) {
+      $originaljson = $this->removefromAsFileStructureBrutForce($not_existing, $originaljson);
+    }
+
+    return $originaljson;
+  }
+
+  /**
+   * Removes a list of File IDs from the as:structure in a non optimal way.
+   *
+   * @param array $file_id_list
+   * @param array $originaljson
+   *
+   * @return array
+   */
+  public function removefromAsFileStructureBrutForce(
+    array $file_id_list,
+    array $originaljson
+  ) {
+    // Iterate and over every as:file and compare against our known not existing
+    // File entity IDs. If found remove.
+    foreach (StrawberryfieldJsonHelper::AS_FILE_TYPE as $file_key) {
+      if (isset($originaljson[$file_key]) &&
+        is_array($originaljson[$file_key])) {
+        foreach ($originaljson[$file_key] as $as_key => $as_entry) {
+          if (isset($as_entry['dr:fid']) && in_array($as_entry['dr:fid'], $file_id_list)) {
+            unset($originaljson[$file_key][$as_key]);
+          }
         }
       }
     }

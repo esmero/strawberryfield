@@ -9,6 +9,7 @@
 namespace Drupal\strawberryfield\Plugin\StrawberryfieldKeyNameProvider;
 
 use Drupal\Core\Annotation\Translation;
+use Drupal\strawberryfield\EventSubscriber\StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator;
 use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
 use Drupal\strawberryfield\Plugin\StrawberryfieldKeyNameProviderBase;
 use Drupal\Core\Form\FormStateInterface;
@@ -43,7 +44,17 @@ class EntityJmesPathNameProvider extends JmesPathNameProvider {
       '#size' => 40,
       '#maxlength' => 255,
       '#default_value' => $this->getConfiguration()['source_key'],
-      '#description' => $this->t('JMespath(s) will be evaluated against your <em>Strawberry field</em> JSON to extract referenced Node entities.<br> e.g. ismemberof. Only Integer values are valid.'),
+      '#description' => $this->t('JMespath(s) will be evaluated against your <em>Strawberry field</em> JSON to extract referenced Drupal entities.<br> e.g. ismemberof. Only Integer values are valid.'),
+      '#required' => true,
+    ];
+    $supported_entities = str_replace('entity:', '', StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator::SUPPORTED_CORE_ENTITIES);
+    $element['entity_type'] = [
+      '#id' => 'entity_type',
+      '#type' => 'select',
+      '#title' => $this->t('Entity type.'),
+      '#options' => array_combine($supported_entities, $supported_entities),
+      '#default_value' => !empty($this->getConfiguration()['entity_type']) ? $this->getConfiguration()['entity_type'] : 'node',
+      '#description' => $this->t('The type of Drupal entity'),
       '#required' => true,
     ];
     // We need the parent form structure, if any, to make machine name work.

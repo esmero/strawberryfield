@@ -10,6 +10,7 @@ use Drupal\strawberryfield\StrawberryfieldFilePersisterService;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
+use Drupal\Component\Uuid\Uuid;
 
 
 /**
@@ -120,24 +121,23 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
    *
    * @throws \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException
    * @throws \Drupal\Component\Plugin\Exception\PluginNotFoundException
+   * @throws \Drupal\Core\Entity\EntityStorageException
    */
   public function onEntityPresave(StrawberryfieldCrudEvent $event) {
 
-    /* @var $entity \Drupal\Core\Entity\ContentEntityInterface */
+    /** @var \Drupal\Core\Entity\ContentEntityInterface $entity*/
     $entity = $event->getEntity();
     $sbf_fields = $event->getFields();
 
     foreach ($sbf_fields as $field_name) {
-      /* @var $field \Drupal\Core\Field\FieldItemInterface */
+      /** @var \Drupal\Core\Field\FieldItemInterface $field*/
       $field = $entity->get($field_name);
-      /* @var \Drupal\strawberryfield\Field\StrawberryFieldItemList $field */
-
+      /** @var \Drupal\strawberryfield\Field\StrawberryFieldItemList $field */
       if (!$field->isEmpty()) {
         $entity = $field->getEntity();
-        $entity_type_id = $entity->getEntityTypeId();
         /** @var $field \Drupal\Core\Field\FieldItemList */
         foreach ($field->getIterator() as $delta => $itemfield) {
-          /** @var $itemfield \Drupal\strawberryfield\Plugin\Field\FieldType\StrawberryFieldItem */
+          /** @var \Drupal\strawberryfield\Plugin\Field\FieldType\StrawberryFieldItem $itemfield */
           $fullvalues = $itemfield->provideDecoded(TRUE);
 
           // SBF needs to have the entity mapping key
@@ -145,53 +145,40 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
           if (!is_array($fullvalues)) {
             break;
           }
-          $original_fids = [];
-          // We will use the original data to compare if any files existing before were removed by the user
-          // Edge case. IF for some reason the user "escaped" our conditions and ended
-          // With an ADO with a SBF (not sure how) we want to check if the previous version
-          // REALLY has a SBF before trying to provide the flatten version
-          if (!$entity->isNew() && !empty($entity->original) && $entity->original->hasField($field_name)) {
-            try {
-              $original_field = $entity->original->get(
-                $field_name
-              );
-              if ($original_field !== NULL  && isset($original_field[$delta])) {
-                $original_fullvalues = $original_field[$delta]->provideFlatten();
-              $original_fids = isset($original_fullvalues['dr:fid']) ? $original_fullvalues['dr:fid'] : [];
-              $original_fids = is_array(
-                $original_fids
-              ) ? $original_fids : [$original_fids];
-              // To save some memory
-              unset($original_fullvalues);
-             } else {
-                $this->messenger->addWarning($this->t('Your previous revision did not have any JSON Metadata. This is strange. We worked around this but Please notify your site admin.'));
-              }
-            }
-            catch (\Exception $exception) {
-              $this->messenger->addError($this->t('We could not retrieve your original data to clean up any changes in attached files. Please contact the site admin.'));
-            }
-          }
+          $fullvalues_flat = $itemfield->provideFlatten();
+          $fids_from_as = isset($fullvalues_flat['dr:fid']) ? $fullvalues_flat['dr:fid'] : [];
+          $for_from_as = isset($fullvalues_flat['dr:for']) ? $fullvalues_flat['dr:for'] : [];
+          $fids_from_as = is_array(
+            $fids_from_as
+          ) ? $fids_from_as : [$fids_from_as];
+          $for_from_as = is_array(
+            $for_from_as
+          ) ? $for_from_as : [$for_from_as];
 
-          $fullvalues = $this->cleanUpEntityMappingStructure($fullvalues);
-          // 'ap:entitymapping' will always exists of ::cleanUpEntityMappingStructure
+          $fullvalues = $this->cleanUpEntityMappingStructure($fullvalues, $for_from_as);
+          // 'ap:entitymapping' will always exists because of ::cleanUpEntityMappingStructure
           $entity_mapping_structure = $fullvalues['ap:entitymapping'];
           $allprocessedAsValues = [];
+          $flipped_json_keys_with_filenumids = [];
           // All fids we have in this doc.
           $all_fids = [];
+          $sortmode = 'natural';
           if (isset($entity_mapping_structure['entity:file'])) {
             foreach ($entity_mapping_structure['entity:file'] as $jsonkey_with_filenumids) {
               // Here each $jsonkey_with_filenumids is a json key that holds file ids
               // Also $fullvalues[$jsonkeys_with_filenumids] will be there because
               // ::cleanUpEntityMappingStructure. Still, double check please?
-              $processedAsValuesForKey = [];
               $fullvalues[$jsonkey_with_filenumids] = isset($fullvalues[$jsonkey_with_filenumids]) ? $fullvalues[$jsonkey_with_filenumids] : [];
+
               // make even single files an array
               $fids = (is_array($fullvalues[$jsonkey_with_filenumids])) ? $fullvalues[$jsonkey_with_filenumids] : [$fullvalues[$jsonkey_with_filenumids]];
               // Only keep ids that can be actually entity ids or uuids
+
               $fids = array_filter(
                 $fids,
                 [$this, 'isEntityId']
               );
+
               // NOTE. If no files are passed no processing will be done
               // Does not mean we actually cleaned left overs from a previous
               // Revision and we are not handling that here!
@@ -199,6 +186,10 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
 
               if (is_array($fids) && !empty($fids)) {
                 $fids = array_unique($fids);
+
+                // We will use this for Key based Ordering.
+                $flipped_json_keys_with_filenumids[$jsonkey_with_filenumids] = array_flip($fids);
+
                 // @TODO. If UUID the loader needs to be different.
                 $processedAsValuesForKey = $this->strawberryfilepersister
                   ->generateAsFileStructure(
@@ -217,13 +208,13 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
 
             // Calculate the array_diff between OLD files and new ones
             $all_fids = array_unique($all_fids);
-            $original_fids = array_unique($original_fids);
-            $to_be_removed_files = array_diff($original_fids, $all_fids);
+            $fids_from_as = array_unique($fids_from_as);
+            $to_be_removed_files = array_diff($fids_from_as, $all_fids);
             if (is_array($to_be_removed_files) && count($to_be_removed_files) > 0) {
               // We remove from the fullvalues any file that was removed
               // This will also decrease the Usage Count for that file
               $fullvalues = $this->strawberryfilepersister->removefromAsFileStructure(
-                $to_be_removed_files, $fullvalues, $entity->id());
+                $to_be_removed_files, $fullvalues, $entity);
             }
 
             // WE should be able to load also UUIDs here.
@@ -240,16 +231,25 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
               // Could come from another URL only field or added manually by some
               // Advanced user. New INFO will always win, old entries only added if they did not exist.
               $new_info = $info + $previous_info;
+
+              // Only if we have files
               if (count($new_info) > 0) {
                 $fullvalues[$askey] = $new_info;
-              } else {
+                // Now Sort Files here, after all the cleanup and removing of old files
+                $sortmode = $fullvalues['ap:tasks']['ap:sortfiles'] ?? 'natural';
+                $sortmode = in_array($sortmode, ['natural','index', 'manual']) ? $sortmode : 'natural';
+                $fullvalues[$askey] = $this->strawberryfilepersister->sortFileStructure($fullvalues[$askey], $flipped_json_keys_with_filenumids, $sortmode);
+              }
+              else {
                 // Do not leave empty keys around
                 unset($fullvalues[$askey]);
               }
             }
+
+            $fullvalues['ap:tasks']['ap:sortfiles'] = $sortmode;
             if (!$itemfield->setMainValueFromArray((array) $fullvalues)) {
               $this->messenger->addError($this->t('We could not persist file classification. Please contact the site admin.'));
-            };
+            }
           }
         }
       }
@@ -277,10 +277,23 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
    *     "ismemberof"
    *   }
    *
+   *  @param array $for_from_as
+   *    An array with all source keys (dr:from) fetched from the flat array
+   *    This may not exist of course and be an empty array.
+   *
    * @return array
-   *   The cleaned/up $entityMapping
+   *   The cleaned/up $entityMapping or empty array if nothing.
    */
-  private function cleanUpEntityMappingStructure(array $fullvalues) {
+  private function cleanUpEntityMappingStructure(array $fullvalues, array $for_from_as = []) {
+
+    // If not present or empty and we do have dr:for try to rebuild from that
+    // Its an edge cases but adds an extra level of dexterity/safety.
+
+    $jsonkeys_with_fileids_clean = [];
+
+    if (!isset($fullvalues['ap:entitymapping']['entity:file']) && !empty($for_from_as)) {
+      $fullvalues['ap:entitymapping']['entity:file'] = $for_from_as;
+    }
 
     if (isset($fullvalues['ap:entitymapping']) && is_array(
         $fullvalues['ap:entitymapping']
@@ -291,16 +304,18 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
         ARRAY_FILTER_USE_KEY
       );
       // We can not have an array of arrays.
+      foreach ($entityMapping as $entity_type_key => $jsonkeys_with_fileids) {
+        if (is_array($jsonkeys_with_fileids)) {
+          $jsonkeys_with_fileids_clean = array_filter(
+            $jsonkeys_with_fileids,
+            [$this, 'isNotArray']
+          );
+        }
 
-      foreach ($entityMapping as $entity_type_key => &$jsonkeys_with_fileids) {
-        $jsonkeys_with_fileids_clean = [];
-        $jsonkeys_with_fileids_clean = array_filter(
-          $jsonkeys_with_fileids,
-          [$this,'isNotArray']
-        );
-        // Clean again in case we have an empty mapping, like entity:node?
-        $jsonkeys_with_fileids_clean = array_filter($jsonkeys_with_fileids_clean);
+
         if (is_array($jsonkeys_with_fileids_clean)) {
+          // Clean again in case we have an empty mapping, like entity:node?
+          $jsonkeys_with_fileids_clean = array_filter($jsonkeys_with_fileids_clean);
           foreach ($jsonkeys_with_fileids_clean as $json_key) {
             // If not present simply create
             if (!isset($fullvalues[$json_key])) {
@@ -313,17 +328,14 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
         // nor if they are valid. IF we have 2000 entities
         // doing this here is an overkill. Just do when needed
         // Also: i really want to allow relationships to exist even before
-        // the referenced entites are present.
+        // the referenced entities are present.
         // We really care here only for the entity:file part
         // but will do our best to clean all.
       }
       $fullvalues['ap:entitymapping'] = $entityMapping;
     }
     else {
-      // If not here or not an array create the structure. We want it .
-      $fullvalues['ap:entitymapping'] = [
-        "entity:file" => [],
-      ];
+      $fullvalues['ap:entitymapping'] = [];
     }
     return $fullvalues;
   }
@@ -336,7 +348,7 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
    * @return bool
    */
   private function isEntityId($val) {
-    return (is_int($val) && $val > 0) || \Drupal\Component\Uuid\Uuid::isValid(
+    return (is_int($val) && $val > 0) || Uuid::isValid(
         $val
       );
   }
@@ -354,7 +366,7 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
   /**
    * Array value callback. True if $key starts with Entity
    *
-   * @param mixed $val
+   * @param mixed $key
    *
    * @return bool
    */

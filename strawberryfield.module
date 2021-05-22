@@ -1,11 +1,15 @@
 <?php
+
 /**
  * @file
  * Contains strawberryfield.module.
  */
 
-use Drupal\node\NodeInterface;
 use Drupal\Core\Entity\ContentEntityInterface;
+use Drupal\Core\Entity\EntityPublishedInterface;
+use Drupal\Core\Render\Markup;
+use Drupal\file\FileInterface;
+use Drupal\search_api\Query\QueryInterface;
 use Drupal\strawberryfield\Event\StrawberryfieldCrudEvent;
 use Drupal\strawberryfield\StrawberryfieldEventType;
 use Drupal\Core\Field\BaseFieldDefinition;
@@ -18,19 +22,17 @@ use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Field\FieldItemListInterface;
+use Solarium\Core\Query\QueryInterface as SolariumQueryInterface;
 
 /**
  * Implements hook_ENTITY_TYPE_presave().
- *
- * {@inheritdoc}
  */
 function strawberryfield_node_presave(ContentEntityInterface $entity) {
-
-
   if ($sbf_fields = \Drupal::service('strawberryfield.utility')->bearsStrawberryfield($entity)) {
     $config = \Drupal::config('strawberryfield.general');
     $bench = FALSE;
-    // When benchmark is enabled a simple but effective report will be found in the reports/logs
+    // When benchmark is enabled a simple but effective report will be found in
+    // the reports/logs.
     if ($config->get('benchmark')) {
       $bench = TRUE;
       $start_time = microtime(true);
@@ -38,34 +40,29 @@ function strawberryfield_node_presave(ContentEntityInterface $entity) {
     // Introducing our newest development, the processing time stats!
     // Starting on PHP 7.3 we should use hrtime for docker and VMS.
     // https://www.php.net/manual/en/function.microtime.php
-
-    //@TODO make bench simply an Event Method! That way we can measure every
-    //Event by calling it and for new ones. Etc.
-
+    // @TODO make bench simply an Event Method! That way we can measure every
+    // event by calling it and for new ones. Etc.
     $event_type = StrawberryfieldEventType::PRESAVE;
     $event = new StrawberryfieldCrudEvent($event_type, $entity, $sbf_fields);
-    /** @var \Symfony\Component\EventDispatcher\EventDispatcher $dispatcher */
-    $dispatcher = \Drupal::service('event_dispatcher');
-    $dispatcher->dispatch($event_type, $event);
+    \Drupal::service('event_dispatcher')->dispatch($event_type, $event);
 
     if ($bench) {
       $end_time = microtime(TRUE);
-      // Removed bsuc
+      // Removed bsuc.
       $time = round($end_time - $start_time, 4);
       $max_memory = memory_get_peak_usage(TRUE);
       $events = '';
-      foreach($event->getProcessedBy() as $event_info) {
-        $success = $event_info['success']? 'Successful' : 'Failure';
-        $events .= '<li>'.$event_info['class']. ' => '.$success.'</li>';
+      foreach ($event->getProcessedBy() as $event_info) {
+        $success = $event_info['success'] ? 'Successful' : 'Failure';
+        $events .= '<li>' . $event_info['class'] . ' => ' . $success . '</li>';
       }
-      $events_markup = \Drupal\Core\Render\Markup::create($events);
       \Drupal::logger('strawberryfield')->notice(
         'ADO with UUID @uuid spent @time seconds on all presave event subscriber processing and max memory usage was @maxmem. <br> Event Subscribers that could run were the following: <br><ul>@events</ul>',
         [
           '@uuid' => $entity->uuid(),
           '@time' => $time,
           '@maxmem' => \Drupal::service('strawberryfield.utility')->formatBytes($max_memory, 2),
-          '@events' => $events_markup,
+          '@events' => Markup::create($events),
         ]
       );
     }
@@ -74,109 +71,81 @@ function strawberryfield_node_presave(ContentEntityInterface $entity) {
 
 /**
  * Implements hook_ENTITY_TYPE_update().
- *
- * {@inheritdoc}
  */
 function strawberryfield_node_update(ContentEntityInterface $entity) {
-
   if ($sbf_fields = \Drupal::service('strawberryfield.utility')->bearsStrawberryfield($entity)) {
     $event_type = StrawberryfieldEventType::SAVE;
     $event = new StrawberryfieldCrudEvent($event_type, $entity, $sbf_fields);
-    /** @var \Symfony\Component\EventDispatcher\EventDispatcher $dispatcher */
-    $dispatcher = \Drupal::service('event_dispatcher');
-    $dispatcher->dispatch($event_type, $event);
+    \Drupal::service('event_dispatcher')->dispatch($event_type, $event);
   }
 }
 
 /**
  * Implements hook_ENTITY_TYPE_insert().
- *
- * {@inheritdoc}
  */
 function strawberryfield_node_insert(ContentEntityInterface $entity) {
-
-  //@TODO move this to an event subscriber.
+  // @TODO move this to an event subscriber.
   strawberryfield_invalidate_fieldefinition_caches($entity);
 
   if ($sbf_fields = \Drupal::service('strawberryfield.utility')->bearsStrawberryfield($entity)) {
     $event_type = StrawberryfieldEventType::INSERT;
     $event = new StrawberryfieldCrudEvent($event_type, $entity, $sbf_fields);
-    /** @var \Symfony\Component\EventDispatcher\EventDispatcher $dispatcher */
-    $dispatcher = \Drupal::service('event_dispatcher');
-    $dispatcher->dispatch($event_type, $event);
-    //@TODO use updated $event object to debug things if an event failed.
-    //via $event->getProcessedBy();
+    \Drupal::service('event_dispatcher')->dispatch($event_type, $event);
+    // @TODO use updated $event object to debug things if an event failed.
+    // via $event->getProcessedBy();
   }
 }
+
 /**
  * Implements hook_ENTITY_TYPE_revision_create().
- *
- * {@inheritdoc}
  */
 function strawberryfield_node_revision_create(ContentEntityInterface $new_revision, ContentEntityInterface $entity, $keep_untranslatable_fields) {
-
   if ($sbf_fields = \Drupal::service('strawberryfield.utility')->bearsStrawberryfield($entity)) {
     $event_type = StrawberryfieldEventType::NEW_REVISION;
     $event = new StrawberryfieldCrudEvent($event_type, $entity, $sbf_fields);
-    /** @var \Symfony\Component\EventDispatcher\EventDispatcher $dispatcher */
-    $dispatcher = \Drupal::service('event_dispatcher');
-    $dispatcher->dispatch($event_type, $event);
+    \Drupal::service('event_dispatcher')->dispatch($event_type, $event);
   }
 }
 
 /**
  * Implements hook_ENTITY_TYPE_delete().
- *
- * {@inheritdoc}
  */
 function strawberryfield_node_delete(ContentEntityInterface $entity) {
-
   if ($sbf_fields = \Drupal::service('strawberryfield.utility')->bearsStrawberryfield($entity)) {
     $event_type = StrawberryfieldEventType::DELETE;
     $event = new StrawberryfieldCrudEvent($event_type, $entity, $sbf_fields);
-    /** @var \Symfony\Component\EventDispatcher\EventDispatcher $dispatcher */
-    $dispatcher = \Drupal::service('event_dispatcher');
-    $dispatcher->dispatch($event_type, $event);
+    \Drupal::service('event_dispatcher')->dispatch($event_type, $event);
   }
-
 }
 
 /**
  * Implements hook_ENTITY_TYPE_revision_delete().
- *
- * {@inheritdoc}
  */
 function strawberryfield_node_revision_delete(ContentEntityInterface $entity) {
 
   if ($sbf_fields = \Drupal::service('strawberryfield.utility')->bearsStrawberryfield($entity)) {
     $event_type = StrawberryfieldEventType::DELETE;
     $event = new StrawberryfieldCrudEvent($event_type, $entity, $sbf_fields);
-    /** @var \Symfony\Component\EventDispatcher\EventDispatcher $dispatcher */
-    $dispatcher = \Drupal::service('event_dispatcher');
-    $dispatcher->dispatch($event_type, $event);
+    \Drupal::service('event_dispatcher')->dispatch($event_type, $event);
   }
-  //@TODO move this to an event subscriber.
+  // @TODO move this to an event subscriber.
   strawberryfield_invalidate_fieldefinition_caches($entity);
 }
-
 
 /**
  * Invalidate the cache for strawberryfields field type defintions.
  *
- * @param \Drupal\node\NodeInterface $node
+ * @param \Drupal\Core\Entity\ContentEntityInterface $entity
+ *   The entity to invalidate cache.
  */
 function strawberryfield_invalidate_fieldefinition_caches(ContentEntityInterface $entity) {
-
-  //@TODO do the same for StrawberryfieldKeyNameProvider Plugins
-  if ($entity->isPublished() && $entity->isDefaultRevision()) {
+  // @TODO do the same for StrawberryfieldKeyNameProvider Plugins
+  if ($entity instanceof EntityPublishedInterface && $entity->isPublished() && $entity->isDefaultRevision()) {
     $needscleaning = FALSE;
     $strawberry_field_class = $class = \Drupal::service('plugin.manager.field.field_type')->getPluginClass('strawberryfield_field');
     foreach ($entity->getFieldDefinitions() as $field) {
       $class = $field->getItemDefinition()->getClass();
-      $is_ripe = ($class === $strawberry_field_class) || is_subclass_of(
-          $class,
-          $strawberry_field_class
-        );
+      $is_ripe = ($class === $strawberry_field_class) || is_subclass_of($class, $strawberry_field_class);
       if ($is_ripe) {
         $needscleaning = TRUE;
       }
@@ -189,120 +158,97 @@ function strawberryfield_invalidate_fieldefinition_caches(ContentEntityInterface
 }
 
 /**
- * Implements hook_entity_base_field_info();
- *
- * @param \Drupal\Core\Entity\EntityTypeInterface $entity_type
- *
- * @return array
+ * Implements hook_entity_base_field_info().
  */
 function strawberryfield_entity_base_field_info(EntityTypeInterface $entity_type) {
-  if ($entity_type->id() == 'node') {
-    $scheme_options = \Drupal::service('stream_wrapper_manager')->getNames(
-      StreamWrapperInterface::WRITE_VISIBLE
-    );
-    if (isset($scheme_options['private'])) {
-      $schema = 'private';
-    }
-    elseif (isset($scheme_options['public'])) {
-      $schema = 'public';
-    }
-    else {
-      $schema = 'public';
-    }
-
-    $fields = [];
-    // Add a field that serves as a drop box for any entities that bear a SBF
-    // @see https://www.drupal.org/project/drupal/issues/2346347
-    // (still WIP as June 2020)
-    // know why we can't use \Drupal\Core\Field\BaseFieldDefinition
-    // @TODO If we try to make this Bundle specific?
-    // @Update 20202: https://www.previousnext.com.au/blog/how-create-and-expose-computed-properties-rest-api-drupal-8
-    // Issue with that approach is we need to have a hook update for every bundle
-    // Which makes adding new bundles and attaching automagically super complex
-
-    // @TODO future work on exposing other JSON properties as other REAL field types
-    // Dynamically can be achieved by creating a new Class extending BaseFieldDefinition
-    // That manages without hickups the 'Bundle' option
-    // \Drupal\Core\Field\BaseFieldDefinition::setTargetBundle
-
-    $fields['field_file_drop'] = BaseFieldDefinition::create('entity_reference')
-      ->setName('field_file_drop')
-      ->setLabel(t('Drop Files'))
-      ->setComputed(TRUE)
-      ->setRevisionable(FALSE)
-      ->setTranslatable(FALSE)
-      ->setCardinality(FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED)
-      ->setReadOnly(FALSE)
-      ->setTargetEntityTypeId($entity_type->id())
-      ->setSettings(
-        [
-          'target_type' => 'file',
-          'file_directory' => 'sbf_tmp',
-          'uri_scheme' => $schema,
-        ]
-      )
-      ->setClass(StrawberryFieldFileComputedItemList::class)
-      ->setDisplayConfigurable('view', FALSE)
-      ->setDisplayConfigurable('form', FALSE);
-
-
-    // A computed field to store customly detected Node references from a SBF.
-    $fields['field_sbf_nodetonode'] = BaseFieldDefinition::create('entity_reference')
-      ->setName('field_sbf_nodetonode')
-      ->setLabel('Related ADOs')
-      ->setSetting('target_type', 'node')
-      ->setTargetEntityTypeId('node')
-      ->setDescription(t('Computed Node to Node relationships'))
-      ->setComputed(TRUE)
-      ->setCardinality(FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED)
-      ->setRevisionable(FALSE)
-      ->setReadOnly(TRUE)
-      ->setTranslatable(FALSE)
-      ->setClass(StrawberryFieldEntityComputedItemList::class);
-    return $fields;
+  if ($entity_type->id() != 'node') {
+    return [];
   }
+  $scheme_options = \Drupal::service('stream_wrapper_manager')->getNames(StreamWrapperInterface::WRITE_VISIBLE);
+  if (isset($scheme_options['private'])) {
+    $schema = 'private';
+  }
+  elseif (isset($scheme_options['public'])) {
+    $schema = 'public';
+  }
+  else {
+    $schema = 'public';
+  }
+
+  $fields = [];
+  // Add a field that serves as a drop box for any entities that bear a SBF.
+  // @see https://www.drupal.org/project/drupal/issues/2346347
+  // (still WIP as June 2020)
+  // know why we can't use \Drupal\Core\Field\BaseFieldDefinition
+  // @TODO If we try to make this Bundle specific?
+  // @Update 20202: https://www.previousnext.com.au/blog/how-create-and-expose-computed-properties-rest-api-drupal-8
+  // Issue with that approach is we need to have a hook update for every
+  // bundle Which makes adding new bundles and attaching automagically super
+  // complex.
+  // @TODO future work on exposing other JSON properties as other REAL field types
+  // Dynamically can be achieved by creating a new Class extending
+  // BaseFieldDefinition.
+  // That manages without hickups the 'Bundle' option
+  // \Drupal\Core\Field\BaseFieldDefinition::setTargetBundle
+  $fields['field_file_drop'] = BaseFieldDefinition::create('entity_reference')
+    ->setName('field_file_drop')
+    ->setLabel(t('Drop Files'))
+    ->setComputed(TRUE)
+    ->setRevisionable(FALSE)
+    ->setTranslatable(FALSE)
+    ->setCardinality(FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED)
+    ->setReadOnly(FALSE)
+    ->setTargetEntityTypeId($entity_type->id())
+    ->setSettings(
+      [
+        'target_type' => 'file',
+        'file_directory' => 'sbf_tmp',
+        'uri_scheme' => $schema,
+      ]
+    )
+    ->setClass(StrawberryFieldFileComputedItemList::class)
+    ->setDisplayConfigurable('view', FALSE)
+    ->setDisplayConfigurable('form', FALSE);
+
+  // A computed field to store customly detected Node references from a SBF.
+  $fields['field_sbf_nodetonode'] = BaseFieldDefinition::create('entity_reference')
+    ->setName('field_sbf_nodetonode')
+    ->setLabel('Related ADOs')
+    ->setSetting('target_type', 'node')
+    ->setTargetEntityTypeId('node')
+    ->setDescription(t('Computed Node to Node relationships'))
+    ->setComputed(TRUE)
+    ->setCardinality(FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED)
+    ->setRevisionable(FALSE)
+    ->setReadOnly(TRUE)
+    ->setTranslatable(FALSE)
+    ->setClass(StrawberryFieldEntityComputedItemList::class);
+
+  return $fields;
 }
 
 /**
- * Implements hook_entity_bundle_field_info();
- *
- * @param \Drupal\Core\Entity\EntityTypeInterface $entity_type
- *   The entity type definition.
- * @param string $bundle
- *   The bundle.
- * @param \Drupal\Core\Field\FieldDefinitionInterface[] $base_field_definitions
- *   The list of base field definitions for the entity type.
- *
- * @return \Drupal\Core\Field\FieldDefinitionInterface[]
- *   An array of bundle field definitions, keyed by field name.
+ * Implements hook_entity_bundle_field_info().
  */
-function strawberryfield_entity_bundle_field_info(
-  EntityTypeInterface $entity_type,
-  $bundle,
-  array $base_field_definitions
-) {
+function strawberryfield_entity_bundle_field_info(EntityTypeInterface $entity_type, $bundle, array $base_field_definitions) {
   // This is a good workaround for ISSUE-86
   // Will basically attach the base field as a bundled one and by doing so
-  // Allow our bundle based permissions to be evaluated
-
+  // Allow our bundle based permissions to be evaluated.
   if (($entity_type->id() == 'node') && isset($base_field_definitions['field_file_drop'])) {
-    if (\Drupal::service('strawberryfield.utility')
-      ->bundleHasStrawberryfield($bundle)) {
-
+    if (\Drupal::service('strawberryfield.utility')->bundleHasStrawberryfield($bundle)) {
       // Add the target bundle to the field_file_drop base field
       // only if it carries a Strawberryfield
       // In practice this will allow Bundle specific create access permissions
       // to work and force anything not Strawberryfield to either have the node
       // access override or simply not work.
-
       $base_field_definitions['field_file_drop']->setTargetBundle($bundle);
       return [
         'field_file_drop' => $base_field_definitions['field_file_drop'],
       ];
     }
   }
-  // ASk around. Do we need to expose this virtual creature the same way
-  // Given that is its read only?
+  // Ask around. Do we need to expose this virtual creature the same way given
+  // that is its read only?
   if (($entity_type->id() == 'node') && isset($base_field_definitions['field_sbf_nodetonode'])) {
     if (\Drupal::service('strawberryfield.utility')
       ->bundleHasStrawberryfield($bundle)) {
@@ -312,7 +258,6 @@ function strawberryfield_entity_bundle_field_info(
       // In practice this will allow Bundle specific create access permissions
       // to work and force anything not Strawberryfield to either have the node
       // access override or simply not work.
-
       $base_field_definitions['field_sbf_nodetonode']->setTargetBundle($bundle);
       return [
         'field_sbf_nodetonode' => $base_field_definitions['field_sbf_nodetonode'],
@@ -322,26 +267,20 @@ function strawberryfield_entity_bundle_field_info(
 }
 
 /**
- * Implements hook_entity_field_access();
- *
- * @param $operation
- * @param \Drupal\Core\Field\FieldDefinitionInterface $field_definition
- * @param \Drupal\Core\Session\AccountInterface $account
- * @param \Drupal\Core\Field\FieldItemListInterface|NULL $items
- *
- * @return \Drupal\Core\Access\AccessResult|\Drupal\Core\Access\AccessResultNeutral
+ * Implements hook_entity_field_access().
  */
 function strawberryfield_entity_field_access($operation, FieldDefinitionInterface $field_definition, AccountInterface $account, FieldItemListInterface $items = NULL) {
-  if ($field_definition
-      ->getName() == 'field_file_drop') {
-     return AccessResult::allowedIfHasPermission($account, 'upload to Digital Object file dropbox field');
+  if ($field_definition->getName() == 'field_file_drop') {
+    return AccessResult::allowedIfHasPermission($account, 'upload to Digital Object file dropbox field');
   }
   return AccessResult::neutral();
 }
 
+/**
+ * Implements hook_file_mimetype_mapping_alter().
+ */
 function strawberryfield_file_mimetype_mapping_alter(&$mapping) {
-
-  // Add relevant Repository Mimetypes missing from D8
+  // Add relevant Repository Mimetypes missing from D8.
   $mapping['mimetypes']['json_mimetype'] = 'application/json';
   $mapping['extensions']['json'] = 'json_mimetype';
   $mapping['mimetypes']['jsonld_mimetype'] = 'application/ld+json';
@@ -356,28 +295,33 @@ function strawberryfield_file_mimetype_mapping_alter(&$mapping) {
   $mapping['extensions']['stl'] = 'stl_model_mimetype';
   // @see https://www.iana.org/assignments/media-types/media-types.xhtml
   $mapping['mimetypes']['stl_model_mimetype'] = 'model/stl';
-  //@ WACZ WIP
+  // @ WACZ WIP.
   $mapping['mimetypes']['wacz_mimetype'] = 'application/vnd.datapackage+zip';
   $mapping['extensions']['wacz'] = 'wacz_mimetype';
 }
 
+/**
+ * Implements hook_s3fs_url_settings_alter().
+ */
 function strawberryfield_s3fs_url_settings_alter(array &$url_settings, $s3_file_path) {
   // @TODO This is a soft dependency. Means if we have no s3fs module all good.
   // Idea here is to allow in the future
   // signed urls to be generated given a certain condition
   // Or to force AWS S3 metatags to control maybe object lifecycle.
-  //if ($s3_file_path == 'myfile.jpg') {
-  //  $url_settings['presigned_url'] = TRUE;
-  //  $url_settings['timeout'] = 10;
-  //}
+  // if ($s3_file_path == 'myfile.jpg') {
+  // $url_settings['presigned_url'] = TRUE;
+  // $url_settings['timeout'] = 10;
+  // }
   // An example of adding a custom GET argument to all S3 URLs that
   // records the name of the currently logged in user.
-  //$account = Drupal::currentUser();
-  //$url_settings['custom_GET_args']['x-user'] = $account->getAccountName();
+  // $account = Drupal::currentUser();
+  // $url_settings['custom_GET_args']['x-user'] = $account->getAccountName();
 }
 
 /**
- * Lets modules alter the Solarium select query before executing it.
+ * Implements hook_search_api_solr_query_alter().
+ *
+ * Let modules alter the Solarium select query before executing it.
  *
  * After this hook, the select query will be finally converted into an
  * expression that will be processed by the lucene query parser. Therefore you
@@ -388,17 +332,17 @@ function strawberryfield_s3fs_url_settings_alter(array &$url_settings, $s3_file_
  * hook_search_api_solr_converted_query() instead. If you want to force a
  * different parser like edismax you must set the 'defType' parameter
  * accordingly.
- *
- * @param \Solarium\Core\Query\QueryInterface $solarium_query
- *   The Solarium query object, as generated from the Search API query.
- * @param \Drupal\search_api\Query\QueryInterface $query
- *   The Search API query object representing the executed search query.
  */
-function strawberryfield_search_api_solr_query_alter(\Solarium\Core\Query\QueryInterface $solarium_query, \Drupal\search_api\Query\QueryInterface $query) {
-  // To get a list of solrium events:
+function strawberryfield_search_api_solr_query_alter(SolariumQueryInterface $solarium_query, QueryInterface $query) {
+  // To get a list of solarium events:
   // @see http://solarium.readthedocs.io/en/stable/customizing-solarium/#plugin-system
-  // If the Search API query has a 'my_custom_boost' option, use the edsimax
-  // query handler and add some boost queries.
+  if ($query->getOption('no_highlight')) {
+    $solarium_query->addParam('hl', 'false');
+    /* @var \Solarium\Component\Highlighting\Highlighting $hl */
+    $hl = $solarium_query->getHighlighting();
+    $hl->clearFields();
+  }
+
   if ($query->getOption('ocr_highlight')) {
     // $solr_field_names maps search_api field names to real field names in
     // the Solr index.
@@ -406,8 +350,10 @@ function strawberryfield_search_api_solr_query_alter(\Solarium\Core\Query\QueryI
     if (isset($solr_field_names['ocr_text'])) {
       /* @var \Solarium\Component\Highlighting\Highlighting $hl */
       $hl = $solarium_query->getHighlighting();
-      // hl.fl has issues if ocr_text is in that list (Token Offset big error, bad, bad)
-      // By removing any highlight returns in this case we can focus on what we need.
+      // hl.fl has issues if ocr_text is in that list (Token Offset big error,
+      // bad, bad)
+      // By removing any highlight returns in this case we can focus on what we
+      // need.
       $hl->clearFields();
 
       $solarium_query->addParam('hl.ocr.fl', $solr_field_names['ocr_text']);
@@ -417,6 +363,9 @@ function strawberryfield_search_api_solr_query_alter(\Solarium\Core\Query\QueryI
   }
 }
 
+/**
+ * Implements hook_cron().
+ */
 function strawberryfield_cron() {
   // @TODO: Drush calls to CRON do not release the background process? Wait
   // For ever for the exec() to return, even if calling with nohup.
@@ -426,4 +375,3 @@ function strawberryfield_cron() {
     \Drupal::getContainer()->get('strawberryfield.hydroponics')->run();
   }
 }
-

@@ -91,16 +91,7 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
    *
    * @return \Drupal\Core\Cache\CacheableJsonResponse
    */
-  public function search(
-    Request $request,
-    ContentEntityInterface $node,
-    string $fileuuid = 'all',
-    string $processor = 'ocr'
-  ) {
-
-
-
-
+  public function search(Request $request, ContentEntityInterface $node, string $fileuuid = 'all', string $processor = 'ocr') {
 
     if (!Uuid::isValid($fileuuid) && $fileuuid !== 'all') {
       // We do not want to expose the user to errors here?
@@ -137,7 +128,8 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
       }
       return $response;
 
-    } else {
+    }
+    else {
       return new JsonResponse([]);
     }
   }
@@ -179,14 +171,16 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
         }
       }
 
-      $allfields_translated_to_solr = $search_api_index->getServerInstance()->getBackend()->getSolrFieldNames($query->getIndex());
+      $allfields_translated_to_solr = $search_api_index->getServerInstance()
+        ->getBackend()
+        ->getSolrFieldNames($query->getIndex());
       if (isset($allfields_translated_to_solr['ocr_text'])) {
         // Will be used by \strawberryfield_search_api_solr_query_alter
-        $query->setOption('ocr_highlight','on');
+        $query->setOption('ocr_highlight', 'on');
         // We are already checking if the Node can be viewed. Custom Datasources can not depend on Solr node access policies.
         $query->setOption('search_api_bypass_access', TRUE);
       }
-      $query->setOption('search_api_retrieved_field_values',['id']);
+      $query->setOption('search_api_retrieved_field_values', ['id']);
       // If we allow Extra processing here Drupal adds Content Access Check
       // That does not match our Data Source \Drupal\search_api\Plugin\search_api\processor\ContentAccess
       // we get this filter (see 2nd)
@@ -228,8 +222,8 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
                     [
                       'page' => $page_number,
                       'boxes' => [],
-                    ]
-                  ]
+                    ],
+                  ],
                 ];
 
                 foreach ($snippet['highlights'] as $highlight) {
@@ -243,7 +237,7 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
                     't' => $highlight[0]['uly'],
                     'r' => $highlight[0]['lrx'],
                     'b' => $highlight[0]['lry'],
-                    'page' => $page_number
+                    'page' => $page_number,
                   ];
                 }
               }
@@ -257,5 +251,30 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
     }
     return ['matches' => $result_snippets];
   }
+
+  /**
+   * Returns number of Solr Flavour Documents for a given processor and Node.
+   *
+   * @param \Symfony\Component\HttpFoundation\Request $request
+   * @param \Drupal\Core\Entity\ContentEntityInterface $node
+   * @param string $processor
+   *
+   * @return \Symfony\Component\HttpFoundation\JsonResponse
+   * @throws \Drupal\search_api\SearchApiException
+   */
+  public function count(Request $request, ContentEntityInterface $node, string $processor = 'ocr') {
+    $count = 0;
+    try {
+      $count = $this->strawberryfieldUtility->getCountByProcessorInSolr(
+        $node, $processor
+      );
+      return new JsonResponse(['count' => $count]);
+    }
+    catch (\Exception $exception) {
+      // We do not want to throw nor record exceptions for public facing Endpoints
+      return new JsonResponse(['count' => $count]);
+    }
+  }
+
 }
 
