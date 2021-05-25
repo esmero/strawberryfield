@@ -572,7 +572,7 @@ XML;
           $where = isset($processed_data->where) ? (array) $processed_data->where : [];
           $who = isset($processed_data->who) ? (array) $processed_data->who : [];
           $when = isset($processed_data->when) ? (array) $processed_data->when : [];
-          $ts = isset($processed_data->ts) ? (string) $processed_data->who : date("c");
+          $ts = isset($processed_data->ts) ? (string) $processed_data->ts : date("c");
           $sentiment = isset($processed_data->sentiment) ? (string) $processed_data->sentiment : 0;
           $uri = isset($processed_data->uri) ? (string) $processed_data->uri : '';
 
