@@ -576,9 +576,8 @@ XML;
           $who = isset($processed_data->who) ? (array) $processed_data->who : [];
           $when = isset($processed_data->when) ? (array) $processed_data->when : [];
           $ts = isset($processed_data->ts) ? (string) $processed_data->ts : date("c");
-          $sentiment = isset($processed_data->sentiment) ? (string) $processed_data->sentiment : 0;
+          $sentiment = isset($processed_data->sentiment) ? (is_scalar($processed_data->sentiment) ? $processed_data->sentiment : 0) : 0;
           $uri = isset($processed_data->uri) ? (string) $processed_data->uri : '';
-
           $sequence_total = isset($processed_data->sequence_total) ? (string) $processed_data->sequence_total : $sequence_id;
           if ($checksum) {
             $data = [
