@@ -272,8 +272,8 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
     $response = new AjaxResponse();
     $canrun = \Drupal::service('strawberryfield.utility')->verifyCommand($form_state->getValue('mediainfo_exec_path'));
     if (!$canrun) {
-      $response->addCommand(new InvokeCommand('#mediainfo-pdfinfo-exec-path', 'addClass', ['error']));
-      $response->addCommand(new InvokeCommand('#mediainfo-pdfinfo-exec-path', 'removeClass', ['ok']));
+      $response->addCommand(new InvokeCommand('#edit-mediainfo-exec-path', 'addClass', ['error']));
+      $response->addCommand(new InvokeCommand('#edit-mediainfo-exec-path', 'removeClass', ['ok']));
       $response->addCommand(new MessageCommand('Mediainfo path is not valid.', NULL, ['type' => 'error', 'announce' => 'Mediainfo path is not valid.']));
 
     } else {
