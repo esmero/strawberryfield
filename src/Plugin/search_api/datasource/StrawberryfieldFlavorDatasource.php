@@ -198,6 +198,7 @@ XML;
    */
   protected function getEntity(ComplexDataInterface $item) {
     $value = $item->get('target_id')->getValue();
+
     return $value instanceof EntityInterface ? $value : NULL;
   }
 
@@ -547,6 +548,8 @@ XML;
     $keyvalue_collection = self::SBFL_KEY_COLLECTION;
 
     foreach ($this->getEntityStorage()->loadMultiple($entity_ids) as $entity_id => $entity) {
+      $status = $entity->isPublished();
+      $uid = $entity->getOwnerId();
       foreach ($entity_ids_splitted[$entity_id] as $item_id => $splitted_id_for_node) {
         $sequence_id = !empty($splitted_id_for_node[1]) ? $splitted_id_for_node[1] : 1;
         $fid_uuid = isset($splitted_id_for_node[3]) ? $splitted_id_for_node[3] : NULL;
@@ -565,12 +568,21 @@ XML;
           );
           // Put the package File ID / Package.
           $fulltext = isset($processed_data->fulltext) ? (string) $processed_data->fulltext : '';
+          $label = isset($processed_data->label) ? (string) $processed_data->label : "Sequence {$sequence_id}";
           $plaintext = isset($processed_data->plaintext) ? (string) $processed_data->plaintext : '';
+          $metadata = isset($processed_data->metadata) ? (array) $processed_data->metadata : [];
           $checksum = isset($processed_data->checksum) ? (string) $processed_data->checksum : NULL;
+          $where = isset($processed_data->where) ? (array) $processed_data->where : [];
+          $who = isset($processed_data->who) ? (array) $processed_data->who : [];
+          $when = isset($processed_data->when) ? (array) $processed_data->when : [];
+          $ts = isset($processed_data->ts) ? (string) $processed_data->ts : date("c");
+          $sentiment = isset($processed_data->sentiment) ? (is_scalar($processed_data->sentiment) ? $processed_data->sentiment : 0) : 0;
+          $uri = isset($processed_data->uri) ? (string) $processed_data->uri : '';
           $sequence_total = isset($processed_data->sequence_total) ? (string) $processed_data->sequence_total : $sequence_id;
           if ($checksum) {
             $data = [
               'item_id' => $item_id,
+              'label' => $label,
               'sequence_id' => $sequence_id,
               'sequence_total' => $sequence_total,
               'target_id' => $splitted_id_for_node[0],
@@ -580,7 +592,16 @@ XML;
               'processor_id' => $plugin_id,
               'fulltext' => '',
               'plaintext' => '',
+              'metadata' => $metadata,
+              'who' => $who,
+              'where' => $where,
+              'when' => $when,
+              'ts' => $ts,
+              'sentiment' => $sentiment,
+              'uri' => $uri,
               'checksum' => $checksum,
+              'status' => $status,
+              'uid' => $uid,
             ];
             // This will then always create a new Index document, even if empty.
             // Needed if we e.g are gonna use this for Book search/IIIF search

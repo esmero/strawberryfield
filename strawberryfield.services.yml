@@ -50,8 +50,8 @@ services:
     tags:
       - {name: event_subscriber}
     arguments: ['@string_translation', '@messenger', '@logger.factory', '@strawberryfield.file_persister', '@current_user']
-  strawberryfield.file_delete_flavor:
-    class: Drupal\strawberryfield\EventSubscriber\StrawberryEventSaveFileDeleteFlavorSubscriber
+  strawberryfield.node_update_flavor:
+    class: Drupal\strawberryfield\EventSubscriber\StrawberryEventSaveFlavorSubscriber
     tags:
       - { name: event_subscriber }
     arguments: ['@keyvalue']
