@@ -142,6 +142,26 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
       ]
     ];
 
+    $form['mediainfo_exec_path'] = [
+      '#type' => 'textfield',
+      '#title' => $this->t('Absolute path to the mediainfo tool binary inside your server'),
+      '#description' => $this->t('Mediainfo will run against any Video or Audio files associated to an Archipelago Digital Object and resulting technical metadata will be appended to the strawberryfield JSON. mediainfo v20+ is recommended'),
+      '#default_value' => !empty($config->get('mediainfo_exec_path')) ? $config->get('mediainfo_exec_path'): '/usr/bin/mediainfo',
+      '#states' => [
+        'visible' => [
+          ':input[name="extractmetadata"]' => ['checked' => TRUE],
+        ],
+      ],
+      '#prefix' => '<span class="mediainfo-exec-path-validation"></span>',
+      '#ajax' => [
+        'callback' => [$this, 'validateMediaInfo'],
+        'effect' => 'fade',
+        'wrapper' => 'mediainfo-exec-path-validation',
+        'method' => 'replace',
+        'event' => 'change'
+      ]
+    ];
+
     return parent::buildForm($form, $form_state);
   }
 
@@ -240,6 +260,30 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
     }
     return $response;
   }
+
+  /**
+   * Validate MediaInfo Exec Path
+   * @param array $form
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *
+   * @return \Drupal\Core\Ajax\AjaxResponse
+   */
+  public function validateMediaInfo(array $form, FormStateInterface $form_state) {
+    $response = new AjaxResponse();
+    $canrun = \Drupal::service('strawberryfield.utility')->verifyCommand($form_state->getValue('mediainfo_exec_path'));
+    if (!$canrun) {
+      $response->addCommand(new InvokeCommand('#mediainfo-pdfinfo-exec-path', 'addClass', ['error']));
+      $response->addCommand(new InvokeCommand('#mediainfo-pdfinfo-exec-path', 'removeClass', ['ok']));
+      $response->addCommand(new MessageCommand('Mediainfo path is not valid.', NULL, ['type' => 'error', 'announce' => 'Mediainfo path is not valid.']));
+
+    } else {
+      $response->addCommand(new InvokeCommand('#edit-mediainfo-exec-path', 'removeClass', ['error']));
+      $response->addCommand(new InvokeCommand('#edit-mediainfo-exec-path', 'addClass', ['ok']));
+      $response->addCommand(new MessageCommand('Mediainfo path is valid!', NULL, ['type' => 'status', 'announce' => 'Mediainfo path is valid!']));
+
+    }
+    return $response;
+  }
   /**
    * @param array $form
    * @param \Drupal\Core\Form\FormStateInterface $form_state
@@ -284,6 +328,15 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
           $this->t('Please correct. PDFInfo path is not valid.')
         );
       }
+      $canrun_mediainfo = \Drupal::service('strawberryfield.utility')->verifyCommand(
+        $form_state->getValue('mediainfo_exec_path')
+      );
+      if (!$canrun_mediainfo) {
+        $form_state->setErrorByName(
+          'mediainfo_exec_path',
+          $this->t('Please correct. Mediainfo path is not valid.')
+        );
+      }
     }
 
     parent::validateForm(
@@ -303,12 +356,12 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
       ->set('fido_exec_path', trim($form_state->getValue('fido_exec_path')))
       ->set('identify_exec_path', trim($form_state->getValue('identify_exec_path')))
       ->set('pdfinfo_exec_path', trim($form_state->getValue('pdfinfo_exec_path')))
+      ->set('mediainfo_exec_path', trim($form_state->getValue('mediainfo_exec_path')))
       ->save();
     $this->config('strawberryfield.storage_settings')
       ->set('file_scheme', $form_state->getValue('file_scheme'))
       ->set('object_file_scheme', $form_state->getValue('object_file_scheme'))
       ->save();
-
     parent::submitForm($form, $form_state);
   }
 }
