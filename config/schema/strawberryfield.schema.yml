@@ -174,7 +174,10 @@ strawberryfield.filepersister_service_settings:
       label: 'Identify binary full executable path (graphics magic or Imagemagick)'
     pdfinfo_exec_path:
       type: string
-      label: 'pdfinfo binary full executable path (poppler utils)'
+      label: 'pdfinfo binary full executable path (poppler utils)',
+    mediainfo_exec_path:
+      type: string
+      label: 'mediainfo binary full executable path'
 
 strawberryfield.general:
   type: config_object
