@@ -89,7 +89,7 @@ class StrawberryDefaultFormatter extends FormatterBase {
           'json' => [
             '#markup' => json_encode(
               json_decode($item->value, TRUE),
-              JSON_PRETTY_PRINT
+              JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE
             ),
             '#prefix' => '<pre>',
             '#suffix' => '</pre>',

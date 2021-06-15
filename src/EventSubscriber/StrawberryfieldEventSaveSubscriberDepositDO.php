@@ -16,7 +16,7 @@ use Datetime;
 /**
  * Event subscriber for SBF bearing entity insert event.
  */
-class StrawberryfieldEventInsertSubscriberDepositDO extends StrawberryfieldEventInsertSubscriber {
+class StrawberryfieldEventSaveSubscriberDepositDO extends StrawberryfieldEventSaveSubscriber {
 
   use StringTranslationTrait;
 
@@ -102,10 +102,22 @@ class StrawberryfieldEventInsertSubscriberDepositDO extends StrawberryfieldEvent
    *
    * @throws \Drupal\Core\Entity\EntityMalformedException
    */
-  public function onEntityInsert(StrawberryfieldCrudEvent $event) {
+  public function onEntitySave(StrawberryfieldCrudEvent $event) {
     /* @var $entity \Drupal\Core\Entity\ContentEntityInterface */
     $current_class = get_called_class();
     $entity = $event->getEntity();
+    if ($entity->isDefaultRevision()) {
+     dpm('is default revision');
+    }
+    else {
+      dpm('is not default revision');
+    }
+    dpm($entity->getRevisionId());
+    dpm($entity->getRevisionCreationTime());
+
+    return;
+
+
     $sbf_fields = $event->getFields();
     // Strawberryfield data
     $sbf_data = [];

@@ -263,11 +263,11 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
     */
    public function setMainValueFromArray(array $jsonarray) {
 
-     $jsonstring = json_encode($jsonarray, JSON_PRETTY_PRINT, 50);
+     $jsonstring = json_encode($jsonarray, 0, 50);
 
      if ($jsonstring) {
        $this->setValue([$this->mainPropertyName() => $jsonstring], TRUE);
-       // Clear this caches just in case
+       // Clear these caches just in case
        $this->flattenjson = [];
        $this->jsonjmesresults = [];
      }
