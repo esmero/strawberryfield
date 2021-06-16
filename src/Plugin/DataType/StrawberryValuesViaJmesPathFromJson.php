@@ -99,6 +99,13 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
             $values_parsed[] = $date_ini;
             $values_parsed[] = $date_max;
           }
+          else {
+            // try with normal date parser just in case
+            $timestamp = strtotime($value);
+            if ($timestamp) {
+              $values_parsed[] = date('c', $timestamp);
+            }
+          }
         }
         $values = array_unique($values_parsed);
       }
