@@ -107,13 +107,13 @@ class StrawberryfieldEventSaveSubscriberDepositDO extends StrawberryfieldEventSa
     $current_class = get_called_class();
     $entity = $event->getEntity();
     if ($entity->isDefaultRevision()) {
-     dpm('is default revision');
+
     }
     else {
-      dpm('is not default revision');
+
     }
-    dpm($entity->getRevisionId());
-    dpm($entity->getRevisionCreationTime());
+    //dpm($entity->getRevisionId());
+    //dpm($entity->getRevisionCreationTime());
 
     return;
 
