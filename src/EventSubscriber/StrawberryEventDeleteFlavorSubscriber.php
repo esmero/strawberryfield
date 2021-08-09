@@ -42,10 +42,6 @@ class StrawberryEventDeleteFlavorSubscriber extends StrawberryfieldEventDeleteSu
    * {@inheritdoc}
    */
   public function onEntityDelete(StrawberryfieldCrudEvent $event) {
-    // We need to compare the original entity with the saved just now as file
-    // events don't really work for this use case. The file is still attached to
-    // the revisions. This event is run only on update, so we're not treating
-    // the isNew() possibility here.
       $entity = $event->getEntity();
       $this->trackDeleted($entity);
       $current_class = get_called_class();
