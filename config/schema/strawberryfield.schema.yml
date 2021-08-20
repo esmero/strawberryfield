@@ -82,6 +82,9 @@ strawberryfield.storage_settings:
     object_file_scheme:
       type: string
       label: 'Storage Scheme for Persisting Digital Objects in JSON format'
+    object_file_strategy:
+      type: string
+      label: 'Persisting Digital Objects in JSON format strategy (Backup). Can be "all" or "default". Will default to "default"'
 
 strawberryfield.archipelago_solr_settings:
   type: config_object
