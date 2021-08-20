@@ -20,7 +20,8 @@ use Drupal\Core\Entity\ContentEntityBase;
  * @FieldFormatter(
  *   id = "strawberry_default_formatter",
  *   label = @Translation("Strawberry Default Formatter"),
- *   class = "\Drupal\strawberryfield\Plugin\Field\FieldFormatter\StrawberryDefaultFormatter",
+ *   class =
+ *   "\Drupal\strawberryfield\Plugin\Field\FieldFormatter\StrawberryDefaultFormatter",
  *   field_types = {
  *     "strawberryfield_field"
  *   },
@@ -89,7 +90,7 @@ class StrawberryDefaultFormatter extends FormatterBase {
           'json' => [
             '#markup' => json_encode(
               json_decode($item->value, TRUE),
-              JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE
+              JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE
             ),
             '#prefix' => '<pre>',
             '#suffix' => '</pre>',
@@ -101,21 +102,20 @@ class StrawberryDefaultFormatter extends FormatterBase {
   }
 
   /**
-  * Loads the current account object, if it does not exist yet.
-  *
-  * @param \Drupal\Core\Session\AccountInterface $account
-  *   The account interface instance.
-  *
-  * @return \Drupal\Core\Session\AccountInterface
-  *   Returns the current account object.
-  */
+   * Loads the current account object, if it does not exist yet.
+   *
+   * @param \Drupal\Core\Session\AccountInterface $account
+   *   The account interface instance.
+   *
+   * @return \Drupal\Core\Session\AccountInterface
+   *   Returns the current account object.
+   */
   protected function prepareUser(AccountInterface $account = NULL) {
     if (!$account) {
       $account = \Drupal::currentUser();
     }
     return $account;
   }
-
 
 
 }
