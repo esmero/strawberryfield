@@ -42,10 +42,9 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
       '#type' => 'radios',
       '#title' => $this->t('Storage Scheme for Persisting Files'),
       '#description' => $this->t('Please provide your prefered Storage Scheme for Persisting Strawberryfield managed Files'),
-      '#default_value' => $config_storage ->get('file_scheme'),
+      '#default_value' => $config_storage->get('file_scheme'),
       '#options' => $scheme_options,
       '#required' => TRUE
-
     ];
 
     $form['object_file_scheme'] = [
@@ -54,6 +53,17 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
       '#description' => $this->t('Please provide your prefered Storage Scheme for Persisting Digital Objects as JSON Files'),
       '#default_value' => $config_storage ->get('object_file_scheme'),
       '#options' => $scheme_options,
+      '#required' => TRUE
+    ];
+    $form['object_file_strategy'] = [
+      '#type' => 'radios',
+      '#title' => $this->t('Persisting Digital Objects in JSON format Strategy'),
+      '#description' => $this->t('Please Choose how ADO to File (JSON) persistence should we handled. Changes on this are not retroactive and will also not remove existing persisted ADOs at /dostorage'),
+      '#default_value' => $config_storage->get('object_file_strategy') ?? 'default',
+      '#options' => [
+        'all' => 'Every Revision',
+        'default' => 'Only First Ingest + latest Default Revision',
+      ],
       '#required' => TRUE
     ];
 
@@ -361,6 +371,7 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
     $this->config('strawberryfield.storage_settings')
       ->set('file_scheme', $form_state->getValue('file_scheme'))
       ->set('object_file_scheme', $form_state->getValue('object_file_scheme'))
+      ->set('object_file_strategy', $form_state->getValue('object_file_strategy'))
       ->save();
     parent::submitForm($form, $form_state);
   }
