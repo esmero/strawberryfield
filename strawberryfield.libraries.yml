@@ -1,0 +1,15 @@
+d3js:
+  version: 7.0.1
+  js:
+    https://cdn.jsdelivr.net/npm/d3@7.0.1/dist/d3.min.js: { external: true, minified: true, preprocess: false}
+    https://cdn.jsdelivr.net/npm/d3-tip@0.9.1/dist/index.min.js: { external: true, minified: true, preprocess: false}
+
+strawberryfield.d3viz:
+  js:
+    js/d3viz_strawberryfield.js : {minified: false}
+  dependencies:
+    - core/jquery
+    - core/drupal
+    - core/drupalSettings
+    - core/drupal.form
+    - strawberryfield/d3js
