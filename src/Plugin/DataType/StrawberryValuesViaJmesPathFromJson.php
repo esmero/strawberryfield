@@ -6,6 +6,7 @@
  * Time: 8:21 PM
  */
 namespace Drupal\strawberryfield\Plugin\DataType;
+use DateTime;
 use Drupal\Core\TypedData\Plugin\DataType\ItemList;
 use Drupal\strawberryfield\Plugin\Field\FieldType\StrawberryFieldItem;
 use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
@@ -98,6 +99,11 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
             $date_max = date('c', $date_max);
             $values_parsed[] = $date_ini;
             $values_parsed[] = $date_max;
+          }
+          else {
+            // If not EDTF (e.g an already ISO8601 date)
+            // try with string based parsing
+            $values_parsed[] = $this->parseStringToDate($value);
           }
         }
         $values = array_unique($values_parsed);
@@ -199,6 +205,33 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
    */
   public function applyDefaultValue($notify = TRUE) {
     return $this;
+  }
+
+  /**
+   * Will try to parse an unknown string to an ISO8601 date.
+   *
+   * @param mixed $date
+   *
+   * @return false|string
+   *    If string/int could not be parse returns false.
+   *    If it was possible, return an ISO8601 date.
+   */
+  protected function parseStringToDate($date) {
+    // Start by using a full ISO8601 date in case time zone is included
+    $d = DateTime::createFromFormat('c', $date);
+    if (!$d) {
+      // If not check if its not a timestamp
+      if (!is_numeric($date)) {
+        $date = strtotime($date);
+      }
+      if ($date) {
+        $d = DateTime::createFromFormat('U', $date);
+      }
+    }
+    if ($d) {
+      return $d->format('c');
+    }
+    return FALSE;
   }
 }
 
