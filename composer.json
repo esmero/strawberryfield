@@ -18,7 +18,7 @@
         "mtdowling/jmespath.php":"^2.5",
         "swaggest/json-schema":"^0.12.29",
         "swaggest/json-diff":"^3.7.5",
-        "frictionlessdata/datapackage": "dev-master",
+        "frictionlessdata/datapackage": "dev-main",
         "drupal/search_api": "~1.17",
         "drupal/search_api_solr": "^4.1.4"
     },
