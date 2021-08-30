@@ -23,8 +23,8 @@
                 .text("Info");
 
             var diagonal = d3.linkHorizontal().x(d => d.y).y(d => d.x);
-            root.x0 = (height-40)/2;
-            root.y0 = 50;
+            root.x0 = height/2;
+            root.y0 = margin.right/2;
             var tree = d3.tree().size([height - margin.top - margin.bottom, width - margin.left - margin.right]);
 
 
@@ -36,9 +36,7 @@
 
             const svg = d3.select(selector).append("svg")
                 .attr("viewBox", [0, 0, width, height])
-                //.attr("width", width + margin.right + margin.left)
-                //.attr("height", height + margin.top + margin.bottom)
-                .style("font", "0.55em sans-serif")
+                .style("font", "0.45em sans-serif")
                 .style("user-select", "none");
 
             var columns = svg.append("g").attr("transform", "translate(40,40)");
@@ -54,7 +52,7 @@
                 .attr("pointer-events", "all")
 
             function update(source) {
-                const duration = d3.event && d3.event.altKey ? 2500 : 250;
+                const duration = d3.event && d3.event.altKey ? 2500 : 350;
                 const nodes = root.descendants().reverse();
                 // Compute the tree layout.
                 tree(root);
@@ -71,7 +69,7 @@
 
                 const transition = svg.transition()
                     .duration(duration)
-                    .attr("viewBox", [-margin.left, left.x - margin.top, width + margin.right, height])
+                    .attr("viewBox", [ -margin.left , left.x - margin.top, width, height])
                     .tween("resize", window.ResizeObserver ? null : () => () => svg.dispatch("toggle"));
 
                 // Update the nodes…
@@ -106,7 +104,7 @@
                 nodeEnter.append("text")
                     .attr("dy", "0.31em")
                     .attr("class", "nodelabel")
-                    .attr("x", d => d._children ? -13 : 13)
+                    .attr("x", d => d._children ? -10 : 10)
                     .attr("text-anchor", d => d._children ? "end" : "start")
                     .text(d => d.data.name)
                     .call(wrap, 200)
@@ -119,7 +117,7 @@
                 nodeEnter.append("text")
                     .attr("dy", "0.31em")
                     .style('fill', 'darkOrange')
-                    .attr("x", d => d._children ? 13 : -13)
+                    .attr("x", d => d._children ? 10 : -10)
                     .attr("text-anchor", d => d._children ? "start" : "end")
                     .call(openlink);
 
