@@ -46,6 +46,13 @@ class StrawberryfieldEventInsertSubscriberDepositDO extends StrawberryfieldEvent
   protected $destinationScheme = NULL;
 
   /**
+   * The Storage Destination Relative Path.
+   *
+   * @var string;
+   */
+  protected $destinationRelativePath = NULL;
+
+  /**
    * The Strawberryfield File Persister Service
    *
    *  @var \Drupal\strawberryfield\StrawberryfieldFilePersisterService
@@ -91,6 +98,9 @@ class StrawberryfieldEventInsertSubscriberDepositDO extends StrawberryfieldEvent
     $this->destinationScheme = $config_factory->get(
       'strawberryfield.storage_settings'
     )->get('object_file_scheme');
+    $this->destinationRelativePath = $config_factory->get(
+      'strawberryfield.storage_settings'
+    )->get('object_file_path') ?? "dostorage";
     $this->loggerFactory = $logger_factory;
     $this->strawberryfilepersister = $strawberry_filepersister;
     $this->account = $account;
@@ -119,7 +129,7 @@ class StrawberryfieldEventInsertSubscriberDepositDO extends StrawberryfieldEvent
     );
     //@TODO right now JSON API does not expose its serialization publicly
     // We can use JSONAPI_Extras module for this
-    $path = $this->destinationScheme . '://dostorage/' . $entity->uuid();
+    $path = $this->destinationScheme . '://' . $this->destinationRelativePath . '/' . $entity->uuid();
     $success = FALSE;
     if ($full_node_data) {
       $filename_full_node = 'node_' . $entity->bundle() . '_' . $entity->uuid() . '.json';

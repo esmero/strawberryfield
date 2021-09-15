@@ -47,7 +47,12 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
       '#required' => TRUE
 
     ];
-
+    $form['file_path'] = [
+      '#type' => 'textfield',
+      '#title' => $this->t('Relative Path for Persisting Files'),
+      '#description' => $this->t('Path relative to the root of the storage scheme selected above where the hashed directories used to store persisted managed files will be created. Do not include beginning or ending slashes. Default is "".'),
+      '#default_value' => !empty($config_storage->get('file_path')) ? $config_storage->get('file_path'): "",
+    ];
     $form['object_file_scheme'] = [
       '#type' => 'radios',
       '#title' => $this->t('Storage Scheme for Persisting Digital Objects'),
@@ -55,6 +60,12 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
       '#default_value' => $config_storage ->get('object_file_scheme'),
       '#options' => $scheme_options,
       '#required' => TRUE
+    ];
+    $form['object_file_path'] = [
+      '#type' => 'textfield',
+      '#title' => $this->t('Relative Path for Persisting Digital Object Files'),
+      '#description' => $this->t('Path relative to the root of the storage scheme selected above where digital object files will be stored. Do not include beginning or ending slashes. Default is "dostorage".'),
+      '#default_value' => !empty($config_storage->get('object_file_path')) ? $config_storage->get('object_file_path'): "dostorage",
     ];
 
     $form['extractmetadata'] = [
@@ -306,7 +317,9 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
       ->save();
     $this->config('strawberryfield.storage_settings')
       ->set('file_scheme', $form_state->getValue('file_scheme'))
+      ->set('file_path', trim($form_state->getValue('file_path')," \n\r\t\v\0/"))
       ->set('object_file_scheme', $form_state->getValue('object_file_scheme'))
+      ->set('object_file_path', trim($form_state->getValue('object_file_path')," \n\r\t\v\0/"))
       ->save();
 
     parent::submitForm($form, $form_state);
