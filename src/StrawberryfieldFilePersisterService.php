@@ -350,6 +350,7 @@ class StrawberryfieldFilePersisterService {
       $file_parts['destination_extension'] ?? 'bin'
     );
     // First part of Mime type becomes prefix. Performant for filtering in S3.
+    $destination_basename = $this->sanitizeFileName($destination_basename);
     $processed_file_parts['destination_filename'] =  $destination_filename = $destination_basename . '-' . $uuid . '.' . $destination_extension;
     $processed_file_parts['force'] = $force;
 
@@ -372,7 +373,6 @@ class StrawberryfieldFilePersisterService {
     if ($force || $file->isTemporary()) {
       $desired_scheme = $processed_file_parts['desired_scheme'] ?? $destination_scheme;
       $destination_filename = $processed_file_parts['destination_filename'] ?? $destination_filename;
-      $destination_filename = $this->sanitizeFileName($destination_filename);
       $destination_folder = $processed_file_parts['destination_folder'] ?? $destination_folder;
       // Sanitize the whole thing.
       // Finally make temporary Again in case it is permanent and we forced this.
