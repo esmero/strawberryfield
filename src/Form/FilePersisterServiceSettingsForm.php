@@ -51,7 +51,8 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
     $form['file_path'] = [
       '#type' => 'textfield',
       '#title' => $this->t('Relative Path for Persisting Files'),
-      '#description' => $this->t('Path relative to the root of the storage scheme selected above where the hashed directories used to store persisted managed files will be created. Do not include beginning or ending slashes. Default is "".'),
+      '#description' => $this->t('Path relative to the root of the storage scheme selected above where the hashed directories used to store persisted managed files will be created. Do not include beginning or ending slashes. Default is "". 
+                                  <br>Note that changing this setting will not affect the file storage locations for previously ingested objects. They will remain where they were.'),
       '#default_value' => !empty($config_storage->get('file_path')) ? $config_storage->get('file_path'): "",
     ];
     $form['object_file_scheme'] = [
@@ -65,7 +66,8 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
     $form['object_file_path'] = [
       '#type' => 'textfield',
       '#title' => $this->t('Relative Path for Persisting Digital Object Files'),
-      '#description' => $this->t('Path relative to the root of the storage scheme selected above where digital object files will be stored. Do not include beginning or ending slashes. Default is "@storage"',
+      '#description' => $this->t('Path relative to the root of the storage scheme selected above where digital object files will be stored. Do not include beginning or ending slashes. Default is "@storage". 
+                                  <br>Note that changing this setting will not affect the file storage locations for previously ingested objects. They will remain where they were.',
         ['@storage' => StrawberryfieldEventInsertSubscriberDepositDO::DEFAULTOBJECTSTORAGEFILEPATH]),
       '#default_value' => !empty($config_storage->get('object_file_path')) ? $config_storage->get('object_file_path'): StrawberryfieldEventInsertSubscriberDepositDO::DEFAULTOBJECTSTORAGEFILEPATH,
     ];
