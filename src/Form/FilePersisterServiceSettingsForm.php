@@ -5,6 +5,7 @@ namespace Drupal\strawberryfield\Form;
 use Drupal\Core\Ajax\AjaxResponse;
 use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\strawberryfield\EventSubscriber\StrawberryfieldEventInsertSubscriberDepositDO;
 use Drupal\strawberryfield\Tools\Ocfl\OcflHelper;
 use Drupal\Core\Ajax\InvokeCommand;
 use Drupal\Core\Ajax\MessageCommand;
@@ -64,8 +65,9 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
     $form['object_file_path'] = [
       '#type' => 'textfield',
       '#title' => $this->t('Relative Path for Persisting Digital Object Files'),
-      '#description' => $this->t('Path relative to the root of the storage scheme selected above where digital object files will be stored. Do not include beginning or ending slashes. Default is "dostorage".'),
-      '#default_value' => !empty($config_storage->get('object_file_path')) ? $config_storage->get('object_file_path'): "dostorage",
+      '#description' => $this->t('Path relative to the root of the storage scheme selected above where digital object files will be stored. Do not include beginning or ending slashes. Default is "@storage"',
+        ['@storage' => StrawberryfieldEventInsertSubscriberDepositDO::DEFAULTOBJECTSTORAGEFILEPATH]),
+      '#default_value' => !empty($config_storage->get('object_file_path')) ? $config_storage->get('object_file_path'): StrawberryfieldEventInsertSubscriberDepositDO::DEFAULTOBJECTSTORAGEFILEPATH,
     ];
 
     $form['extractmetadata'] = [

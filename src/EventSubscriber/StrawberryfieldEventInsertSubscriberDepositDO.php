@@ -21,6 +21,11 @@ class StrawberryfieldEventInsertSubscriberDepositDO extends StrawberryfieldEvent
   use StringTranslationTrait;
 
   /**
+   * Default path for digital object file storage.
+   */
+  public const DEFAULTOBJECTSTORAGEFILEPATH = 'dostorage';
+
+  /**
    * @var int
    */
   protected static $priority = -700;
@@ -100,7 +105,7 @@ class StrawberryfieldEventInsertSubscriberDepositDO extends StrawberryfieldEvent
     )->get('object_file_scheme');
     $this->destinationRelativePath = $config_factory->get(
       'strawberryfield.storage_settings'
-    )->get('object_file_path') ?? "dostorage";
+    )->get('object_file_path') ?? self::DEFAULTOBJECTSTORAGEFILEPATH;
     $this->loggerFactory = $logger_factory;
     $this->strawberryfilepersister = $strawberry_filepersister;
     $this->account = $account;
