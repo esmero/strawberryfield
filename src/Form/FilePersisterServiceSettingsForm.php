@@ -3,8 +3,10 @@
 namespace Drupal\strawberryfield\Form;
 
 use Drupal\Core\Ajax\AjaxResponse;
+use Drupal\Core\File\FileSystemInterface;
 use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Url;
 use Drupal\strawberryfield\EventSubscriber\StrawberryfieldEventInsertSubscriberDepositDO;
 use Drupal\strawberryfield\Tools\Ocfl\OcflHelper;
 use Drupal\Core\Ajax\InvokeCommand;
@@ -51,9 +53,17 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
     $form['file_path'] = [
       '#type' => 'textfield',
       '#title' => $this->t('Relative Path for Persisting Files'),
-      '#description' => $this->t('Path relative to the root of the storage scheme selected above where the hashed directories used to store persisted managed files will be created. Do not include beginning or ending slashes. Default is "". 
+      '#description' => $this->t('Path relative to the root of the storage scheme selected above where the hashed directories used to store persisted managed files will be created. Do not include beginning or ending slashes. Default is "".
                                   <br>Note that changing this setting will not affect the file storage locations for previously ingested objects. They will remain where they were.'),
-      '#default_value' => !empty($config_storage->get('file_path')) ? $config_storage->get('file_path'): "",
+      '#default_value' => !empty($config_storage->get('file_path')) ? $config_storage->get('file_path') : "",
+      '#prefix' => '<span class="filepath-exec-path-validation"></span>',
+      '#ajax' => [
+        'callback' => [$this, 'validateFilePath'],
+        'effect' => 'fade',
+        'wrapper' => 'filepath-exec-path-validation',
+        'method' => 'replace',
+        'event' => 'change',
+      ],
     ];
     $form['object_file_scheme'] = [
       '#type' => 'radios',
@@ -66,10 +76,18 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
     $form['object_file_path'] = [
       '#type' => 'textfield',
       '#title' => $this->t('Relative Path for Persisting Digital Object Files'),
-      '#description' => $this->t('Path relative to the root of the storage scheme selected above where digital object files will be stored. Do not include beginning or ending slashes. Default is "@storage". 
+      '#description' => $this->t('Path relative to the root of the storage scheme selected above where digital object files will be stored. Do not include beginning or ending slashes. Default is "@storage".
                                   <br>Note that changing this setting will not affect the file storage locations for previously ingested objects. They will remain where they were.',
         ['@storage' => StrawberryfieldEventInsertSubscriberDepositDO::DEFAULTOBJECTSTORAGEFILEPATH]),
-      '#default_value' => !empty($config_storage->get('object_file_path')) ? $config_storage->get('object_file_path'): StrawberryfieldEventInsertSubscriberDepositDO::DEFAULTOBJECTSTORAGEFILEPATH,
+      '#default_value' => !empty($config_storage->get('object_file_path')) ? $config_storage->get('object_file_path') : StrawberryfieldEventInsertSubscriberDepositDO::DEFAULTOBJECTSTORAGEFILEPATH,
+      '#prefix' => '<span class="filepath-exec-path-validation"></span>',
+      '#ajax' => [
+        'callback' => [$this, 'validateObjectFilePath'],
+        'effect' => 'fade',
+        'wrapper' => 'objectfilepath-exec-path-validation',
+        'method' => 'replace',
+        'event' => 'change',
+      ],
     ];
 
     $form['extractmetadata'] = [
@@ -161,9 +179,154 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
   }
 
   /**
+   * Validate File Path
+   *
+   * @param  array  $form
+   * @param  \Drupal\Core\Form\FormStateInterface  $form_state
+   *
+   * @return \Drupal\Core\Ajax\AjaxResponse
+   */
+  public function validateFilePath(
+    array $form,
+    FormStateInterface $form_state
+  ) {
+    $response = new AjaxResponse();
+    $path = $form_state->getValue('file_path');
+    $scheme = $form_state->getValue('file_scheme');
+    if (empty($path)) {
+      $valid = TRUE;
+    }
+    else {
+      switch ($scheme) {
+        case 's3':
+          $valid = \Drupal::service('strawberryfield.utility')
+            ->s3FilePathIsValid($path);
+          break;
+        default:
+          $valid = \Drupal::service('strawberryfield.utility')
+            ->internalFilePathIsValid($scheme, $path);
+          break;
+      }
+    }
+    if (!$valid) {
+      $warning_message = self::filePathErrorMessage('file', $scheme, $path);
+      $response->addCommand(new InvokeCommand('#edit-file-path', 'addClass',
+        ['error']));
+      $response->addCommand(new InvokeCommand('#edit-file-path', 'removeClass',
+        ['ok']));
+      $response->addCommand(new MessageCommand($warning_message, NULL,
+        ['type' => 'error', 'announce' => 'file path is not valid.']));
+
+    }
+    else {
+      $response->addCommand(new InvokeCommand('#edit-file-path', 'removeClass',
+        ['error']));
+      $response->addCommand(new InvokeCommand('#edit-file-path', 'addClass',
+        ['ok']));
+      $response->addCommand(new MessageCommand('Relative file path is valid for ' . $scheme . '://',
+        NULL, ['type' => 'status', 'announce' => 'file path is valid!']));
+
+    }
+    return $response;
+  }
+
+  /**
+   * Validate Object File Path
+   *
+   * @param  array  $form
+   * @param  \Drupal\Core\Form\FormStateInterface  $form_state
+   *
+   * @return \Drupal\Core\Ajax\AjaxResponse
+   */
+  public function validateObjectFilePath(
+    array $form,
+    FormStateInterface $form_state
+  ) {
+    $response = new AjaxResponse();
+    $path = $form_state->getValue('object_file_path');
+    $scheme = $form_state->getValue('object_file_scheme');
+    if (empty($path)) {
+      $valid = TRUE;
+    }
+    else {
+      switch ($scheme) {
+        case 's3':
+          $valid = \Drupal::service('strawberryfield.utility')
+            ->s3FilePathIsValid($path);
+          break;
+        default:
+          $valid = \Drupal::service('strawberryfield.utility')
+            ->internalFilePathIsValid($scheme, $path);
+          break;
+      }
+    }
+    if (!$valid) {
+      $warning_message = self::filePathErrorMessage('object file', $scheme,
+        $path);
+      $response->addCommand(new InvokeCommand('#edit-object-file-path',
+        'addClass', ['error']));
+      $response->addCommand(new InvokeCommand('#edit-object-file-path',
+        'removeClass', ['ok']));
+      $response->addCommand(new MessageCommand($warning_message, NULL,
+        ['type' => 'error', 'announce' => 'object file path is not valid.']));
+
+    }
+    else {
+      $response->addCommand(new InvokeCommand('#edit-object-file-path',
+        'removeClass', ['error']));
+      $response->addCommand(new InvokeCommand('#edit-object-file-path',
+        'addClass', ['ok']));
+      $response->addCommand(new MessageCommand('Relative object file path is valid for ' . $scheme . '://',
+        NULL,
+        ['type' => 'status', 'announce' => 'object file path is valid!']));
+
+    }
+    return $response;
+  }
+
+  /**
+   * Utility function builds warning message string for file path validation
+   * functions.
+   *
+   * @param $type
+   * @param $scheme
+   * @param $path
+   *
+   * @return mixed
+   */
+  private function filePathErrorMessage($type, $scheme, $path) {
+    $instructions = [
+      's3' => t('Relative @type path "@path" is not valid for @scheme://.
+          Folder names must be a minimum of three characters, and may contain only lower case letters, numbers and internal hyphens.
+          Folder names are separated by forward slashes. Total path length limit is 63 characters.',
+        [
+          '@type' => $type,
+          '@scheme' => $scheme,
+          '@path' => $path,
+        ]
+      ),
+      'default' => t('Relative @type path "@path" is not valid for @scheme://. The path is not valid or is not writable.',
+        [
+          '@type' => $type,
+          '@scheme' => $scheme,
+          '@path' => $path,
+        ]
+      ),
+    ];
+    if (!empty($instructions[$scheme])) {
+      return $instructions[$scheme];
+    }
+    else {
+      return $instructions['default'];
+    }
+  }
+
+
+  /**
    * Validate exiftool Exec Path
-   * @param array $form
-   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *
+   * @param  array  $form
+   * @param  \Drupal\Core\Form\FormStateInterface  $form_state
    *
    * @return \Drupal\Core\Ajax\AjaxResponse
    */
@@ -297,6 +460,32 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
         $form_state->setErrorByName(
           'pdfinfo_exec_path',
           $this->t('Please correct. PDFInfo path is not valid.')
+        );
+      }
+    }
+
+    foreach(['file' => t('Relative file path'), 'object_file' => t('Relative object file path')] as $file_path_field => $file_path_field_label) {
+      $path = $form_state->getValue($file_path_field . "_path");
+      $scheme = $form_state->getValue($file_path_field . "_scheme");
+      if (empty($path)) {
+        $valid = TRUE;
+      }
+      else {
+        switch ($scheme) {
+          case 's3':
+            $valid = \Drupal::service('strawberryfield.utility')
+              ->s3FilePathIsValid($path);
+            break;
+          default:
+            $valid = \Drupal::service('strawberryfield.utility')
+              ->internalFilePathIsValid($scheme, $path);
+            break;
+        }
+      }
+      if(!$valid) {
+        $form_state->setErrorByName(
+          $file_path_field . "_path",
+          $this->t('Please correct. @label is not valid.', ['@label' => $file_path_field_label] )
         );
       }
     }

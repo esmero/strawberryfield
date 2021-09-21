@@ -4,6 +4,7 @@ namespace Drupal\strawberryfield;
 
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\File\FileSystemInterface;
 use Drupal\search_api\Entity\Index;
 
 /**
@@ -144,5 +145,34 @@ interface StrawberryfieldUtilityServiceInterface {
    * @throws \Drupal\search_api\SearchApiException
    */
   public function getCountByProcessorInSolr(EntityInterface $entity, string $processor, array $indexes = [], string $checksum = NULL): int;
+
+  /**
+   * Determines if a file system path is valid and can be written to.
+   *
+   * @param  string  $scheme
+   *   The URI scheme.
+   * @param  string  $path
+   *   The path (relative to the scheme).
+   *
+   * @return bool
+   *   FALSE if not valid
+   *   TRUE if valid.
+   */
+  public function internalFilePathIsValid(string $scheme, string $path): bool;
+
+  /**
+   * Determines if an S3 directory path is valid according to a restricted version
+   * of the rules defined here: https://www.ezs3.com/public/232.cfm:
+   *   Between 3 and 63 characters in total length.
+   *   Forward slashes delimit virtual directory structure (not actual)
+   *   Only lower case letters, numbers, and hyphens permitted for each virtual folder.
+   *   Virtual folders must be at least three characters, and may not begin or end with a hyphen.
+   *
+   * @param  string  $path
+   *   The virtual folder path, not including the "s3://" scheme at the beginning.
+   *
+   * @return bool
+   */
+  public function s3FilePathIsValid(string $path): bool;
 
 }

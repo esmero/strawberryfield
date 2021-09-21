@@ -29,6 +29,20 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
   use StringTranslationTrait;
 
   /**
+   * File system path pattern. Must begin and end with a word character, may have
+   * forward slashes delimiting directory names within the path.
+   */
+  const PATHPATTERN = "/(^(\w)+$)|(^(\w)([\/\w-]*)(\w)$)/";
+
+  /**
+   * S3 file system path pattern.
+   * See \Drupal\strawberryfield\StrawberryfieldUtilityServiceInterface::s3FilePathIsValid
+   * for explanation of the rules.
+   */
+  const S3PATHPATTERN = "/^[a-z0-9][a-z0-9\-]{1,61}[a-z0-9]$/";
+
+
+  /**
    * File system service.
    *
    * @var \Drupal\Core\File\FileSystemInterface
@@ -329,4 +343,57 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
     return $count;
   }
 
+  /**
+   * {@inheritdoc}
+   */
+  public function internalFilePathIsValid(string $scheme, string $path): bool {
+    // Empty path is always valid.
+    if(empty($path)) {
+      return TRUE;
+    }
+    // First check to see if the path is ok.
+    $path_valid = preg_match(self::PATHPATTERN, $path, $matches);
+    if(!$path_valid) {
+      return FALSE;
+    }
+
+    // TODO is there an easier way to determine if the file path is valid and writable?
+    //   \Drupal::service('path.validator')->isValid($path) always returns FALSE,
+    //   and \Drupal::service('stream_wrapper_manager')->isValidUri($path) always returns TRUE!
+
+    $test_path = $scheme . "://" . $path;
+
+    // FileSystemInterface::prepareDirectory with the MODIFY_PERMISSIONS flag checks to see if it's present and able to be written to.
+    $valid = \Drupal::service('file_system')->prepareDirectory($test_path, FileSystemInterface::MODIFY_PERMISSIONS);
+    if(!$valid) {
+      // If not present or able to be written to, let's check to see if we can create it.
+      $valid = \Drupal::service('file_system')->prepareDirectory($test_path, FileSystemInterface::CREATE_DIRECTORY);
+      if($valid) {
+        // Successfully created the directory, so we delete it now.
+        \Drupal::service('file_system')->rmdir($test_path);
+      }
+    }
+    return !empty($valid);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function s3FilePathIsValid(string $path): bool {
+    // Empty path is always valid.
+    if(empty($path)) {
+      return TRUE;
+    }
+
+    // Split the path into virtual directory names and check each one. If
+    // any are not valid, exit the loop and return FALSE.
+    $path = explode("/", $path);
+    foreach($path as $path_part) {
+      $valid = preg_match(self::S3PATHPATTERN, $path_part, $matches);
+      if(!$valid) {
+        return FALSE;
+      }
+    }
+    return TRUE;
+  }
 }
