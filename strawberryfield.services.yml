@@ -40,6 +40,11 @@ services:
     tags:
       - {name: event_subscriber}
     arguments: ['@string_translation', '@messenger', '@serializer', '@config.factory', '@logger.factory', '@strawberryfield.file_persister', '@current_user']
+  strawberryfield.savedeposit_subscriber:
+    class: Drupal\strawberryfield\EventSubscriber\StrawberryfieldEventSaveSubscriberDepositDO
+    tags:
+      - { name: event_subscriber }
+    arguments: [ '@string_translation', '@messenger', '@serializer', '@config.factory', '@logger.factory', '@strawberryfield.file_persister', '@current_user' ]
   strawberryfield.insertfileusage_subscriber:
     class: Drupal\strawberryfield\EventSubscriber\StrawberryfieldEventInsertFileUsageUpdater
     tags:

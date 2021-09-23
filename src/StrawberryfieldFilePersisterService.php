@@ -29,6 +29,7 @@ use Drupal\strawberryfield\Event\StrawberryfieldJsonProcessEvent;
 use Drupal\Core\StreamWrapper\StreamWrapperInterface;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
+use Mhor\MediaInfo\MediaInfo;
 use Drupal\Core\Url;
 
 
@@ -568,7 +569,6 @@ class StrawberryfieldFilePersisterService {
         // @TODO evaluate Node locking while this happens.
         $md5 = md5_file($uri);
         $filemetadata = $this->getBaseFileMetadata($file, $askey);
-
         $uuid = $file->uuid();
         // again, i know!
         $mime = $file->getMimeType();
@@ -1054,7 +1054,7 @@ class StrawberryfieldFilePersisterService {
         // Now check if there is still usage around.
         $usage = $this->fileUsage->listUsage($file);
         if (empty($usage)) {
-          //@TODO D 8.4+ does not mark unusued files as temporary.
+          //@TODO D 8.4+ does not mark unused files as temporary.
           // For repo needs we want everything SBF managed to be cleaned up.
           $file->setTemporary();
           $file->save();
@@ -1247,16 +1247,14 @@ class StrawberryfieldFilePersisterService {
     // Should we check everytime?
     // Or just when saving via the form?
 
-    $exif_exec_path = trim(
-      $this->config->get(
-        'exif_exec_path'
-      )
-    );
+    $exif_exec_path = trim($this->config->get('exif_exec_path'));
     $fido_exec_path = trim($this->config->get('fido_exec_path'));
     $identify_exec_path = trim($this->config->get('identify_exec_path'));
     $pdfinfo_exec_path = trim($this->config->get('pdfinfo_exec_path'));
+    $mediainfo_exec_path = trim($this->config->get('mediainfo_exec_path'));
 
     $uri = $file->getFileUri();
+    $file_uuid = $file->uuid();
     $mime = $file->getMimeType();
 
     /** @var \Drupal\Core\File\FileSystem $file_system */
@@ -1264,10 +1262,8 @@ class StrawberryfieldFilePersisterService {
     $templocation = NULL;
 
     // If the file isn't stored locally make a temporary copy.
-    if (!isset(
-      $this->streamWrapperManager->getWrappers(
-        StreamWrapperInterface::LOCAL
-      )[$scheme]
+    if (!isset($this->streamWrapperManager->getWrappers(
+        StreamWrapperInterface::LOCAL)[$scheme]
     )) {
       // Local stream.
       $cache_key = md5($uri);
@@ -1435,14 +1431,71 @@ class StrawberryfieldFilePersisterService {
           );
         }
         else {
-          // JSON-ify Identify data
-          $identify_meta = [];
-          if (count($output_identify) && isset($output_identify[0])) {
-            $output_identify = array_filter(
-              explode(
-                '@',
-                $output_identify[0]
-              )
+          // JSON-ify EXIF data
+          // remove RW Properties?
+          $output_fido = explode(',', str_replace('"', '', $result_fido));
+          if (count($output_fido) && $output_fido[0] == 'OK') {
+            // Means FIDO could do its JOB
+            $pronom['pronom_id'] = isset($output_fido[2]) ? 'info:pronom/' . $output_fido[2] : NULL;
+            $pronom['label'] = $output_fido[3] ?: NULL;
+            $pronom['mimetype'] = $output_fido[7] ?: NULL;
+            $pronom['detection_type'] = $output_fido[8] ?: NULL;
+            $metadata['flv:pronom'] = $pronom;
+          }
+        }
+      }
+      else {
+        $this->loggerFactory->get('strawberryfield')->warning(
+          '@fileurl was not processed using FIDO (Pronom) because the path is not set. <a href="@url">Please configure it here</a>',
+          [
+            '@fileurl' => $file->getFileUri(),
+            '@url' => Url::fromRoute(
+              'strawberryfield.file_persister_settings_form'
+            )->toString(),
+          ]
+        );
+      }
+
+      // Only run Media info if Video/Audio
+      // Do we need an exact list?
+      if (strlen($mediainfo_exec_path) > 0) {
+        if (in_array($askey, ['audio', 'video'])) {
+          $mediaInfo = new MediaInfo();
+          $mediaInfo->setConfig('command', $mediainfo_exec_path);
+          $mediaInfoContainer = $mediaInfo->getInfo($templocation, TRUE);
+          $metadata['flv:mediainfo'] = $mediaInfoContainer->__toArray();
+        }
+      }
+      else {
+        $this->loggerFactory->get('strawberryfield')->warning(
+          '@fileurl was not processed using mediainfo (Video/audio characterization) because the path is not set. <a href="@url">Please configure it here if you want that</a>',
+          [
+            '@fileurl' => $file->getFileUri(),
+            '@url' => Url::fromRoute(
+              'strawberryfield.file_persister_settings_form'
+            )->toString(),
+          ]
+        );
+      }
+
+      // Only run identify on Images/Documents?
+      // Do we need an exact list?
+      if (strlen($identify_exec_path) > 0) {
+        if (in_array($askey, ['image', 'video'])) {
+          $result_identify = exec(
+            $identify_exec_path . " -format 'format:%m|width:%w|height:%h|orientation:%[orientation]@' -quiet " . $templocation_for_exec,
+            $output_identify,
+            $status_identify
+          );
+
+          if ($status_identify != 0) {
+            // Means Identify did not work
+            $this->loggerFactory->get('strawberryfield')->warning(
+              'Could not process Identify on @templocation for @fileurl',
+              [
+                '@fileurl' => $file->getFileUri(),
+                '@templocation' => $templocation,
+              ]
             );
             foreach ($output_identify as $sequencenumber => $pageinfo) {
               if (is_string($pageinfo)) {
@@ -1581,17 +1634,60 @@ class StrawberryfieldFilePersisterService {
           }
         }
       }
-    }
-    else {
-      $this->loggerFactory->get('strawberryfield')->warning(
-        '@fileurl was not processed using PDFinfo because the path is not set. <a href="@url">Please configure it here</a>',
-        [
-          '@fileurl' => $file->getFileUri(),
-          '@url' => Url::fromRoute(
-            'strawberryfield.file_persister_settings_form'
-          )->toString(),
-        ]
-      );
+      else {
+        $this->loggerFactory->get('strawberryfield')->warning(
+          '@fileurl was not processed using PDFinfo because the path is not set. <a href="@url">Please configure it here</a>',
+          [
+            '@fileurl' => $file->getFileUri(),
+            '@url' => Url::fromRoute(
+              'strawberryfield.file_persister_settings_form'
+            )->toString(),
+          ]
+        );
+      }
+      if (strlen($fido_exec_path) > 0) {
+        $result_fido = exec(
+          $fido_exec_path . ' ' . $templocation_for_exec,
+          $output_fido,
+          $status_fido
+        );
+
+        // Second FIDO
+        if ($status_fido != 0) {
+          // Means Fido did not work
+          $this->loggerFactory->get('strawberryfield')->warning(
+            'Could not process FIDO on @templocation for @fileurl',
+            [
+              '@fileurl' => $file->getFileUri(),
+              '@templocation' => $templocation,
+            ]
+          );
+        }
+        else {
+          // JSON-ify EXIF data
+          // remove RW Properties?
+          $output_fido = explode(',', str_replace('"', '', $result_fido));
+          if (count($output_fido) && $output_fido[0] == 'OK') {
+            // Means FIDO could do its JOB
+            $pronom['pronom_id'] = isset($output_fido[2]) ? 'info:pronom/' . $output_fido[2] : NULL;
+            $pronom['label'] = $output_fido[3] ?: NULL;
+            $pronom['mimetype'] = $output_fido[7] ?: NULL;
+            $pronom['detection_type'] = $output_fido[8] ?: NULL;
+            $metadata['flv:pronom'] = $pronom;
+          }
+        }
+      }
+      else {
+        $this->loggerFactory->get('strawberryfield')->warning(
+          '@fileurl was not processed using FIDO (Pronom) because the path is not set. <a href="@url">Please configure it here</a>',
+          [
+            '@fileurl' => $file->getFileUri(),
+            '@url' => Url::fromRoute(
+              'strawberryfield.file_persister_settings_form'
+            )->toString(),
+          ]
+        );
+      }
     }
     return $metadata;
   }

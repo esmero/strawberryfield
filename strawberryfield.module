@@ -102,7 +102,7 @@ function strawberryfield_node_insert(ContentEntityInterface $entity) {
 function strawberryfield_node_revision_create(ContentEntityInterface $new_revision, ContentEntityInterface $entity, $keep_untranslatable_fields) {
   if ($sbf_fields = \Drupal::service('strawberryfield.utility')->bearsStrawberryfield($entity)) {
     $event_type = StrawberryfieldEventType::NEW_REVISION;
-    $event = new StrawberryfieldCrudEvent($event_type, $entity, $sbf_fields);
+    $event = new StrawberryfieldCrudEvent($event_type, $new_revision, $sbf_fields);
     \Drupal::service('event_dispatcher')->dispatch($event_type, $event);
   }
 }

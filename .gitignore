@@ -16,3 +16,5 @@
 .idea/codeStyles/Project.xml
 
 .idea/symfony2.xml
+src/.DS_Store
+src/Plugin/.DS_Store
