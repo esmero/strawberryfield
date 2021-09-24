@@ -148,6 +148,12 @@ interface StrawberryfieldUtilityServiceInterface {
 
   /**
    * Determines if a file system path is valid and can be written to.
+   * Utilizes more restrictive Amazon S3 file prefix rules that are
+   * described here: https://www.ezs3.com/public/232.cfm:
+   *   Between 3 and 63 characters in total length.
+   *   Forward slashes delimit virtual directory structure (not actual)
+   *   Only lower case letters, numbers, and hyphens permitted for each virtual folder.
+   *   Virtual folders must be at least three characters, and may not begin or end with a hyphen.
    *
    * @param  string  $scheme
    *   The URI scheme.
@@ -158,21 +164,6 @@ interface StrawberryfieldUtilityServiceInterface {
    *   FALSE if not valid
    *   TRUE if valid.
    */
-  public function internalFilePathIsValid(string $scheme, string $path): bool;
-
-  /**
-   * Determines if an S3 directory path is valid according to a restricted version
-   * of the rules defined here: https://www.ezs3.com/public/232.cfm:
-   *   Between 3 and 63 characters in total length.
-   *   Forward slashes delimit virtual directory structure (not actual)
-   *   Only lower case letters, numbers, and hyphens permitted for each virtual folder.
-   *   Virtual folders must be at least three characters, and may not begin or end with a hyphen.
-   *
-   * @param  string  $path
-   *   The virtual folder path, not including the "s3://" scheme at the beginning.
-   *
-   * @return bool
-   */
-  public function s3FilePathIsValid(string $path): bool;
+  public function filePathIsValid(string $scheme, string $path): bool;
 
 }

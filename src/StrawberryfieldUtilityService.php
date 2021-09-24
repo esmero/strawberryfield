@@ -14,6 +14,7 @@ use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\EntityFieldManagerInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
+use Drupal\Core\StreamWrapper\StreamWrapperInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\search_api\Entity\Index;
@@ -29,17 +30,14 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
   use StringTranslationTrait;
 
   /**
-   * File system path pattern. Must begin and end with a word character, may have
-   * forward slashes delimiting directory names within the path.
-   */
-  const PATHPATTERN = "/(^(\w)+$)|(^(\w)([\/\w-]*)(\w)$)/";
-
-  /**
-   * S3 file system path pattern.
+   * S3 file system valid folder name pattern.
+   * This is a more restrictive folder name pattern than needed for local file systems,
+   * but we apply it to all file systems so that the rules don't change if the user
+   * should change the file system.
    * See \Drupal\strawberryfield\StrawberryfieldUtilityServiceInterface::s3FilePathIsValid
    * for explanation of the rules.
    */
-  const S3PATHPATTERN = "/^[a-z0-9][a-z0-9\-]{1,61}[a-z0-9]$/";
+  const VALID_S3_PREFIX_PATTERN = "/^[a-z0-9][a-z0-9\-]{1,61}[a-z0-9]$/";
 
 
   /**
@@ -60,7 +58,6 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
    * The config factory service.
    *
    * @var \Drupal\Core\Config\ConfigFactoryInterface $configFactory
-
    */
   protected $configFactory;
 
@@ -74,8 +71,7 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
   /**
    * The Entity field manager service
    *
-   * @var \Drupal\Core\Entity\EntityFieldManagerInterface $entityFieldManager;
-
+   * @var \Drupal\Core\Entity\EntityFieldManagerInterface $entityFieldManager ;
    */
   protected $entityFieldManager;
 
@@ -97,15 +93,22 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
   /**
    * StrawberryfieldUtilityService constructor.
    *
-   * @param \Drupal\Core\File\FileSystemInterface $file_system
-   * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entity_type_manager
-   * @param \Drupal\Core\Config\ConfigFactoryInterface $config_factory
-   * @param \Drupal\Core\Extension\ModuleHandlerInterface $module_handler
-   * @param \Drupal\Core\Entity\EntityFieldManagerInterface $entity_field_manager
-   * @param \Drupal\search_api\ParseMode\ParseModePluginManager $parse_mode_manager
+   * @param  \Drupal\Core\File\FileSystemInterface  $file_system
+   * @param  \Drupal\Core\Entity\EntityTypeManagerInterface  $entity_type_manager
+   * @param  \Drupal\Core\Config\ConfigFactoryInterface  $config_factory
+   * @param  \Drupal\Core\Extension\ModuleHandlerInterface  $module_handler
+   * @param  \Drupal\Core\Entity\EntityFieldManagerInterface  $entity_field_manager
+   * @param  \Drupal\search_api\ParseMode\ParseModePluginManager  $parse_mode_manager
    *   The Search API parse Manager
    */
-  public function __construct(FileSystemInterface $file_system, EntityTypeManagerInterface $entity_type_manager, ConfigFactoryInterface $config_factory, ModuleHandlerInterface $module_handler, EntityFieldManagerInterface $entity_field_manager, ParseModePluginManager $parse_mode_manager) {
+  public function __construct(
+    FileSystemInterface $file_system,
+    EntityTypeManagerInterface $entity_type_manager,
+    ConfigFactoryInterface $config_factory,
+    ModuleHandlerInterface $module_handler,
+    EntityFieldManagerInterface $entity_field_manager,
+    ParseModePluginManager $parse_mode_manager
+  ) {
     $this->fileSystem = $file_system;
     $this->entityTypeManager = $entity_type_manager;
     $this->configFactory = $config_factory;
@@ -127,7 +130,8 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
       $hassbf[$key] = [];
       $field_item_lists = $entity->getFields();
       foreach ($field_item_lists as $field) {
-        if ($field->getFieldDefinition()->getType() == 'strawberryfield_field') {
+        if ($field->getFieldDefinition()
+            ->getType() == 'strawberryfield_field') {
           $hassbf[$key][] = $field->getFieldDefinition()->getName();
         }
       }
@@ -163,25 +167,28 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
   public function bundleHasStrawberryfield($bundle = 'digital_object') {
 
     $field = $this->entityTypeManager->getStorage('field_config');
-    $field_ids = $this->entityTypeManager->getStorage('field_config')->getQuery()
-        ->condition('entity_type', 'node')
-        ->condition('bundle', $bundle)
-        ->condition('field_type' , 'strawberryfield_field')
-        ->execute();
-    $fields = $this->entityTypeManager->getStorage('field_config')->loadMultiple($field_ids);
+    $field_ids = $this->entityTypeManager->getStorage('field_config')
+      ->getQuery()
+      ->condition('entity_type', 'node')
+      ->condition('bundle', $bundle)
+      ->condition('field_type', 'strawberryfield_field')
+      ->execute();
+    $fields = $this->entityTypeManager->getStorage('field_config')
+      ->loadMultiple($field_ids);
 
-    return count($field_ids)? TRUE : FALSE;
+    return count($field_ids) ? TRUE : FALSE;
   }
 
   /**
    * {@inheritdoc}
    */
-  public function getStrawberryfieldConfigFromStorage($bundle = 'digital_object') {
+  public function getStrawberryfieldConfigFromStorage($bundle = 'digital_object'
+  ) {
     $field_config = $this->entityTypeManager->getStorage('field_config');
     $field_ids = $field_config->getQuery()
       ->condition('entity_type', 'node')
       ->condition('bundle', $bundle)
-      ->condition('field_type' , 'strawberryfield_field')
+      ->condition('field_type', 'strawberryfield_field')
       ->execute();
     $fields = $field_config->loadMultiple($field_ids);
 
@@ -191,12 +198,14 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
   /**
    * {@inheritdoc}
    */
-  public function getStrawberryfieldMachineForBundle($bundle = 'digital_object') {
+  public function getStrawberryfieldMachineForBundle($bundle = 'digital_object'
+  ) {
     // @WARNING Never call this function inside any field based hook
     // Chances are the hook will be called invoked inside ::getFieldDefinitions
     // All you will find yourself inside a SUPER ETERNAL LOOP. You are adviced.
 
-    $all_bundled_fields = $this->entityFieldManager->getFieldDefinitions('node', $bundle);
+    $all_bundled_fields = $this->entityFieldManager->getFieldDefinitions('node',
+      $bundle);
     $all_sbf_fields = $this->getStrawberryfieldMachineNames();
     return array_intersect(array_keys($all_bundled_fields), $all_sbf_fields);
   }
@@ -204,11 +213,14 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
   /**
    * {@inheritdoc}
    */
-  public function getStrawberryfieldDefinitionsForBundle($bundle = 'digital_object') {
+  public function getStrawberryfieldDefinitionsForBundle(
+    $bundle = 'digital_object'
+  ) {
     // @WARNING Never call this function inside any field based hook
     // Chances are the hook will be called invoked inside ::getFieldDefinitions
     // All you will find yourself inside a SUPER ETERNAL LOOP. You are adviced.
-    $all_bundled_fields = $this->entityFieldManager->getFieldDefinitions('node', $bundle);
+    $all_bundled_fields = $this->entityFieldManager->getFieldDefinitions('node',
+      $bundle);
     $all_sbf_fields = $this->getStrawberryfieldMachineNames();
     $all_sbf_fields = array_flip($all_sbf_fields);
     return array_intersect_key($all_bundled_fields, $all_sbf_fields);
@@ -230,10 +242,12 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
       // check if this $field_name exists as an sbf field name, and store result in $property_path_is_sbf
       // check if key already exists, as there will be repeats among solr fields
       if (!isset($property_path_is_sbf[$field_name])) {
-        $property_path_is_sbf[$field_name] = in_array($field_name, $this->strawberryfieldMachineNames);
+        $property_path_is_sbf[$field_name] = in_array($field_name,
+          $this->strawberryfieldMachineNames);
       }
       $has_sbf_property_path = $property_path_is_sbf[$field_name];
-      $has_node_datasource = array_key_exists('datasource_id', $field) ? $field['datasource_id'] === "entity:node" : false;
+      $has_node_datasource = array_key_exists('datasource_id',
+        $field) ? $field['datasource_id'] === "entity:node" : FALSE;
 
       if ($has_sbf_property_path && $has_node_datasource) {
         $sbf_solr_fields[$id] = $field;
@@ -246,7 +260,7 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
   /**
    * {@inheritdoc}
    */
-  public function verifyCommand($execpath) :bool {
+  public function verifyCommand($execpath): bool {
     $iswindows = strpos(PHP_OS, 'WIN') === 0;
     $canexecute = FALSE;
     $execpath = trim(escapeshellcmd($execpath));
@@ -267,17 +281,18 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
     }
     $base = log($size, 1024);
     $suffixes = array('', 'k', 'M', 'G', 'T');
-    return round(pow(1024, $base - floor($base)), $precision) . $suffixes[floor($base)];
+    return round(pow(1024, $base - floor($base)),
+        $precision) . $suffixes[floor($base)];
   }
 
   /**
    * {@inheritdoc}
    */
-  public function verifyDrush(string $execpath, string $home) :bool {
+  public function verifyDrush(string $execpath, string $home): bool {
     $site_path = \Drupal::service('site.path'); // e.g.: 'sites/default'
     $site_path = explode('/', $site_path);
     $site_name = $site_path[1];
-    $execpath = $execpath.' --uri='.$site_name;
+    $execpath = $execpath . ' --uri=' . $site_name;
     $iswindows = strpos(PHP_OS, 'WIN') === 0;
     $canexecute = FALSE;
     $execpath = trim(escapeshellcmd($execpath));
@@ -286,7 +301,7 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
     if ($output) {
       if (!empty($home)) {
         $home = escapeshellcmd($home);
-        $execpath = "export HOME='".$home."'; ". $execpath;
+        $execpath = "export HOME='" . $home . "'; " . $execpath;
       }
       $output = shell_exec($execpath);
       if ($output) {
@@ -301,7 +316,12 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
   /**
    * {@inheritdoc}
    */
-  public function getCountByProcessorInSolr(EntityInterface $entity, string $processor, array $indexes = [], string $checksum = NULL): int {
+  public function getCountByProcessorInSolr(
+    EntityInterface $entity,
+    string $processor,
+    array $indexes = [],
+    string $checksum = NULL
+  ): int {
     $count = 0;
 
     // If no index specified, query all that implement the strawberry flavor
@@ -322,7 +342,8 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
 
       $query->addCondition('parent_id', $entity->id())
         ->addCondition('processor_id', $processor)
-        ->addCondition('search_api_datasource', 'strawberryfield_flavor_datasource');
+        ->addCondition('search_api_datasource',
+          'strawberryfield_flavor_datasource');
 
       if ($checksum) {
         $query->addCondition('checksum', $checksum);
@@ -333,7 +354,7 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
       // to know if its there or not.
       $query->setProcessingLevel(QueryInterface::PROCESSING_NONE);
       // @see strawberryfield_search_api_solr_query_alter()
-      $query->setOption('ocr_highlight','on');
+      $query->setOption('ocr_highlight', 'on');
       $results = $query->execute();
 
       // In case of more than one Index with the same Data Source we accumulate.
@@ -346,54 +367,48 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
   /**
    * {@inheritdoc}
    */
-  public function internalFilePathIsValid(string $scheme, string $path): bool {
+  public function filePathIsValid(string $scheme, string $path): bool {
     // Empty path is always valid.
-    if(empty($path)) {
+    if (empty($path)) {
       return TRUE;
     }
-    // First check to see if the path is ok.
-    $path_valid = preg_match(self::PATHPATTERN, $path, $matches);
-    if(!$path_valid) {
-      return FALSE;
+
+    $known_schemes = array_merge(['s3'], array_keys(\Drupal::service('stream_wrapper_manager')->getWrappers(StreamWrapperInterface::LOCAL)));
+    if(!in_array($scheme, $known_schemes)) {
+      // Can't flag as invalid if we don't handle this scheme, so just return TRUE.
+      return TRUE;
     }
 
-    // TODO is there an easier way to determine if the file path is valid and writable?
-    //   \Drupal::service('path.validator')->isValid($path) always returns FALSE,
-    //   and \Drupal::service('stream_wrapper_manager')->isValidUri($path) always returns TRUE!
+    // S3 path length limit is 63 characters.
+    if(strlen($path) > 63) {
+      return FALSE;
+    }
+    // Split the path into virtual directory names and check each one. If
+    // any are not valid, exit the loop and return FALSE.
+    $path = explode("/", $path);
+    foreach ($path as $path_part) {
+      $valid = preg_match(self::VALID_S3_PREFIX_PATTERN, $path_part, $matches);
+      if (!$valid) {
+        return FALSE;
+      }
+    }
 
+    // The path validates against our test pattern, but we don't know if it can
+    // actually be written to by the file system. We'll check for that here.
+    // TODO: Is there a non-invasive way to test this?
     $test_path = $scheme . "://" . $path;
-
-    // FileSystemInterface::prepareDirectory with the MODIFY_PERMISSIONS flag checks to see if it's present and able to be written to.
-    $valid = \Drupal::service('file_system')->prepareDirectory($test_path, FileSystemInterface::MODIFY_PERMISSIONS);
-    if(!$valid) {
+    // FileSystemInterface::prepareDirectory with the MODIFY_PERMISSIONS flag checks
+    // to see if it's present and able to be written to.
+    $valid = $this->fileSystem->prepareDirectory($test_path, FileSystemInterface::MODIFY_PERMISSIONS);
+    if (!$valid) {
       // If not present or able to be written to, let's check to see if we can create it.
-      $valid = \Drupal::service('file_system')->prepareDirectory($test_path, FileSystemInterface::CREATE_DIRECTORY);
-      if($valid) {
+      $valid = $this->fileSystem->prepareDirectory($test_path, FileSystemInterface::CREATE_DIRECTORY);
+      if ($valid) {
         // Successfully created the directory, so we delete it now.
-        \Drupal::service('file_system')->rmdir($test_path);
+        $this->fileSystem->rmdir($test_path);
       }
     }
     return !empty($valid);
   }
 
-  /**
-   * {@inheritdoc}
-   */
-  public function s3FilePathIsValid(string $path): bool {
-    // Empty path is always valid.
-    if(empty($path)) {
-      return TRUE;
-    }
-
-    // Split the path into virtual directory names and check each one. If
-    // any are not valid, exit the loop and return FALSE.
-    $path = explode("/", $path);
-    foreach($path as $path_part) {
-      $valid = preg_match(self::S3PATHPATTERN, $path_part, $matches);
-      if(!$valid) {
-        return FALSE;
-      }
-    }
-    return TRUE;
-  }
 }
