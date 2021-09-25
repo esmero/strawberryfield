@@ -79,9 +79,17 @@ strawberryfield.storage_settings:
     file_scheme:
       type: string
       label: 'Storage Scheme for Persisting Files'
+    file_path:
+      type: string
+      label: 'Storage Path under the Storage Scheme, for Persisting Files'
+      default: ""
     object_file_scheme:
       type: string
       label: 'Storage Scheme for Persisting Digital Objects in JSON format'
+    object_file_path:
+      type: string
+      label: 'Storage Path under the Storage Scheme, for Persisting Digital Objects in JSON format'
+      default: "dostorage"
 
 strawberryfield.archipelago_solr_settings:
   type: config_object
