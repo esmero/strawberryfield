@@ -1296,134 +1296,80 @@ class StrawberryfieldFilePersisterService {
       );
     }
 
-    if (!$templocation) {
-      $this->loggerFactory->get('strawberryfield')->warning(
-        'Could not adquire a local accessible location for metadata extraction for file with URL @fileurl. Aborted processing. Please check you have space in your temporary storage location.',
-        [
-          '@fileurl' => $file->getFileUri(),
-        ]
-      );
-      return $metadata;
-    }
-
-    $templocation_for_exec = escapeshellarg($templocation);
-    // In case i need to replace values/cleanup the name but we control the name
-    // So it should not be an issue?
-    // @TODO MOVE CHECKSUM here
-    $output_exif = '';
-    $output_fido = '';
-    $output_identify = '';
-    $output_pdfinfo = '';
-    // Silly really. This needs to be tighter but then unix allows any alias to exist.
-    if (strlen($exif_exec_path) > 0) {
-      $result_exif = exec(
-        $exif_exec_path . ' -json -q -a -gps:all -Common "-gps*" -xmp:all -XMP-tiff:Orientation -ImageWidth -ImageHeight -Canon -Nikon-AllDates -pdf:all -ee -MIMEType ' . $templocation_for_exec,
-        $output_exif,
-        $status_exif
-      );
-
-      // First EXIF
-      if ($status_exif != 0) {
-        // Means exiftool did not work
-        $this->loggerFactory->get('strawberryfield')->warning(
-          'Could not process EXIF on @templocation for @fileurl',
-          [
-            '@fileurl' => $file->getFileUri(),
-            '@templocation' => $templocation,
-          ]
-        );
-      }
-      else {
-        // JSON-ify EXIF data
-        // remove RW Properties?
-        $output_exif = implode('', $output_exif);
-        $exif_full = json_decode($output_exif, TRUE);
-        $json_error = json_last_error();
-        if ($json_error == JSON_ERROR_NONE && isset($exif_full[0])) {
-          $exif = $exif_full[0];
-          unset($exif['FileName']);
-          unset($exif['SourceFile']);
-          unset($exif['Directory']);
-          unset($exif['FilePermissions']);
-          unset($exif['ThumbnailImage']);
-          foreach ($exif as &$exifitem) {
-            $exifitem = is_array($exifitem) ? array_unique(
-              $exifitem
-            ) : $exifitem;
-          }
-          $metadata['flv:exif'] = $exif;
-        }
-      }
-    }
-    else {
-      $this->loggerFactory->get('strawberryfield')->warning(
-        '@fileurl was not processed using EXIF extraction because the path is not set. <a href="@url">Please configure it here</a>',
-        [
-          '@fileurl' => $file->getFileUri(),
-          '@url' => Url::fromRoute(
-            'strawberryfield.file_persister_settings_form'
-          )->toString(),
-        ]
-      );
-    }
-
-    if (strlen($fido_exec_path) > 0) {
-      $result_fido = exec(
-        $fido_exec_path . ' ' . $templocation_for_exec,
-        $output_fido,
-        $status_fido
-      );
-
-      // Second FIDO
-      if ($status_fido != 0) {
-        // Means Fido did not work
-        $this->loggerFactory->get('strawberryfield')->warning(
-          'Could not process FIDO on @templocation for @fileurl',
-          [
-            '@fileurl' => $file->getFileUri(),
-            '@templocation' => $templocation,
-          ]
-        );
-      }
-      else {
-        // JSON-ify EXIF data
-        // remove RW Properties?
-        $output_fido = explode(',', str_replace('"', '', $result_fido));
-        if (count($output_fido) && $output_fido[0] == 'OK') {
-          // Means FIDO could do its JOB
-          $pronom['pronom_id'] = isset($output_fido[2]) ? 'info:pronom/' . $output_fido[2] : NULL;
-          $pronom['label'] = $output_fido[3] ?: NULL;
-          $pronom['mimetype'] = $output_fido[7] ?: NULL;
-          $pronom['detection_type'] = $output_fido[8] ?: NULL;
-          $metadata['flv:pronom'] = $pronom;
-        }
-      }
-    }
-    else {
-      $this->loggerFactory->get('strawberryfield')->warning(
-        '@fileurl was not processed using FIDO (Pronom) because the path is not set. <a href="@url">Please configure it here</a>',
-        [
-          '@fileurl' => $file->getFileUri(),
-          '@url' => Url::fromRoute(
-            'strawberryfield.file_persister_settings_form'
-          )->toString(),
-        ]
-      );
-    }
-    // Only run identify on Images/Documents?
-    // Do we need an exact list?
-    if (strlen($identify_exec_path) > 0) {
-      if (in_array($askey, ['image', 'video'])) {
-        $result_identify = exec(
-          $identify_exec_path . " -format 'format:%m|width:%w|height:%h|orientation:%[orientation]@' -quiet " . $templocation_for_exec,
-          $output_identify,
-          $status_identify
+    if ($templocation) {
+      $templocation_for_exec = escapeshellarg($templocation);
+      // In case i need to replace values/cleanup the name but we control the name
+      // So it should not be an issue?
+      // @TODO MOVE CHECKSUM here
+      $output_exif = '';
+      $output_fido = '';
+      $output_identify = '';
+      $output_pdfinfo = '';
+      // Silly really. This needs to be tighter but then unix allows any alias to exist.
+      if (strlen($exif_exec_path) > 0) {
+        $result_exif = exec(
+          $exif_exec_path . ' -json -q -a -gps:all -Common "-gps*" -xmp:all -XMP-tiff:Orientation -ImageWidth -ImageHeight -Canon -Nikon-AllDates -pdf:all -ee -MIMEType ' . $templocation_for_exec,
+          $output_exif,
+          $status_exif
         );
 
-        if ($status_identify != 0) {
-          // Means Identify did not work
+        // First EXIF
+        if ($status_exif != 0) {
+          // Means exiftool did not work
           $this->loggerFactory->get('strawberryfield')->warning(
-            'Could not process Identify on @templocation for @fileurl',
+            'Could not process EXIF on @templocation for @fileurl',
+            [
+              '@fileurl' => $file->getFileUri(),
+              '@templocation' => $templocation,
+            ]
+          );
+        }
+        else {
+          // JSON-ify EXIF data
+          // remove RW Properties?
+          $output_exif = implode('', $output_exif);
+          $exif_full = json_decode($output_exif, TRUE);
+          $json_error = json_last_error();
+          if ($json_error == JSON_ERROR_NONE && isset($exif_full[0])) {
+            $exif = $exif_full[0];
+            unset($exif['FileName']);
+            unset($exif['SourceFile']);
+            unset($exif['Directory']);
+            unset($exif['FilePermissions']);
+            unset($exif['ThumbnailImage']);
+            foreach ($exif as &$exifitem) {
+              $exifitem = is_array($exifitem) ? array_unique(
+                $exifitem
+              ) : $exifitem;
+            }
+            $metadata['flv:exif'] = $exif;
+          }
+        }
+      }
+      else {
+        $this->loggerFactory->get('strawberryfield')->warning(
+          '@fileurl was not processed using EXIF extraction because the path is not set. <a href="@url">Please configure it here</a>',
+          [
+            '@fileurl' => $file->getFileUri(),
+            '@url' => Url::fromRoute(
+              'strawberryfield.file_persister_settings_form'
+            )->toString(),
+          ]
+        );
+      }
+
+      if (strlen($fido_exec_path) > 0) {
+        $result_fido = exec(
+          $fido_exec_path . ' ' . $templocation_for_exec,
+          $output_fido,
+          $status_fido
+        );
+
+        // Second FIDO
+        if ($status_fido != 0) {
+          // Means Fido did not work
+          $this->loggerFactory->get('strawberryfield')->warning(
+            'Could not process FIDO on @templocation for @fileurl',
             [
               '@fileurl' => $file->getFileUri(),
               '@templocation' => $templocation,
@@ -1477,7 +1423,7 @@ class StrawberryfieldFilePersisterService {
           ]
         );
       }
-      
+
       // Only run identify on Images/Documents?
       // Do we need an exact list?
       if (strlen($identify_exec_path) > 0) {
@@ -1497,137 +1443,149 @@ class StrawberryfieldFilePersisterService {
                 '@templocation' => $templocation,
               ]
             );
-            foreach ($output_identify as $sequencenumber => $pageinfo) {
-              if (is_string($pageinfo)) {
-                $pageinfo_array = array_filter(explode('|', $pageinfo));
-                $identify = [];
-                if (count($pageinfo_array)) {
-                  foreach ($pageinfo_array as $value) {
-                    if (is_string($value) && (strlen($value) > 1)) {
-                      $pair = array_filter(explode(':', $value));
-                      if (count($pair)) {
-                        $identify[$pair[0]] = isset($pair[1]) ? $pair[1] : NULL;
+          }
+          else {
+            // JSON-ify Identify data
+            $identify_meta = [];
+            if (count($output_identify) && isset($output_identify[0])) {
+              $output_identify = array_filter(
+                explode(
+                  '@',
+                  $output_identify[0]
+                )
+              );
+              foreach ($output_identify as $sequencenumber => $pageinfo) {
+                if (is_string($pageinfo)) {
+                  $pageinfo_array = array_filter(explode('|', $pageinfo));
+                  $identify = [];
+                  if (count($pageinfo_array)) {
+                    foreach ($pageinfo_array as $value) {
+                      if (is_string($value) && (strlen($value) > 1)) {
+                        $pair = array_filter(explode(':', $value));
+                        if (count($pair)) {
+                          $identify[$pair[0]] = isset($pair[1]) ? $pair[1] : NULL;
+                        }
                       }
                     }
                   }
+                  $identify_meta[$sequencenumber + 1] = $identify;
                 }
-                $identify_meta[$sequencenumber + 1] = $identify;
               }
+              $metadata['flv:identify'] = $identify_meta;
             }
-            $metadata['flv:identify'] = $identify_meta;
           }
         }
       }
-    }
-    else {
-      $this->loggerFactory->get('strawberryfield')->warning(
-        '@fileurl was not processed using Identify (Media characterization) because the path is not set. <a href="@url">Please configure it here</a>',
-        [
-          '@fileurl' => $file->getFileUri(),
-          '@url' => Url::fromRoute(
-            'strawberryfield.file_persister_settings_form'
-          )->toString(),
-        ]
-      );
-    }
-
-    if (strlen($pdfinfo_exec_path) > 0) {
-      if (in_array($mime, ['application/pdf', 'application/postscript'])) {
-        $result_pdfinfo = exec(
-          $pdfinfo_exec_path . ' ' . $templocation_for_exec . " | grep '^Pages:' ",
-          $output_pdfinfo,
-          $status_pdfinfo
+      else {
+        $this->loggerFactory->get('strawberryfield')->warning(
+          '@fileurl was not processed using Identify (Media characterization) because the path is not set. <a href="@url">Please configure it here</a>',
+          [
+            '@fileurl' => $file->getFileUri(),
+            '@url' => Url::fromRoute(
+              'strawberryfield.file_persister_settings_form'
+            )->toString(),
+          ]
         );
+      }
 
-        // Second FIDO
-        if ($status_pdfinfo != 0) {
-          // Means Fido did not work
-          $this->loggerFactory->get('strawberryfield')->warning(
-            'Could not process PDFinfo page count on @templocation for @fileurl',
-            [
-              '@fileurl' => $file->getFileUri(),
-              '@templocation' => $templocation,
-            ]
+      if (strlen($pdfinfo_exec_path) > 0) {
+        if (in_array($mime, ['application/pdf', 'application/postscript'])) {
+          $result_pdfinfo = exec(
+            $pdfinfo_exec_path . ' ' . $templocation_for_exec . " | grep '^Pages:' ",
+            $output_pdfinfo,
+            $status_pdfinfo
           );
-        }
-        else {
-          // We need the number of pages first
-          $pagecount = explode(':', $output_pdfinfo[0]);
-          if (count($pagecount) == 2) {
-            $pagecount_int = (int) $pagecount[1];
-            // Second pass now
-            $result_pages_pdfinfo = exec(
-              $pdfinfo_exec_path . ' ' . $templocation_for_exec . " -f 1 -l $pagecount_int |grep '^Page' ",
-              $output_pdfinfo_pages,
-              $status_pdfinfo_pages
-            );
-            if ($status_pdfinfo_pages != 0) {
-              // Means Fido did not work
-              $this->loggerFactory->get('strawberryfield')->warning(
-                'Could not process PDFinfo page dimensions on @templocation for @fileurl',
-                [
-                  '@fileurl' => $file->getFileUri(),
-                  '@templocation' => $templocation,
-                ]
-              );
-            }
-            else {
-              $pdfinfo_metadata = [];
-              // Rotation to Orientation/pdfinfo will give is the first
-              //  0 (no rotation), TopLeft
-              //(rotation to the East, or 90 degrees clockwise), LeftBottom
-              // (rotation to the South, tumbled page image, upside-down, or 180 degrees clockwise), BottomRight
-              // (rotation to the West, or 90 degrees counter-clockwise, or 270 degrees clockwise). RightTop
-              // @see https://stackoverflow.com/questions/9371273/how-can-i-display-the-orientation-of-a-jpeg-file
-              $rot_to_orient = [
-                '0' => 'TopLeft',
-                '90' => 'LeftBottom',
-                '180' => 'BottomRight',
-                '270' => 'RightTop',
-              ];
-              if (count($output_pdfinfo_pages) > 1) {
-                $i = 0;
-                /* $output_pdfinfo_pages will be something like this
-                 0 => "Pages:          100"
-                 1 => "Page    1 size: 635.05 x 797.05 pts"
-                 2 => "Page    1 rot:  0"
-                 3 => "Page    2 size: 623 x 795.95 pts"
-                 4 => "Page    2 rot:  0"
-                */
-                foreach ($output_pdfinfo_pages as $value) {
-                  $i++;
-                  if ($i == 1) {
-                    // Skip first line
-                    continue;
-                  }
-                  $page_info = preg_split(
-                    '/(:|[\s]+|x)/',
-                    $value,
-                    -1,
-                    PREG_SPLIT_NO_EMPTY
-                  );
-                  if (count($page_info) >= 4) {
-                    if (trim($page_info[2]) == "size") {
-                      $pdfinfo_metadata[trim(
-                        $page_info[1]
-                      )]['width'] = $page_info[3];
-                      $pdfinfo_metadata[trim(
-                        $page_info[1]
-                      )]['height'] = $page_info[4];
-                    }
-                    elseif (trim($page_info[2]) == "rot") {
-                      $pdfinfo_metadata[trim(
-                        $page_info[1]
-                      )]['rotation'] = $page_info[3];
 
-                      $pdfinfo_metadata[trim(
-                        $page_info[1]
-                      )]['orientation'] = $rot_to_orient[$page_info[3]];
+          // Second FIDO
+          if ($status_pdfinfo != 0) {
+            // Means Fido did not work
+            $this->loggerFactory->get('strawberryfield')->warning(
+              'Could not process PDFinfo page count on @templocation for @fileurl',
+              [
+                '@fileurl' => $file->getFileUri(),
+                '@templocation' => $templocation,
+              ]
+            );
+          }
+          else {
+            // We need the number of pages first
+            $pagecount = explode(':', $output_pdfinfo[0]);
+            if (count($pagecount) == 2) {
+              $pagecount_int = (int) $pagecount[1];
+              // Second pass now
+              $result_pages_pdfinfo = exec(
+                $pdfinfo_exec_path . ' ' . $templocation_for_exec . " -f 1 -l $pagecount_int |grep '^Page' ",
+                $output_pdfinfo_pages,
+                $status_pdfinfo_pages
+              );
+              if ($status_pdfinfo_pages != 0) {
+                // Means Fido did not work
+                $this->loggerFactory->get('strawberryfield')->warning(
+                  'Could not process PDFinfo page dimensions on @templocation for @fileurl',
+                  [
+                    '@fileurl' => $file->getFileUri(),
+                    '@templocation' => $templocation,
+                  ]
+                );
+              }
+              else {
+                $pdfinfo_metadata = [];
+                // Rotation to Orientation/pdfinfo will give is the first
+                //  0 (no rotation), TopLeft
+                //(rotation to the East, or 90 degrees clockwise), LeftBottom
+                // (rotation to the South, tumbled page image, upside-down, or 180 degrees clockwise), BottomRight
+                // (rotation to the West, or 90 degrees counter-clockwise, or 270 degrees clockwise). RightTop
+                // @see https://stackoverflow.com/questions/9371273/how-can-i-display-the-orientation-of-a-jpeg-file
+                $rot_to_orient = [
+                  '0' => 'TopLeft',
+                  '90' => 'LeftBottom',
+                  '180' => 'BottomRight',
+                  '270' => 'RightTop',
+                ];
+                if (count($output_pdfinfo_pages) > 1) {
+                  $i = 0;
+                  /* $output_pdfinfo_pages will be something like this
+                   0 => "Pages:          100"
+                   1 => "Page    1 size: 635.05 x 797.05 pts"
+                   2 => "Page    1 rot:  0"
+                   3 => "Page    2 size: 623 x 795.95 pts"
+                   4 => "Page    2 rot:  0"
+                  */
+                  foreach ($output_pdfinfo_pages as $value) {
+                    $i++;
+                    if ($i == 1) {
+                      // Skip first line
+                      continue;
+                    }
+                    $page_info = preg_split(
+                      '/(:|[\s]+|x)/',
+                      $value,
+                      -1,
+                      PREG_SPLIT_NO_EMPTY
+                    );
+                    if (count($page_info) >= 4) {
+                      if (trim($page_info[2]) == "size") {
+                        $pdfinfo_metadata[trim(
+                          $page_info[1]
+                        )]['width'] = $page_info[3];
+                        $pdfinfo_metadata[trim(
+                          $page_info[1]
+                        )]['height'] = $page_info[4];
+                      }
+                      elseif (trim($page_info[2]) == "rot") {
+                        $pdfinfo_metadata[trim(
+                          $page_info[1]
+                        )]['rotation'] = $page_info[3];
+
+                        $pdfinfo_metadata[trim(
+                          $page_info[1]
+                        )]['orientation'] = $rot_to_orient[$page_info[3]];
+                      }
                     }
                   }
-                }
-                if (count($pdfinfo_metadata) >= 1) {
-                  $metadata['flv:pdfinfo'] = $pdfinfo_metadata;
+                  if (count($pdfinfo_metadata) >= 1) {
+                    $metadata['flv:pdfinfo'] = $pdfinfo_metadata;
+                  }
                 }
               }
             }
