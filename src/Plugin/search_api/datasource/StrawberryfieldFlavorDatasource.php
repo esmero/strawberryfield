@@ -599,7 +599,6 @@ XML;
               'ts' => $ts,
               'sentiment' => $sentiment,
               'uri' => $uri,
-
               'checksum' => $checksum,
               'status' => $status,
               'uid' => $uid,
