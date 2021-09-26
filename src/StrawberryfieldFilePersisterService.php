@@ -1295,6 +1295,17 @@ class StrawberryfieldFilePersisterService {
         $file->getFileUri()
       );
     }
+    
+    if (!$templocation) {
+      $this->loggerFactory->get('strawberryfield')->warning(
+        'Could not adquire a local accessible location for metadata extraction for file with URL @fileurl. Aborted processing. Please check you have space in your temporary storage location.',
+        [
+          '@fileurl' => $file->getFileUri(),
+        ]
+      );
+      return $metadata;
+    }
+    
 
     if ($templocation) {
       $templocation_for_exec = escapeshellarg($templocation);
