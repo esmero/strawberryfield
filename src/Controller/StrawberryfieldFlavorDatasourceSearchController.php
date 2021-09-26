@@ -14,8 +14,6 @@ use Symfony\Component\HttpFoundation\RequestStack;
 use Drupal\Core\Cache\CacheableJsonResponse;
 use Drupal\Core\Cache\CacheableResponse;
 use Symfony\Component\DependencyInjection\ContainerInterface;
-use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
-use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Drupal\strawberryfield\StrawberryfieldUtilityService;
 use Drupal\search_api\ParseMode\ParseModePluginManager;
 
@@ -85,27 +83,37 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
 
 
   /**
+   * OCR Search Controller. Can deal with multiple formats/requests types
+   *
+   * @param \Symfony\Component\HttpFoundation\Request $request
    * @param \Drupal\Core\Entity\ContentEntityInterface $node
-   * @param string $processor
    * @param string $fileuuid
+   * @param string $processor
    * @param string $format
    * @param string $page
    *
-   * @return \Drupal\Core\Cache\CacheableJsonResponse
+   * @return \Symfony\Component\HttpFoundation\Response
+   * @throws \Drupal\Component\Plugin\Exception\PluginException
+   * @throws \Drupal\search_api\SearchApiException
    */
   public function search(Request $request, ContentEntityInterface $node, string $fileuuid = 'all', string $processor = 'ocr', string $format = 'json', string $page = 'all') {
 
+    $response = NULL;
+    $indexes = NULL;
     if (!Uuid::isValid($fileuuid) && $fileuuid !== 'all') {
       // We do not want to expose the user to errors here?
       // So an empty JSON response is better?
       return new JsonResponse([]);
     }
+    else {
+      $indexes = StrawberryfieldFlavorDatasource::getValidIndexes();
+    }
 
     //search for IAB highlight
-    //if format=json, page=all and q not null
+    // if format=json, page=all and q not null
     if (($input = $request->query->get('q')) && ($format == 'json') && ($page == 'all')) {
 
-      $indexes = StrawberryfieldFlavorDatasource::getValidIndexes();
+
       $snippets = $this->flavorfromSolrIndex(
         $input,
         $node->id(),
@@ -120,24 +128,12 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
         ['content-type' => 'application/json'],
         TRUE
       );
-
-
-      if ($response) {
-        // Set CORS. IIIF and others will assume this is true.
-        $response->headers->set('access-control-allow-origin', '*');
-        $response->addCacheableDependency($node);
-        if ($callback = $request->query->get('callback')) {
-          $response->setCallback($callback);
-        }
-
-      }
-      return $response;
-
     }
     elseif ((($format == 'originalocr') || ($format == 'djvuxml')) && (is_numeric($page))) {
-      $indexes = StrawberryfieldFlavorDatasource::getValidIndexes();
+
       //as IAB text selection page number starts from 0
       //and djvuxml is inteded for IAB
+      $page = (int) $page;
       if ($format == 'djvuxml') {
         $page += 1;
       }
@@ -159,16 +155,15 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
       $response = new CacheableResponse(
         $output,
         200,
-        ['content-type' => 'application/xml'],
-        TRUE
+        ['content-type' => 'application/xml']
       );
-      if ($response) {
-        // Set CORS. IIIF and others will assume this is true.
-        $response->headers->set('access-control-allow-origin', '*');
-        $response->addCacheableDependency($node);
-        if ($callback = $request->query->get('callback')) {
-          $response->setCallback($callback);
-        }
+    }
+    if ($response) {
+      // Set CORS. IIIF and others will assume this is true.
+      $response->headers->set('access-control-allow-origin', '*');
+      $response->addCacheableDependency($node);
+      if ($callback = $request->query->get('callback')) {
+        $response->setCallback($callback);
       }
       return $response;
     }
@@ -177,16 +172,29 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
     }
   }
 
-  protected function flavorfromSolrIndex($term, $nodeid, $processor, $file_uuid, $indexes) {
-    /* @var \Drupal\search_api\IndexInterface[] $indexes */
 
+  /**
+   * Gets a Flavor (e.g OCR) from solr
+   *
+   * @param string $term
+   * @param int $nodeid
+   * @param string $processor
+   * @param string $file_uuid
+   * @param array $indexes
+   * @param int $limit
+   *
+   * @return array[]
+   * @throws \Drupal\Component\Plugin\Exception\PluginException
+   * @throws \Drupal\search_api\SearchApiException
+   */
+  protected function flavorfromSolrIndex(string $term, int $nodeid, string $processor, string $file_uuid, array $indexes, $limit = 50) {
+    /* @var \Drupal\search_api\IndexInterface[] $indexes */
     $result_snippets = [];
     foreach ($indexes as $search_api_index) {
 
       // Create the query.
-      // How many?
       $query = $search_api_index->query([
-        'limit' => 20,
+        'limit' => $limit,
         'offset' => 0,
       ]);
 
@@ -237,10 +245,6 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
       ),
        */
 
-      // We have to get page number from different ID (sequence_12, Page12, page_12)
-      // so better use $str = preg_replace('/\D/', '', $str); to get page number integer from ID
-      //$page_prefix = 'sequence_'; // Optional. XML id=1 is really invalid but if someone wants to use that, OK.
-      //$page_prefix_len = strlen($page_prefix);
       $query->setProcessingLevel(QueryInterface::PROCESSING_BASIC);
       $results = $query->execute();
       $extradata = $results->getAllExtraData();
@@ -264,9 +268,9 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
                 // and rebase page number starting with 0
                 $page_number = ($page_number > 0) ? (int) ($page_number - 1) : 0;
 
-                //We assume that if coords <1 (i.e. .123) => MINIOCR else ALTO
-                //As ALTO are absolute to be compatible with current logic we have to transform to relative
-                //To convert we need page width/height
+                // We assume that if coords <1 (i.e. .123) => MINIOCR else ALTO
+                // As ALTO are absolute to be compatible with current logic we have to transform to relative
+                // To convert we need page width/height
                 $page_width = (float) $snippet['pages'][0]['width'];
                 $page_height = (float) $snippet['pages'][0]['height'];
 
@@ -286,7 +290,7 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
                     $snippet['regions'][$highlight[0]['parentRegionIdx']]['text']
                   );
 
-                  //check if coord >=1 (ALTO)
+                  // check if coord >=1 (ALTO)
                   // else between 0 and <1 (MINIOCR)
                   if ( ((int) $highlight[0]['lrx']) > 0  ){
                     //ALTO so coords need to be relative
@@ -326,13 +330,21 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
   }
 
 
-
-
-
-  protected function originalocrfromSolrIndex($nodeid, $processor, $file_uuid, $indexes, $page) {
+  /**
+   * Gets the Original, un processed Content from a SBF Flavor
+   *
+   * @param int $nodeid
+   * @param string $processor
+   * @param string $file_uuid
+   * @param array $indexes
+   * @param int $page
+   *
+   * @return array|mixed|string
+   * @throws \Drupal\Component\Plugin\Exception\PluginException
+   * @throws \Drupal\search_api\SearchApiException
+   */
+  protected function originalocrfromSolrIndex(int $nodeid, string $processor, string $file_uuid, array $indexes, int $page) {
     /* @var \Drupal\search_api\IndexInterface[] $indexes */
-
-    $result_snippets = [];
     foreach ($indexes as $search_api_index) {
 
       // Create the query.
@@ -344,22 +356,11 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
 
       $parse_mode = $this->parseModeManager->createInstance('direct');
       $query->setParseMode($parse_mode);
-      //$query->sort('search_api_relevance', 'DESC');
-      //$query->keys($term);
-
-      //$query->setFulltextFields(['ocr_text']);
 
       $query->addCondition('parent_id', $nodeid)
         ->addCondition('search_api_datasource', 'strawberryfield_flavor_datasource')
         ->addCondition('processor_id', $processor)
         ->addCondition('sequence_id', ($page));
-      // IN the case of multiple files being used in the same IIIF manifest we do not limit
-      // Which file we are loading.
-      // @IDEA. Since the Rendered Twig templates (metadata display) that generate a IIIF manifest are cached
-      // We could also pass arguments that would allow us to fetch that rendered JSON
-      // And preprocess everything here.
-      // Its like having the same Twig template on front and back?
-      // @giancarlobi. Maybe an idea for the future once this "works".
 
       if ($file_uuid != 'all') {
         if (Uuid::isValid($file_uuid)) {
@@ -367,40 +368,10 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
         }
       }
 
-      $allfields_translated_to_solr = $search_api_index->getServerInstance()
-        ->getBackend()
-        ->getSolrFieldNames($query->getIndex());
-      //if (isset($allfields_translated_to_solr['ocr_text'])) {
-        // Will be used by \strawberryfield_search_api_solr_query_alter
-        //$query->setOption('ocr_highlight', 'on');
-        // We are already checking if the Node can be viewed. Custom Datasources can not depend on Solr node access policies.
-        //$query->setOption('search_api_bypass_access', TRUE);
-      //}
-      //$query->setOption('search_api_retrieved_field_values', ['id']);
       $query->setOption('search_api_retrieved_field_values', ['ocr_text']);
-      // If we allow Extra processing here Drupal adds Content Access Check
-      // That does not match our Data Source \Drupal\search_api\Plugin\search_api\processor\ContentAccess
-      // we get this filter (see 2nd)
-      /*
-       *   array (
-        0 => 'ss_search_api_id:"strawberryfield_flavor_datasource/2006:1:en:3dccdb09-f79f-478e-81c5-0bb680c3984e:ocr"',
-        1 => 'ss_search_api_datasource:"strawberryfield_flavor_datasource"',
-        2 => '{!tag=content_access,content_access_enabled,content_access_grants}(ss_search_api_datasource:"entity:file" (+(bs_status:"true" bs_status_2:"true") +(sm_node_grants:"node_access_all:0" sm_node_grants:"node_access__all")))',
-        3 => '+index_id:default_solr_index +hash:1evb7z',
-        4 => 'ss_search_api_language:("en" "und" "zxx")',
-      ),
-       */
 
-      //$page_prefix = 'sequence_'; // Optional. XML id=1 is really invalid but if someone wants to use that, OK.
-      //$page_prefix_len = strlen($page_prefix);
       $query->setProcessingLevel(QueryInterface::PROCESSING_BASIC);
-      //$query->setOption('ocr_highlight','off');
-      //$query->setOption('highlight','off');
       $results = $query->execute();
-      $extradata = $results->getAllExtraData();
-      // Just in case something goes wrong with the returning region text
-      //$region_text = $term;
-
       $output = '';
       foreach ($results as $result) {
         $value = $result->getField('ocr_text')->getValues();
@@ -416,54 +387,41 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
 
   protected function originalocr2djvuxml($response) {
 
+    $internalErrors = libxml_use_internal_errors(TRUE);
+    libxml_clear_errors();
+    libxml_use_internal_errors($internalErrors);
+
     $originalocr = simplexml_load_string($response);
     if (!$originalocr) {
-      //$this->logger->warning('Sorry for this page we could not decode/extract OCR');
       return NULL;
     }
+
     $namespaces = $originalocr->getDocNamespaces();
     if (in_array("http://www.loc.gov/standards/alto/ns-v3#", $namespaces)) {
-
-
       $alto = $originalocr;
       unset($originalocr);
-      $internalErrors = libxml_use_internal_errors(TRUE);
-      libxml_clear_errors();
-      libxml_use_internal_errors($internalErrors);
-
 
       $djvuxml = new \XMLWriter();
       $djvuxml->openMemory();
       $djvuxml->startDocument('1.0', 'UTF-8');
 
       foreach ($alto->Layout->children() as $page) {
-
         $pageWidthPts = (float) $page['WIDTH'];
         $pageHeightPts = (float) $page['HEIGHT'];
-
 
         $djvuxml->startElement("OBJECT");
         $djvuxml->writeAttribute("height", sprintf('%.0f',$pageHeightPts));
         $djvuxml->writeAttribute("width", sprintf('%.0f',$pageWidthPts));
 
-
-
         $page->registerXPathNamespace('ns', 'http://www.loc.gov/standards/alto/ns-v3#');
         foreach ($page->xpath('.//ns:TextBlock') as $block) {
-
           $djvuxml->startElement("PARAGRAPH");
-
-
           foreach ($block->children() as $line) {
             $djvuxml->startElement("LINE");
 
             foreach ($line->children() as $child_name=>$child_node) {
-              if ($child_name == 'SP') {
-                //nothing
-              }
-              elseif ($child_name == 'String') {
+              if ($child_name == 'String') {
                 $djvuxml->startElement("WORD");
-
                 $left = (float) $child_node['HPOS'];
                 $top = (float) $child_node['VPOS'];
                 $width = (float) $child_node['WIDTH'];
@@ -477,32 +435,21 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
                 $djvuxml->endElement(); //WORD
               }
             }
-
             $djvuxml->endElement(); //LINE
           }
-
           $djvuxml->endElement(); //PARAGRAPH
         }
-
-
-
         $djvuxml->endElement(); //OBJECT
       }
 
-
       $djvuxml->endDocument();
       unset($alto);
-
       return $djvuxml->outputMemory(TRUE);
-
     }
     else {
 
       $miniocr = $originalocr;
       unset($originalocr);
-      $internalErrors = libxml_use_internal_errors(TRUE);
-      libxml_clear_errors();
-      libxml_use_internal_errors($internalErrors);
 
       $wh = explode(" ", $miniocr->p[0]['wh']);
       $pagewidth = (float) $wh[0];
@@ -518,7 +465,6 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
         $djvuxml->startElement("PARAGRAPH");
         foreach ($p->children() as $b) {
           foreach ($b->children() as $l) {
-
             $djvuxml->startElement("LINE");
             foreach ($l->children() as $word) {
               $djvuxml->startElement("WORD");
@@ -537,13 +483,8 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
               $text = (string) $word;
               $djvuxml->text($text);
               $djvuxml->endElement();
-              $lastchar = substr($text, -1);
             }
             $djvuxml->endElement();
-            //if ($lastchar == '.') {
-              //$djvuxml->endElement();
-              //$djvuxml->startElement("PARAGRAPH");
-            //}
           }
         }
         $djvuxml->endElement();
@@ -551,10 +492,8 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
       $djvuxml->endElement();
       $djvuxml->endDocument();
       unset($miniocr);
-
       return $djvuxml->outputMemory(TRUE);
     }
-
   }
 
   /**
@@ -565,7 +504,6 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
    * @param string $processor
    *
    * @return \Symfony\Component\HttpFoundation\JsonResponse
-   * @throws \Drupal\search_api\SearchApiException
    */
   public function count(Request $request, ContentEntityInterface $node, string $processor = 'ocr') {
     $count = 0;
@@ -580,5 +518,4 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
       return new JsonResponse(['count' => $count]);
     }
   }
-
 }
