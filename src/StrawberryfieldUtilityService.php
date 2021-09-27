@@ -385,8 +385,8 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
     }
     // Split the path into virtual directory names and check each one. If
     // any are not valid, exit the loop and return FALSE.
-    $path = explode("/", $path);
-    foreach ($path as $path_part) {
+    $path_parts = explode("/", $path);
+    foreach ($path_parts as $path_part) {
       $valid = preg_match(self::VALID_S3_PREFIX_PATTERN, $path_part, $matches);
       if (!$valid) {
         return FALSE;
