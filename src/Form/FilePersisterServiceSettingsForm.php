@@ -3,12 +3,10 @@
 namespace Drupal\strawberryfield\Form;
 
 use Drupal\Core\Ajax\AjaxResponse;
-use Drupal\Core\File\FileSystemInterface;
 use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\StreamWrapper\StreamWrapperInterface;
-use Drupal\Core\Url;
-use Drupal\strawberryfield\EventSubscriber\StrawberryfieldEventInsertSubscriberDepositDO;
+use Drupal\strawberryfield\StrawberryfieldFilePersisterService;
 use Drupal\strawberryfield\Tools\Ocfl\OcflHelper;
 use Drupal\Core\Ajax\InvokeCommand;
 use Drupal\Core\Ajax\MessageCommand;
@@ -83,13 +81,14 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
         'default' => 'Only First Ingest + latest Default Revision',
       ],
       '#required' => TRUE
+    ];
     $form['object_file_path'] = [
       '#type' => 'textfield',
-      '#title' => $this->t('Relative Path for Persisting Digital Object Files'),
+      '#title' => $this->t('Relative Path for Persisting Digital Object Attached Files'),
       '#description' => $this->t('Path relative to the root of the storage scheme selected above where digital object files will be stored. Do not include beginning or ending slashes. Default is "@storage".
-                                  <br>Note that changing this setting will not affect the file storage locations for previously ingested objects. They will remain where they were.',
-        ['@storage' => StrawberryfieldEventInsertSubscriberDepositDO::DEFAULT_OBJECT_STORAGE_FILE_PATH]),
-      '#default_value' => !empty($config_storage->get('object_file_path')) ? $config_storage->get('object_file_path') : StrawberryfieldEventInsertSubscriberDepositDO::DEFAULT_OBJECT_STORAGE_FILE_PATH,
+                                  <br>Note that changing this setting will not affect the file storage locations for previously ingested objects.They will remain where they were. IIIF Server level changes may need to be applied if you have a custom Source resolving strategy.',
+        ['@storage' => StrawberryfieldFilePersisterService::DEFAULT_OBJECT_STORAGE_FILE_PATH]),
+      '#default_value' => !empty($config_storage->get('object_file_path')) ? $config_storage->get('object_file_path') : StrawberryfieldFilePersisterService::DEFAULT_OBJECT_STORAGE_FILE_PATH,
       '#prefix' => '<span class="object-file-path-validation"></span>',
       '#ajax' => [
         'callback' => [$this, 'validateObjectFilePath'],
@@ -203,6 +202,13 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
         'method' => 'replace',
         'event' => 'change'
       ]
+    ];
+
+    $form['delete_tempfiles'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Delete Temporary Local files immediatelly after File Metadata Processing'),
+      '#description' => $this->t('If checked and the Local File is not a preservation master, then deletion will be instant. This may have Performance penalties on subsequente processing or when Running other parts of the stack that require locally accessible files for remote stored ones.'),
+      '#default_value' => $config->get('delete_tempfiles') ?? FALSE,
     ];
 
     return parent::buildForm($form, $form_state);
@@ -524,6 +530,7 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
       ->set('identify_exec_path', trim($form_state->getValue('identify_exec_path')))
       ->set('pdfinfo_exec_path', trim($form_state->getValue('pdfinfo_exec_path')))
       ->set('mediainfo_exec_path', trim($form_state->getValue('mediainfo_exec_path')))
+      ->set('delete_tempfiles', (bool) $form_state->getValue('delete_tempfiles'))
       ->save();
     $this->config('strawberryfield.storage_settings')
       ->set('file_scheme', $form_state->getValue('file_scheme'))
