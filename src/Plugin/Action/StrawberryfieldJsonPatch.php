@@ -28,7 +28,6 @@ use Swaggest\JsonDiff\JsonDiff;
  *   id = "entity:jsonpatch_action",
  *   action_label = @Translation("JSON Patch an ADO"),
  *   category = @Translation("Metadata"),
- *   deriver = "Drupal\Core\Action\Plugin\Action\Derivative\EntityChangedActionDeriver",
  *   type = "node"
  * )
  */

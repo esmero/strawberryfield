@@ -98,3 +98,13 @@ strawberryfield.flavor_datasource_count:
   requirements:
     processor: .+
     _entity_access: 'node.view'
+
+strawberryfield.strawberryfield_keynameprovider_overview_form:
+  path: '/admin/structure/strawberry_keynameprovider/overview'
+  defaults:
+    _form: '\Drupal\strawberryfield\Form\keyNameProviderOverviewForm'
+    _title: 'Key Name Provider Overview'
+  requirements:
+    _permission: 'access administration pages'
+  options:
+    _admin_route: TRUE

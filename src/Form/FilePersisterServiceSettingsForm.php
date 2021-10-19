@@ -3,12 +3,10 @@
 namespace Drupal\strawberryfield\Form;
 
 use Drupal\Core\Ajax\AjaxResponse;
-use Drupal\Core\File\FileSystemInterface;
 use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\StreamWrapper\StreamWrapperInterface;
-use Drupal\Core\Url;
-use Drupal\strawberryfield\EventSubscriber\StrawberryfieldEventInsertSubscriberDepositDO;
+use Drupal\strawberryfield\StrawberryfieldFilePersisterService;
 use Drupal\strawberryfield\Tools\Ocfl\OcflHelper;
 use Drupal\Core\Ajax\InvokeCommand;
 use Drupal\Core\Ajax\MessageCommand;
@@ -46,10 +44,9 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
       '#type' => 'radios',
       '#title' => $this->t('Storage Scheme for Persisting Files'),
       '#description' => $this->t('Please provide your prefered Storage Scheme for Persisting Strawberryfield managed Files'),
-      '#default_value' => $config_storage ->get('file_scheme'),
+      '#default_value' => $config_storage->get('file_scheme'),
       '#options' => $scheme_options,
       '#required' => TRUE
-
     ];
     $form['file_path'] = [
       '#type' => 'textfield',
@@ -74,13 +71,24 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
       '#options' => $scheme_options,
       '#required' => TRUE
     ];
+    $form['object_file_strategy'] = [
+      '#type' => 'radios',
+      '#title' => $this->t('Persisting Digital Objects in JSON format Strategy'),
+      '#description' => $this->t('Please Choose how ADO to File (JSON) persistence should we handled. Changes on this are not retroactive and will also not remove existing persisted ADOs at /dostorage'),
+      '#default_value' => $config_storage->get('object_file_strategy') ?? 'default',
+      '#options' => [
+        'all' => 'Every Revision',
+        'default' => 'Only First Ingest + latest Default Revision',
+      ],
+      '#required' => TRUE
+    ];
     $form['object_file_path'] = [
       '#type' => 'textfield',
-      '#title' => $this->t('Relative Path for Persisting Digital Object Files'),
+      '#title' => $this->t('Relative Path for Persisting Digital Object Attached Files'),
       '#description' => $this->t('Path relative to the root of the storage scheme selected above where digital object files will be stored. Do not include beginning or ending slashes. Default is "@storage".
-                                  <br>Note that changing this setting will not affect the file storage locations for previously ingested objects. They will remain where they were.',
-        ['@storage' => StrawberryfieldEventInsertSubscriberDepositDO::DEFAULT_OBJECT_STORAGE_FILE_PATH]),
-      '#default_value' => !empty($config_storage->get('object_file_path')) ? $config_storage->get('object_file_path') : StrawberryfieldEventInsertSubscriberDepositDO::DEFAULT_OBJECT_STORAGE_FILE_PATH,
+                                  <br>Note that changing this setting will not affect the file storage locations for previously ingested objects.They will remain where they were. IIIF Server level changes may need to be applied if you have a custom Source resolving strategy.',
+        ['@storage' => StrawberryfieldFilePersisterService::DEFAULT_OBJECT_STORAGE_FILE_PATH]),
+      '#default_value' => !empty($config_storage->get('object_file_path')) ? $config_storage->get('object_file_path') : StrawberryfieldFilePersisterService::DEFAULT_OBJECT_STORAGE_FILE_PATH,
       '#prefix' => '<span class="object-file-path-validation"></span>',
       '#ajax' => [
         'callback' => [$this, 'validateObjectFilePath'],
@@ -174,6 +182,33 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
         'method' => 'replace',
         'event' => 'change'
       ]
+    ];
+
+    $form['mediainfo_exec_path'] = [
+      '#type' => 'textfield',
+      '#title' => $this->t('Absolute path to the mediainfo tool binary inside your server'),
+      '#description' => $this->t('Mediainfo will run against any Video or Audio files associated to an Archipelago Digital Object and resulting technical metadata will be appended to the strawberryfield JSON. mediainfo v20+ is recommended'),
+      '#default_value' => !empty($config->get('mediainfo_exec_path')) ? $config->get('mediainfo_exec_path'): '/usr/bin/mediainfo',
+      '#states' => [
+        'visible' => [
+          ':input[name="extractmetadata"]' => ['checked' => TRUE],
+        ],
+      ],
+      '#prefix' => '<span class="mediainfo-exec-path-validation"></span>',
+      '#ajax' => [
+        'callback' => [$this, 'validateMediaInfo'],
+        'effect' => 'fade',
+        'wrapper' => 'mediainfo-exec-path-validation',
+        'method' => 'replace',
+        'event' => 'change'
+      ]
+    ];
+
+    $form['delete_tempfiles'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Delete Temporary Local files immediatelly after File Metadata Processing'),
+      '#description' => $this->t('If checked and the Local File is not a preservation master, then deletion will be instant. This may have Performance penalties on subsequente processing or when Running other parts of the stack that require locally accessible files for remote stored ones.'),
+      '#default_value' => $config->get('delete_tempfiles') ?? FALSE,
     ];
 
     return parent::buildForm($form, $form_state);
@@ -373,6 +408,30 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
     }
     return $response;
   }
+
+  /**
+   * Validate MediaInfo Exec Path
+   * @param array $form
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *
+   * @return \Drupal\Core\Ajax\AjaxResponse
+   */
+  public function validateMediaInfo(array $form, FormStateInterface $form_state) {
+    $response = new AjaxResponse();
+    $canrun = \Drupal::service('strawberryfield.utility')->verifyCommand($form_state->getValue('mediainfo_exec_path'));
+    if (!$canrun) {
+      $response->addCommand(new InvokeCommand('#edit-mediainfo-exec-path', 'addClass', ['error']));
+      $response->addCommand(new InvokeCommand('#edit-mediainfo-exec-path', 'removeClass', ['ok']));
+      $response->addCommand(new MessageCommand('Mediainfo path is not valid.', NULL, ['type' => 'error', 'announce' => 'Mediainfo path is not valid.']));
+
+    } else {
+      $response->addCommand(new InvokeCommand('#edit-mediainfo-exec-path', 'removeClass', ['error']));
+      $response->addCommand(new InvokeCommand('#edit-mediainfo-exec-path', 'addClass', ['ok']));
+      $response->addCommand(new MessageCommand('Mediainfo path is valid!', NULL, ['type' => 'status', 'announce' => 'Mediainfo path is valid!']));
+
+    }
+    return $response;
+  }
   /**
    * @param array $form
    * @param \Drupal\Core\Form\FormStateInterface $form_state
@@ -415,6 +474,15 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
         $form_state->setErrorByName(
           'pdfinfo_exec_path',
           $this->t('Please correct. PDFInfo path is not valid.')
+        );
+      }
+      $canrun_mediainfo = \Drupal::service('strawberryfield.utility')->verifyCommand(
+        $form_state->getValue('mediainfo_exec_path')
+      );
+      if (!$canrun_mediainfo) {
+        $form_state->setErrorByName(
+          'mediainfo_exec_path',
+          $this->t('Please correct. Mediainfo path is not valid.')
         );
       }
     }
@@ -461,14 +529,16 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
       ->set('fido_exec_path', trim($form_state->getValue('fido_exec_path')))
       ->set('identify_exec_path', trim($form_state->getValue('identify_exec_path')))
       ->set('pdfinfo_exec_path', trim($form_state->getValue('pdfinfo_exec_path')))
+      ->set('mediainfo_exec_path', trim($form_state->getValue('mediainfo_exec_path')))
+      ->set('delete_tempfiles', (bool) $form_state->getValue('delete_tempfiles'))
       ->save();
     $this->config('strawberryfield.storage_settings')
       ->set('file_scheme', $form_state->getValue('file_scheme'))
       ->set('file_path', trim($form_state->getValue('file_path')," \n\r\t\v\0/"))
       ->set('object_file_scheme', $form_state->getValue('object_file_scheme'))
+      ->set('object_file_strategy', $form_state->getValue('object_file_strategy'))
       ->set('object_file_path', trim($form_state->getValue('object_file_path')," \n\r\t\v\0/"))
       ->save();
-
     parent::submitForm($form, $form_state);
   }
 }

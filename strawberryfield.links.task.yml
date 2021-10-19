@@ -4,3 +4,16 @@ strawberryfield.custom_node_edit: # The ID of local task is the same as route, t
   title: 'Edit' 
   base_route: 'entity.node.canonical'
   weight: 3
+
+
+strawberryfield_keynameprovider_collection:
+  title: 'JSON Key Name Providers'
+  route_name: entity.strawberry_keynameprovider.collection
+  base_route: entity.strawberry_keynameprovider.collection
+  weight: 1
+
+strawberryfield_keynameprovider_overview_form:
+  route_name: 'strawberryfield.strawberryfield_keynameprovider_overview_form'
+  title: 'JSON Key Name Providers Overview'
+  base_route: 'entity.strawberry_keynameprovider.collection'
+  weight: 3
