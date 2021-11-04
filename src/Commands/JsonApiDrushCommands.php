@@ -582,6 +582,7 @@ JSON;
           ]
         );
 
+        $this->output()->writeln(implode(' ', $args_node));
         $process_node = Drush::process(implode(' ', $args_node));
         $process_node->mustRun();
 
