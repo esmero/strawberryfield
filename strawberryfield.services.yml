@@ -49,7 +49,7 @@ services:
     class: Drupal\strawberryfield\EventSubscriber\StrawberryfieldEventSaveSubscriberDepositDO
     tags:
       - { name: event_subscriber }
-    arguments: [ '@string_translation', '@messenger', '@serializer', '@config.factory', '@logger.factory', '@strawberryfield.file_persister', '@current_user' ]
+    arguments: ['@string_translation', '@messenger', '@serializer', '@config.factory', '@logger.factory', '@strawberryfield.file_persister', '@current_user']
   strawberryfield.insertfileusage_subscriber:
     class: Drupal\strawberryfield\EventSubscriber\StrawberryfieldEventInsertFileUsageUpdater
     tags:
@@ -82,13 +82,18 @@ services:
     arguments: ['@entity_type.manager', '@entity.repository']
   strawberryfield.mime_type.guesser.mime:
     class: Drupal\strawberryfield\StrawberryfieldMimeService
-    arguments: [ '@module_handler' ]
+    arguments: ['@module_handler']
     tags:
       - { name: mime_type_guesser }
     lazy: true
   logger.channel.hydroponics:
     parent: logger.channel_base
-    arguments: [ 'hydroponics' ]
+    arguments: ['hydroponics']
   strawberryfield.hydroponics:
     class: Drupal\strawberryfield\StrawberryfieldHydroponicsService
     arguments: ['@entity_type.manager', '@config.factory', '@module_handler', '@plugin.manager.queue_worker', '@queue', '@logger.channel.hydroponics']
+  strawberryfield.semantic_breadcrumb:
+    class: Drupal\strawberryfield\StrawberryFieldBreadcrumbBuilder
+    arguments: ['@entity_type.manager', '@current_user', '@strawberryfield.utility', '@config.factory']
+    tags:
+      - { name: breadcrumb_builder, priority: 1500 }

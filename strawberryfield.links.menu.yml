@@ -34,3 +34,10 @@ strawberryfield.hydroponics_settings_form:
   description: 'Configure which Queues will run as Background Services'
   parent: strawberryfield.group.admin
   weight: 101
+
+strawberryfield.breadcrumb_settings_form:
+  title: 'ADO Breadcrumb settings'
+  route_name: strawberryfield.breadcrumb_settings_form
+  description: 'Configure how Breadcrumbs are going to be generated for ADOs'
+  parent: strawberryfield.group.admin
+  weight: 100
