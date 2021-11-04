@@ -88,6 +88,13 @@ class StrawberryfieldFileMetadataService {
   protected $cleanUp = FALSE;
 
   /**
+   * Number of files per ADO that will trigger reduced set of TechMD
+   *
+   * @var int
+   */
+  private $manyFiles = 0;
+
+  /**
    * StrawberryfieldFileMetadataService constructor.
    *
    * @param \Drupal\Core\File\FileSystemInterface $file_system
@@ -113,6 +120,7 @@ class StrawberryfieldFileMetadataService {
     $this->loggerFactory = $logger_factory;
     $this->strawberryfieldUtility = $strawberryfield_utility_service;
     // This will verified once per injection of the service, not every time
+    $this->manyFiles = $this->config->get('manyfiles') ?? 0;
     if ((boolean) $this->config->get('extractmetadata')) {
       $canrun_exif = $this->strawberryfieldUtility->verifyCommand(
         $this->config->get('exif_exec_path')
@@ -141,23 +149,28 @@ class StrawberryfieldFileMetadataService {
    *
    * @param \Drupal\file\FileInterface $file
    *  A file
-   * @param  string|bool $checksum
-   * @param $total_count
+   * @param string|bool $checksum
+   * @param int $total_count
    * @param string $askey
    *   How the file was classified according to the as:key format
    *   Can be: document, image, model, text, application, movie, sound etc.
    *
+   * @param bool $force_reduced
+   *
    * @return array
    *    Metadata extracted for the image in array format if any
+   * @throws \Exception
    */
   public function getBaseFileMetadata(
     FileInterface $file, $checksum, $total_count = 1,
-    $askey = 'document'
+    $askey = 'document', bool $force_reduced = FALSE
   ) {
 
     // - How many files? Like 1 is cool, 2000 not cool
     // - Size? Like moving realtime 'Sync' 2TB back to TEMP to MD5-it not cool
     $metadata = [];
+    $reduced = ($total_count >= $this->manyFiles) && ($this->manyFiles !=0) ? TRUE : FALSE;
+    $reduced = ($reduced || $force_reduced);
 
     if (!$this->extractFileMetadata) {
       // early return if not allowed.
@@ -218,7 +231,7 @@ class StrawberryfieldFileMetadataService {
     }
     else {
       $this->extractExif($askey, $exif_exec_path, $file, $templocation,
-        $metadata);
+        $metadata, $reduced);
     }
 
     if (strlen($fido_exec_path) == 0) {
@@ -282,7 +295,7 @@ class StrawberryfieldFileMetadataService {
     }
     else {
       $this->extractMediaInfo($askey, $mediainfo_exec_path, $file, $templocation,
-        $metadata);
+        $metadata, $reduced);
     }
 
     // Now check if cleanup is needed and how
@@ -309,14 +322,25 @@ class StrawberryfieldFileMetadataService {
    * @param \Drupal\file\FileInterface $file
    * @param string $templocation
    * @param array $metadata
+   * @param bool $reduced
    */
-  public function extractExif(string $askey, string $exec_path, FileInterface $file, string $templocation, &$metadata = []) {
+  public function extractExif(string $askey, string $exec_path, FileInterface $file, string $templocation, &$metadata = [], bool $reduced = FALSE) {
     $templocation_for_exec = escapeshellarg($templocation);
-    $result_exif = exec(
-      $exec_path . ' -json -q -a -gps:all -Common "-gps*" -xmp:all -XMP-tiff:Orientation -ImageWidth -ImageHeight -Canon -Nikon-AllDates -pdf:all -ee -MIMEType ' . $templocation_for_exec,
-      $output_exif,
-      $status_exif
-    );
+
+    if (!$reduced) {
+      $result_exif = exec(
+        $exec_path . ' -json -q -a -gps:all -Common "-gps*" -xmp:all -XMP-tiff:Orientation -ImageWidth -ImageHeight -Canon -Nikon-AllDates -pdf:all -ee -MIMEType ' . $templocation_for_exec,
+        $output_exif,
+        $status_exif
+      );
+    }
+    else {
+      $result_exif = exec(
+        $exec_path . ' -json -q -ImageWidth -ImageHeight -MIMEType -XMP-tiff:Orientation -common -Aperture -FocalLength -ModifyDate ' . $templocation_for_exec,
+        $output_exif,
+        $status_exif
+      );
+    }
 
     // First EXIF
     if ($status_exif != 0) {
@@ -569,9 +593,11 @@ class StrawberryfieldFileMetadataService {
    * @param \Drupal\file\FileInterface $file
    * @param string $templocation
    * @param array $metadata
+   * @param bool $reduced
    *
+   * @throws \Exception
    */
-  public function extractMediaInfo(string $askey, string $exec_path, FileInterface $file, string $templocation, &$metadata = []) {
+  public function extractMediaInfo(string $askey, string $exec_path, FileInterface $file, string $templocation, &$metadata = [], bool $reduced = FALSE) {
     // Only run Media info if Video/Audio
     if (in_array($askey, ['audio', 'video'])) {
       $mediaInfo = new MediaInfo();
@@ -579,6 +605,15 @@ class StrawberryfieldFileMetadataService {
       try {
         $mediaInfoContainer = $mediaInfo->getInfo($templocation, TRUE);
         $metadata['flv:mediainfo'] = $mediaInfoContainer->__toArray();
+        if ($reduced) {
+          // These are the basics needed to construct a IIIF Manifest.
+          $temp['videos'][0]['width']['absoluteValue'] = $metadata['flv:mediainfo']['videos'][0]['width']['absoluteValue'] ?? NULL;
+          $temp['videos'][0]['height']['absoluteValue'] = $metadata['flv:mediainfo']['videos'][0]['height']['absoluteValue'] ?? NULL;
+          $temp['videos'][0]['duration']['milliseconds'] = $metadata['flv:mediainfo']['videos'][0]['duration']['milliseconds'] ?? NULL;
+          $temp['audios'][0]['duration']['milliseconds'] =  $temp['flv:mediainfo']['audios'][0]['duration']['milliseconds'] ?? NULL;
+          $temp['general']['internet_media_type'] =  $temp['flv:mediainfo']['general']['internet_media_type'] ?? NULL;
+          $metadata['flv:mediainfo'] = $temp;
+        }
       } catch (UnknownTrackTypeException $e) {
         $this->loggerFactory->get('strawberryfield')->warning(
           'Could not process MediaInfo on @templocation for @fileurl',
