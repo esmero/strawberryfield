@@ -106,6 +106,14 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
       '#default_value' => !empty($config->get('extractmetadata')) ? $config->get('extractmetadata'): FALSE,
       '#return_value' => TRUE,
     ];
+    $form['manyfiles'] = [
+      '#type' => 'number',
+      '#min' => 0,
+      '#max' => 300,
+      '#title' => $this->t('Number (inclussive) of files per ADO that will trigger reduced set of Technical metadata. This allows you to control the size of the resulting JSON and may help with time outs when PHP max time to process is set low.'),
+      '#description' => $this->t('This number may be also used by other modules to opt for alternate file fetching and description strategies.A value of 0 means there are no limits and all Files with get all possible TechMD. We recommend to keep this between 10 and 20.'),
+      '#default_value' => !empty($config->get('manyfiles')) ? $config->get('manyfiles'): 10,
+    ];
     $form['exif_exec_path'] = [
       '#type' => 'textfield',
       '#title' => $this->t('Absolute path to the exiftool inside your server'),
@@ -531,6 +539,7 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
       ->set('pdfinfo_exec_path', trim($form_state->getValue('pdfinfo_exec_path')))
       ->set('mediainfo_exec_path', trim($form_state->getValue('mediainfo_exec_path')))
       ->set('delete_tempfiles', (bool) $form_state->getValue('delete_tempfiles'))
+      ->set('manyfiles', (int) $form_state->getValue('manyfiles'))
       ->save();
     $this->config('strawberryfield.storage_settings')
       ->set('file_scheme', $form_state->getValue('file_scheme'))
