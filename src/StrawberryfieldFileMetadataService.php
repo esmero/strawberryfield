@@ -155,7 +155,8 @@ class StrawberryfieldFileMetadataService {
    *   How the file was classified according to the as:key format
    *   Can be: document, image, model, text, application, movie, sound etc.
    *
-   * @param bool $force_reduced
+   * @param bool $force_reduced_techmd
+   *    Forces Minimal TECHMD to be extracted.
    *
    * @return array
    *    Metadata extracted for the image in array format if any
@@ -163,14 +164,14 @@ class StrawberryfieldFileMetadataService {
    */
   public function getBaseFileMetadata(
     FileInterface $file, $checksum, $total_count = 1,
-    $askey = 'document', bool $force_reduced = FALSE
+    $askey = 'document', bool $force_reduced_techmd = FALSE
   ) {
 
     // - How many files? Like 1 is cool, 2000 not cool
     // - Size? Like moving realtime 'Sync' 2TB back to TEMP to MD5-it not cool
     $metadata = [];
     $reduced = ($total_count >= $this->manyFiles) && ($this->manyFiles !=0) ? TRUE : FALSE;
-    $reduced = ($reduced || $force_reduced);
+    $reduced = ($reduced || $force_reduced_techmd);
 
     if (!$this->extractFileMetadata) {
       // early return if not allowed.

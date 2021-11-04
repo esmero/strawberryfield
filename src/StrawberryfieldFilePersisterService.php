@@ -441,18 +441,22 @@ class StrawberryfieldFilePersisterService {
    * @param bool $force
    *    If true, we will force a new Path even if current localtion of the file
    *    Matches the Destination Schema. This can be altered:
-   * @see \Drupal\strawberryfield\StrawberryfieldFilePersisterService::getDestinationUri
+   * @param bool $force_reduced_techmd
+   *    Forces Minimal TECHMD to be produced
    *
    * @return array
    *    An array containing only as:structures with every file classified and
    *    their metadata.
    * @throws \Drupal\Core\Entity\EntityStorageException
+   * @see \Drupal\strawberryfield\StrawberryfieldFilePersisterService::getDestinationUri
+   *
    */
   public function generateAsFileStructure(
     array $file_id_list = [],
     $file_source_key,
     array $cleanjson = [],
-    bool $force = FALSE
+    bool $force = FALSE,
+    bool $force_reduced_techmd = FALSE
   ) {
 
     /* @see https://www.drupal.org/project/drupal/issues/2577417 for a
@@ -564,7 +568,7 @@ class StrawberryfieldFilePersisterService {
         // @TODO Fills up the md5 for all files and updates a single node at a time
         // @TODO evaluate Node locking while this happens.
         $md5 = md5_file($uri);
-        $filemetadata = $this->strawberryfieldFileMetadataService->getBaseFileMetadata($file, $md5, count($files), $askey);
+        $filemetadata = $this->strawberryfieldFileMetadataService->getBaseFileMetadata($file, $md5, count($files), $askey, $force_reduced_techmd);
         $uuid = $file->uuid();
         // again, i know!
         $mime = $file->getMimeType();

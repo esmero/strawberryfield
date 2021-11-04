@@ -110,8 +110,8 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
       '#type' => 'number',
       '#min' => 0,
       '#max' => 300,
-      '#title' => $this->t('Number (inclussive) of files per ADO that will trigger reduced set of Technical metadata. This allows you to control the size of the resulting JSON and may help with time outs when PHP max time to process is set low.'),
-      '#description' => $this->t('This number may be also used by other modules to opt for alternate file fetching and description strategies.A value of 0 means there are no limits and all Files with get all possible TechMD. We recommend to keep this between 10 and 20.'),
+      '#title' => $this->t('Number (inclusive) of files per ADO that will trigger reduced set of Technical metadata. This allows you to control the size of the resulting JSON and may help with time outs when PHP max time to process is set low.'),
+      '#description' => $this->t('This number may be also used by other modules to opt for alternate file fetching and description strategies. A value of "0" means there are no limits and all files with get all possible TechMD. We recommend to keep this between "10" and "20".'),
       '#default_value' => !empty($config->get('manyfiles')) ? $config->get('manyfiles'): 10,
     ];
     $form['exif_exec_path'] = [
