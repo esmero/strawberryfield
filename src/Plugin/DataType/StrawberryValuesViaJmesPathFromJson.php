@@ -101,7 +101,7 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
             $edtf_value = $result->getEdtfValue();
             switch(get_class($edtf_value)) {
               case "EDTF\Model\Interval":
-                if($result->getEdtfValue()->hasStartDate()) {
+                if($edtf_value->hasStartDate()) {
                   $values_parsed[] = date('c', $edtf_value->getMin());
                 }
                 if($result->getEdtfValue()->hasEndDate()) {
