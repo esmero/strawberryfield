@@ -85,6 +85,11 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
       }
       // This is an array, don't double nest to make the normalizer happy.
       $jmespath_result_to_expose = array_filter($jmespath_result_to_expose);
+      foreach($jmespath_result_to_expose as $i => $v) {
+        if(is_array($v) or is_object($v)) {
+          $jmespath_result_to_expose[$i] = json_encode($v);
+        }
+      }
       $values = array_map('trim', $jmespath_result_to_expose);
       $values = array_map('stripslashes', $values);
       if ($is_date) {
@@ -93,12 +98,22 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
         foreach ($values as $value) {
           $result = $parser->parse($value);
           if ($result->isValid()) {
-            $date_ini = $result->getEdtfValue()->getMin();
-            $date_max = $result->getEdtfValue()->getMax();
-            $date_ini = date('c', $date_ini);
-            $date_max = date('c', $date_max);
-            $values_parsed[] = $date_ini;
-            $values_parsed[] = $date_max;
+            $edtf_value = $result->getEdtfValue();
+            // @todo remove once EDTF fixes their invalid Constructor for EDTF\Model\Interval that should per interface never allow NULL for start nor end date
+            switch(get_class($edtf_value)) {
+              case "EDTF\Model\Interval":
+                if($edtf_value->hasStartDate()) {
+                  $values_parsed[] = date('c', $edtf_value->getMin());
+                }
+                if($edtf_value->hasEndDate()) {
+                  $values_parsed[] = date('c', $edtf_value->getMax());
+                }
+                break;
+              default:
+                $values_parsed[] = date('c', $edtf_value->getMin());
+                $values_parsed[] = date('c', $edtf_value->getMax());
+                break;
+            }
           }
           else {
             // If not EDTF (e.g an already ISO8601 date)
@@ -234,4 +249,3 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
     return FALSE;
   }
 }
-
