@@ -649,10 +649,10 @@ class StrawberryfieldFileMetadataService {
    *   False if we could not acquire location
    *   TRUE if its already local so we can use existing path.
    */
-  private function ensureFileAvailability(FileInterface $file, $cheksum) {
+  public function ensureFileAvailability(FileInterface $file, $checksum) {
     $uri = $file->getFileUri();
     // Local stream.
-    $cache_key = $cheksum ?? md5($uri);
+    $cache_key = $checksum ?? md5($uri);
     // Check first if the file is already around in temp?
     // @TODO can be sure its the same one? Ideas?
     // If the file isn't stored locally make a temporary copy.
