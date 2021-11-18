@@ -14,9 +14,9 @@ use Drupal\Core\Session\AccountInterface;
 use Datetime;
 
 /**
- * Event subscriber for SBF bearing entity insert event.
+ * Event subscriber for SBF bearing entity Save event that Deposits ADO to File.
  */
-class StrawberryfieldEventInsertSubscriberDepositDO extends StrawberryfieldEventInsertSubscriber {
+class StrawberryfieldEventSaveSubscriberDepositDO extends StrawberryfieldEventSaveSubscriber {
 
   use StringTranslationTrait;
 
@@ -73,6 +73,13 @@ class StrawberryfieldEventInsertSubscriberDepositDO extends StrawberryfieldEvent
   protected $account;
 
   /**
+   * Which strategy to use for ADO revision deposits.
+   *
+   * @var string
+   */
+  protected $objectFileStrategy;
+
+  /**
    * StrawberryfieldEventInsertSubscriberDepositDO constructor.
    *
    * @param \Drupal\Core\StringTranslation\TranslationInterface $string_translation
@@ -98,6 +105,9 @@ class StrawberryfieldEventInsertSubscriberDepositDO extends StrawberryfieldEvent
     $this->destinationScheme = $config_factory->get(
       'strawberryfield.storage_settings'
     )->get('object_file_scheme');
+    $this->objectFileStrategy = $config_factory->get(
+        'strawberryfield.storage_settings'
+      )->get('object_file_strategy') ?? 'default';
     $this->loggerFactory = $logger_factory;
     $this->strawberryfilepersister = $strawberry_filepersister;
     $this->account = $account;
@@ -112,10 +122,20 @@ class StrawberryfieldEventInsertSubscriberDepositDO extends StrawberryfieldEvent
    *
    * @throws \Drupal\Core\Entity\EntityMalformedException
    */
-  public function onEntityInsert(StrawberryfieldCrudEvent $event) {
+  public function onEntitySave(StrawberryfieldCrudEvent $event) {
     /* @var $entity \Drupal\Core\Entity\ContentEntityInterface */
     $current_class = get_called_class();
     $entity = $event->getEntity();
+    if ($entity->isDefaultRevision()) {
+       $prefix = 'current';
+    }
+    elseif ($this->objectFileStrategy == 'all') {
+       $prefix = $entity->getRevisionCreationTime();
+    }
+    else {
+      return;
+    }
+
     $sbf_fields = $event->getFields();
     // Strawberryfield data
     $sbf_data = [];
@@ -132,15 +152,15 @@ class StrawberryfieldEventInsertSubscriberDepositDO extends StrawberryfieldEvent
     $path = $this->destinationScheme . '://' . $this->destinationRelativePath . '/' . $entity->uuid();
     $success = FALSE;
     if ($full_node_data) {
-      $filename_full_node = 'node_' . $entity->bundle() . '_' . $entity->uuid() . '.json';
+      $filename_full_node = $prefix.'.node_' . $entity->bundle() . '_' . $entity->uuid() . '.json';
       // Create the DO JSON file
-      $success = $this->strawberryfilepersister->persistMetadataToDisk(
-        $full_node_data,
-        $path,
-        $filename_full_node,
-        TRUE,
-        FALSE
-      );
+        $success = $this->strawberryfilepersister->persistMetadataToDisk(
+          $full_node_data,
+          $path,
+          $filename_full_node,
+          TRUE,
+          (bool) !$entity->isDefaultRevision()
+        );
     }
     // Now do only SBF data
     foreach ($sbf_fields as $field_name) {
@@ -155,7 +175,7 @@ class StrawberryfieldEventInsertSubscriberDepositDO extends StrawberryfieldEvent
       }
     }
     if ($sbf_data) {
-      $filename_sbf = 'do-' . $entity->uuid() . '.json';
+      $filename_sbf = $prefix . '.do-' . $entity->uuid() . '.json';
       // A lot of string manip. But faster than decode and rencode.
       $sbf_data[] = '"id": "' . $entity->toUrl('canonical')->toString() . '"';
       $sbf_data[] = '"type": "' . $entity->bundle() . '"';
@@ -177,17 +197,17 @@ class StrawberryfieldEventInsertSubscriberDepositDO extends StrawberryfieldEvent
         $path,
         $filename_sbf,
         TRUE,
-        FALSE
+        (bool) !$entity->isDefaultRevision()
       );
     }
     $event->setProcessedBy($current_class, $success);
     // Entity is "assigned by reference" so any change on the entity here will persist.
     if ($success && $this->account->hasPermission('display strawberry messages')) {
       $this->messenger->addStatus(
-        t('Digital Object persisted to Filesystem.')
+        t('Digital Object Revision persisted to Filesystem.')
       );
       $this->loggerFactory->get('archipelago')->info(
-        'Digital Object persisted to Filesystem.',
+        'Digital Object Revision persisted to Filesystem.',
         ['Entity ID' => $entity->id(), 'Entity Title' => $entity->label()]
       );
     }
@@ -195,7 +215,7 @@ class StrawberryfieldEventInsertSubscriberDepositDO extends StrawberryfieldEvent
     if (!$success) {
       $this->messenger->addError(
         t(
-          'Digital Object Serialization failed? We could not persist to Filesystem. Please contact your site admin.'
+          'Digital Object Serialization failed? We could not persist Revision to Filesystem. Please contact your site admin.'
         )
       );
       $this->loggerFactory->get('archipelago')->critical(
@@ -204,4 +224,5 @@ class StrawberryfieldEventInsertSubscriberDepositDO extends StrawberryfieldEvent
       );
     }
   }
+
 }

@@ -163,9 +163,9 @@ class StrawberryFieldFileComputedItem extends EntityReferenceItem {
     $settings = $this->getSettings();
 
     // Cap the upload size according to the PHP limit.
-    $max_filesize = Bytes::toInt(\Drupal\Component\Utility\Environment::getUploadMaxSize());
+    $max_filesize = Bytes::toNumber(\Drupal\Component\Utility\Environment::getUploadMaxSize());
     if (!empty($settings['max_filesize'])) {
-      $max_filesize = min($max_filesize, Bytes::toInt($settings['max_filesize']));
+      $max_filesize = min($max_filesize, Bytes::toNumber($settings['max_filesize']));
     }
 
     // There is always a file size limit due to the PHP server limit.

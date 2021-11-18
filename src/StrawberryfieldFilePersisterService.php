@@ -26,11 +26,8 @@ use Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException;
 use Drupal\Component\Plugin\Exception\PluginNotFoundException;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\strawberryfield\Event\StrawberryfieldJsonProcessEvent;
-use Drupal\Core\StreamWrapper\StreamWrapperInterface;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
-use Drupal\Core\Url;
-
 
 /**
  * Provides a SBF File persisting class.
@@ -40,6 +37,11 @@ class StrawberryfieldFilePersisterService {
   const FILE_IRI_PREFIX = 'urn:uuid:';
 
   const AS_TYPE_PREFIX = 'as:';
+
+  /**
+   * Default path for digital object file storage.
+   */
+  const DEFAULT_OBJECT_STORAGE_FILE_PATH = 'dostorage';
 
   use StringTranslationTrait;
   use MessengerTrait;
@@ -116,6 +118,13 @@ class StrawberryfieldFilePersisterService {
   protected $config;
 
   /**
+   * The SBF storage configuration settings.
+   *
+   * @var \Drupal\Core\Config\ImmutableConfig
+   */
+  protected $storageConfig;
+
+  /**
    * The logger factory.
    *
    * @var \Drupal\Core\Logger\LoggerChannelFactoryInterface
@@ -128,6 +137,14 @@ class StrawberryfieldFilePersisterService {
    * @var \Drupal\strawberryfield\StrawberryfieldUtilityService
    */
   protected $strawberryfieldUtility;
+
+  /**
+   * The Strawberry Field File Metadata Service.
+   *
+   * @var \Drupal\strawberryfield\StrawberryfieldFileMetadataService
+   */
+  protected $strawberryfieldFileMetadataService;
+
 
   /**
    * If getBaseFileMetadata should be processed
@@ -149,7 +166,9 @@ class StrawberryfieldFilePersisterService {
    * @param \Drupal\Core\Language\LanguageManagerInterface $language_manager
    * @param \Drupal\Component\Transliteration\TransliterationInterface $transliteration
    * @param \Drupal\Core\Extension\ModuleHandlerInterface $module_handler
-   * @param StrawberryfieldUtilityService $strawberryfield_utility_service ,
+   * @param \Drupal\Core\Logger\LoggerChannelFactoryInterface $logger_factory
+   * @param StrawberryfieldUtilityService $strawberryfield_utility_service
+   * @param \Drupal\strawberryfield\StrawberryfieldFileMetadataService $strawberryfield_file_metadata_service
    */
   public function __construct(
     FileSystemInterface $file_system,
@@ -163,44 +182,28 @@ class StrawberryfieldFilePersisterService {
     TransliterationInterface $transliteration,
     ModuleHandlerInterface $module_handler,
     LoggerChannelFactoryInterface $logger_factory,
-    StrawberryfieldUtilityService $strawberryfield_utility_service
+    StrawberryfieldUtilityService $strawberryfield_utility_service,
+    StrawberryfieldFileMetadataService $strawberryfield_file_metadata_service
   ) {
     $this->fileSystem = $file_system;
     $this->fileUsage = $file_usage;
     $this->entityTypeManager = $entity_type_manager;
     $this->streamWrapperManager = $stream_wrapper_manager;
     $this->archiverManager = $archiver_manager;
+    $this->strawberryfieldFileMetadataService = $strawberryfield_file_metadata_service;
     //@TODO evaluate creating a ServiceFactory instead of reading this on construct.
-    $this->destinationScheme = $config_factory->get(
-      'strawberryfield.storage_settings'
-    )->get('file_scheme');
     $this->config = $config_factory->get(
       'strawberryfield.filepersister_service_settings'
     );
+    $this->storageConfig = $config_factory->get(
+      'strawberryfield.storage_settings'
+    );
+    $this->destinationScheme = $this->storageConfig->get('file_scheme');
     $this->languageManager = $language_manager;
     $this->transliteration = $transliteration;
     $this->moduleHandler = $module_handler;
     $this->loggerFactory = $logger_factory;
     $this->strawberryfieldUtility = $strawberryfield_utility_service;
-    // This will verify once per injection of the service, not every time
-    if ((boolean) $this->config->get('extractmetadata')) {
-      $canrun_exif = $this->strawberryfieldUtility->verifyCommand(
-        $this->config->get('exif_exec_path')
-      );
-      $canrun_fido = $this->strawberryfieldUtility->verifyCommand(
-        $this->config->get('fido_exec_path')
-      );
-      if ($canrun_exif || $canrun_fido) {
-        $this->extractFileMetadata = TRUE;
-      }
-      else {
-        // This will be moved to runners anyway so won't work it too
-        // much more.
-        $this->loggerFactory->get('strawberryfield')->warning(
-          'File Metadata Extraction is enabled on ingest via Strawberryfield but neither EXIF or FIDO paths are correct executables. Please correct of disable.'
-        );
-      }
-    }
   }
 
 
@@ -213,17 +216,34 @@ class StrawberryfieldFilePersisterService {
    *
    * @param \Drupal\file\FileInterface $file
    * @param string $checksum
+   *    The checksum of the file
+   * @param array $cleanjson
+   *    The Original Clean SBF Metadata of the ADO that holds this File
+   * @param bool $force
+   *    Forcing will impose a new Path even if the current saved path is seen
+   *    by this method as "Ok" to keep. This is based on the destination Schema,
+   *    which means anything that is e.g in S3 will be kept its current place
+   *    in S3 if set to false.
    *
    * @return string
    */
   public function getDestinationUri(
     FileInterface $file,
     string $checksum,
+    array $cleanjson,
     bool $force = FALSE
   ) {
 
+    // The building blocks, as info for the alter hook
+    $file_parts = [];
+    // The processed building blocks, what the altering agent will want to set
+    $processed_file_parts = [];
+
     // Default $relativefolder is a 3 char hash generated by a checksum algorithm.
-    $relativefolder = substr($checksum, 0, 3);
+    // First, get any parent directories.
+    $relativefolders = explode('/', $this->storageConfig->get('file_path') ?? "");
+    $relativefolders[] = substr($checksum, 0, 3);
+    $relativefolder = implode('/', array_filter($relativefolders));
     $current_uri = $file->getFileUri();
     $uuid = $file->uuid();
     // At this level we do not know the current
@@ -263,7 +283,7 @@ class StrawberryfieldFilePersisterService {
         // Condition to make it temporary again and also take ownership is
         //  Not used by any SBF Node. And we can check our own module here to be quick
         if (count($usage_list)) {
-          // Means someone has take ownership?
+          // Means someone has taken ownership. E.g AMI module.
           $force = TRUE;
         }
         foreach ($usage_list as $module => $use) {
@@ -274,94 +294,104 @@ class StrawberryfieldFilePersisterService {
         }
       }
     }
+    // Start building the file parts.
+    $destination_folder = $processed_file_parts['destination_folder'] = $relativefolder;
+    $file_parts['destination_filename'] = pathinfo(
+      $current_uri,
+      PATHINFO_FILENAME
+    );
 
+    $file_parts['destination_extension'] = pathinfo(
+      $current_uri,
+      PATHINFO_EXTENSION
+    );
+    // Check if the file may have a secondary extension
+
+    $file_parts['destination_extension_secondary'] = pathinfo(
+      $file_parts['destination_filename'],
+      PATHINFO_EXTENSION
+    );
+    // Deal with 2 part extension problem.
+    if (!empty($file_parts['destination_extension_secondary']) &&
+      strlen($file_parts['destination_extension_secondary']) <= 4 &&
+      strlen($file_parts['destination_extension_secondary']) > 0
+    ) {
+      $file_parts['destination_extension'] = $file_parts['destination_extension_secondary'] . '.' . $file_parts['destination_extension'];
+    }
+
+    $file_parts['destination_scheme'] = $this->streamWrapperManager
+      ->getScheme($current_uri);
+
+    [$file_parts['destination_filetype'],] = explode(
+      '/',
+      $file->getMimeType()
+    );
+
+    //https://api.drupal.org/api/drupal/core%21includes%21file.inc/function/file_uri_scheme/8.7.x
+    // If no destination scheme was setup on our global config use the original file scheme.
+    // @TODO alert if no Destination scheme?
+
+    $processed_file_parts['desired_scheme'] = $destination_scheme = !empty($this->destinationScheme) ? $this->destinationScheme : $file_parts['destination_scheme'];
+    // First part of Mime type becomes prefix. Performant for filtering in S3.
+    $destination_basename = $file_parts['destination_filetype'] . '-' . $file_parts['destination_filename'];
+
+    // Edge case, should only happen if all goes wrong.
+    // RFC 2046: Since unknown mime-types always default to
+    // application/octet-stream  and we use first part of the string
+    // we default to 'application' here.
+    if (empty($destination_basename)) {
+      $destination_basename = 'application-unnamed';
+    }
+    else {
+      // Object name limit for AWS S3 is 512 chars. Minio does not impose any.
+      // UUID adds 36 characters,  plus 1 for the dash + 4 for extension.
+      // So we shamelessly cut at 471. Someone needs to act!
+      $destination_basename = substr($destination_basename, 0, 471);
+    }
+
+    // WE add the unique UUID at the end. That gives us best protection against
+    // name collisions but still keeping human semantically aware file naming.
+    $destination_extension = mb_strtolower(
+      $file_parts['destination_extension'] ?? 'bin'
+    );
+    // First part of Mime type becomes prefix. Performant for filtering in S3.
+    $destination_basename = $this->sanitizeFileName($destination_basename);
+    $processed_file_parts['destination_filename'] =  $destination_filename = $destination_basename . '-' . $uuid . '.' . $destination_extension;
+    $processed_file_parts['force'] = $force;
+
+    // Allow other modules to alter the parts used to create final persistent destination.
+    $file_extra_data = [
+      'checksum' => $checksum,
+      'file' => $file,
+      'file_parts' => $processed_file_parts
+    ];
+
+    $this->moduleHandler->alter(
+      'strawberryfield_file_destination',
+      $processed_file_parts,
+      $cleanjson,
+      $file_extra_data
+    );
+    // Recover the $force flag from the alter
+    $force = $processed_file_parts['force'] ?? $force;
 
     if ($force || $file->isTemporary()) {
-
-      $file_parts['destination_folder'] = $relativefolder;
-      $file_parts['destination_filename'] = pathinfo(
-        $current_uri,
-        PATHINFO_FILENAME
-      );
-
-      $file_parts['destination_extension'] = pathinfo(
-        $current_uri,
-        PATHINFO_EXTENSION
-      );
-      // Check if the file may have a secondary extension
-
-      $file_parts['destination_extension_secondary'] = pathinfo(
-        $file_parts['destination_filename'],
-        PATHINFO_EXTENSION
-      );
-      // Deal with 2 part extension problem.
-      if (!empty($file_parts['destination_extension_secondary']) &&
-        strlen($file_parts['destination_extension_secondary'])<=4 &&
-        strlen($file_parts['destination_extension_secondary']) > 0
-      ) {
-        $file_parts['destination_extension'] = $file_parts['destination_extension_secondary'].'.'.$file_parts['destination_extension'];
-      }
-
-      $file_parts['destination_scheme'] = $this->streamWrapperManager
-        ->getScheme($current_uri);
-
-      [$file_parts['destination_filetype'],] = explode(
-        '/',
-        $file->getMimeType()
-      );
-
-      // Allow other modules to alter the parts used to create final persistent destination.
-      // @TODO add the .api file and an example for this.
-      $this->moduleHandler->alter(
-        'strawberryfield_file_destination',
-        $file_parts,
-        $file,
-        $checksum
-      );
-
-      $destination_extension = mb_strtolower(
-        $file_parts['destination_extension']
-      );
-      //https://api.drupal.org/api/drupal/core%21includes%21file.inc/function/file_uri_scheme/8.7.x
-      // If no destination scheme was setup on our global config use the original file scheme.
-      // @TODO alert if no Destination scheme?
-      $desired_scheme = !empty($this->destinationScheme) ? $this->destinationScheme : $file_parts['destination_scheme'];
-
-      // First part of Mime type becomes prefix. Performant for filtering in S3.
-      $destination_basename = $file_parts['destination_filetype'] . '-' . $file_parts['destination_filename'];
-
+      $desired_scheme = $processed_file_parts['desired_scheme'] ?? $destination_scheme;
+      $destination_filename = $processed_file_parts['destination_filename'] ?? $destination_filename;
+      $destination_folder = $processed_file_parts['destination_folder'] ?? $destination_folder;
       // Sanitize the whole thing.
-      $destination_basename = $this->sanitizeFileName($destination_basename);
-
-      // Edge case, should only happen if all goes wrong.
-      // RFC 2046: Since unknown mime-types always default to
-      // application/octet-stream  and we use first part of the string
-      // we default to 'application' here.
-      if (empty($destination_basename)) {
-        $destination_basename = 'application-unnamed';
-      }
-      else {
-        // Object name limit for AWS S3 is 512 chars. Minio does not impose any.
-        // UUID adds 36 characters,  plus 1 for the dash + 4 for extension.
-        // So we shamelessly cut at 471. Someone needs to act!
-        $destination_basename = substr($destination_basename, 0, 471);
-      }
-
-      // WE add the unique UUID at the end. That gives us best protection against
-      // name collisions but still keeping human semantically aware file naming.
-
-      $destination_filename = $destination_basename . '-' . $uuid . '.' . $destination_extension;
-      // Finally make temporary Again in case its Still
+      // Finally make temporary Again in case it is permanent and we forced this.
       if ($force && $file->isPermanent()) {
         $file->setTemporary();
-        // Ensure its temporary so persister actually reacts to it.
+        // Ensure its temporary so persisting Event Handler actually reacts to it.
       }
-      return $desired_scheme . '://' . $file_parts['destination_folder'] . '/' . $destination_filename;
+      return $desired_scheme . '://' . $destination_folder . '/' . $destination_filename;
     }
     else {
       return $file->getFileUri();
     }
   }
+
 
   /**
    * Sanitizes a File name removing/mapping non valid characters.
@@ -408,15 +438,25 @@ class StrawberryfieldFilePersisterService {
    *   already processed as:structures. This means the only real requirement
    *   are the as:structures, if an
    *
+   * @param bool $force
+   *    If true, we will force a new Path even if current localtion of the file
+   *    Matches the Destination Schema. This can be altered:
+   * @param bool $force_reduced_techmd
+   *    Forces Minimal TECHMD to be produced
+   *
    * @return array
    *    An array containing only as:structures with every file classified and
    *    their metadata.
    * @throws \Drupal\Core\Entity\EntityStorageException
+   * @see \Drupal\strawberryfield\StrawberryfieldFilePersisterService::getDestinationUri
+   *
    */
   public function generateAsFileStructure(
     array $file_id_list = [],
     $file_source_key,
-    array $cleanjson = []
+    array $cleanjson = [],
+    bool $force = FALSE,
+    bool $force_reduced_techmd = FALSE
   ) {
 
     /* @see https://www.drupal.org/project/drupal/issues/2577417 for a
@@ -514,6 +554,8 @@ class StrawberryfieldFilePersisterService {
         $fileinfo_bytype_many[self::AS_TYPE_PREFIX . $askey]
       );
     }
+
+
     // Final iteration
     // Only do this if file was not previously processed and stored.
     foreach ($to_process as $askey => $files) {
@@ -526,13 +568,12 @@ class StrawberryfieldFilePersisterService {
         // @TODO Fills up the md5 for all files and updates a single node at a time
         // @TODO evaluate Node locking while this happens.
         $md5 = md5_file($uri);
-        $filemetadata = $this->getBaseFileMetadata($file, $askey);
-
+        $filemetadata = $this->strawberryfieldFileMetadataService->getBaseFileMetadata($file, $md5, count($files), $askey, $force_reduced_techmd);
         $uuid = $file->uuid();
         // again, i know!
         $mime = $file->getMimeType();
-        // Desired destination.
-        $destinationuri = $this->getDestinationUri($file, $md5);
+        // Desired destination. Passes also Clean JSON around.
+        $destinationuri = $this->getDestinationUri($file, $md5, $cleanjson, $force);
         // Add exception here for PDFs. We need the number of pages
         // @TODO add a mime type based hook/plugin or event. Idea is to allow modules
         // to intercept this
@@ -545,16 +586,17 @@ class StrawberryfieldFilePersisterService {
           'dr:for' => $file_source_key,
           'dr:fid' => (int) $file->id(),
           'dr:uuid' => $uuid,
+          'dr:filesize' => (int) $file->getSize(),
           'dr:mimetype' => $mime,
           'name' => $file->getFilename(),
           'tags' => [],
         ];
 
-        // Add Metadata from exif/fido
+        // Add Metadata from exif/fido/etc.
         $fileinfo = array_merge($fileinfo, $filemetadata);
         // Dispatch event with just the $fileinfo for a single file as JSON
         // This is used allow other functions to do things based on the JSON.
-        // IN this case we want 'someone' to count txhe number of pages e.g
+        // IN this case we want 'someone' to count the number of pages e.g
         // If the file is a PDF.
         // @TODO inject event dispatcher and move this to its own method.
         $event_type = StrawberryfieldEventType::JSONPROCESS;
@@ -563,7 +605,7 @@ class StrawberryfieldFilePersisterService {
           $cleanjson,
           $fileinfo
         );
-        /** @var \Symfony\Component\EventDispatcher\EventDispatcher $dispatcher */
+        /** @var \Symfony\Component\EventDispatcher\EventDispatcherInterface $dispatcher */
         $dispatcher = \Drupal::service('event_dispatcher');
         $dispatcher->dispatch($event_type, $event);
         if ($event->wasModified()) {
@@ -676,7 +718,7 @@ class StrawberryfieldFilePersisterService {
    * @return array
    */
   protected function retrieve_filestructure_from_metadata(
-    $cleanjsonbytype = [],
+    array $cleanjsonbytype,
     $file_id_list,
     string $file_source_key
   ) {
@@ -707,7 +749,6 @@ class StrawberryfieldFilePersisterService {
     if (!$field->isEmpty()) {
       $entity = $field->getEntity();
       $entity_type_id = $entity->getEntityTypeId();
-      /** @var $field \Drupal\Core\Field\FieldItemList */
       foreach ($field->getIterator() as $delta => $itemfield) {
         // Note: we are not longer touching the metadata here.
         /** @var $itemfield \Drupal\strawberryfield\Plugin\Field\FieldType\StrawberryFieldItem */
@@ -1000,28 +1041,27 @@ class StrawberryfieldFilePersisterService {
       if (!empty($usage)) {
         if (isset($usage['strawberryfield']) && isset($usage['strawberryfield'][$entity_type_id])) {
           foreach ($usage['strawberryfield'][$entity_type_id] as $id => $count) {
-
             $values = \Drupal::entityQuery($entity_type_id)->condition(
               'nid',
               $id
             )->execute();
-          }
-          if (empty($values)) {
-            $this->remove_file_usage($file, $id, $entity_type_id, 0);
-            $orphaned++;
+            if (empty($values)) {
+              $this->remove_file_usage($file, $id, $entity_type_id, 0);
+              $orphaned++;
+            }
           }
         }
         // Now check if there is still usage around.
         $usage = $this->fileUsage->listUsage($file);
         if (empty($usage)) {
-          //@TODO D 8.4+ does not mark unusued files as temporary.
+          //@TODO D 8.4+ does not mark unused files as temporary.
           // For repo needs we want everything SBF managed to be cleaned up.
           $file->setTemporary();
           $file->save();
         }
       }
       else {
-        //@TODO D 8.4+ does not mark unusued files as temporary.
+        //@TODO D 8.4+ does not mark unused files as temporary.
         // For repo needs we want everything SBF managed to be cleaned up.
         $file->setTemporary();
         $file->save();
@@ -1047,10 +1087,7 @@ class StrawberryfieldFilePersisterService {
       return;
     }
     /** @var \Drupal\file\FileUsage\FileUsageInterface $file_usage */
-
-    if ($file) {
-      $this->fileUsage->add($file, 'strawberryfield', $entity_type_id, $nodeid);
-    }
+    $this->fileUsage->add($file, 'strawberryfield', $entity_type_id, $nodeid);
   }
 
   /**
@@ -1072,15 +1109,13 @@ class StrawberryfieldFilePersisterService {
     }
     /** @var \Drupal\file\FileUsage\FileUsageInterface $file_usage */
 
-    if ($file) {
-      $this->fileUsage->delete(
-        $file,
-        'strawberryfield',
-        $entity_type_id,
-        $nodeid,
-        $count
-      );
-    }
+    $this->fileUsage->delete(
+      $file,
+      'strawberryfield',
+      $entity_type_id,
+      $nodeid,
+      $count
+    );
   }
 
   /**
@@ -1171,398 +1206,4 @@ class StrawberryfieldFilePersisterService {
   public function sortByFileName($a, $b) {
     return strnatcmp($a['name'], $b['name']);
   }
-
-
-  /**
-   * Gets basic metadata from a File to be put back into a SBF
-   *
-   * Also deals with the fact that it can be local v/s remote.
-   *
-   * @param \Drupal\file\FileInterface $file
-   *  A file
-   * @param string $askey
-   *   How the file was classified according to the as:key format
-   *   Can be: document, image, model, text, application, movie, sound etc.
-   *
-   * @return array
-   *    Metadata extracted for the image in array format if any
-   */
-  public function getBaseFileMetadata(
-    FileInterface $file,
-    $askey = 'document'
-  ) {
-
-    // These are the 2 basic binaries we want eventually be able to run
-    // For each referenced Files
-    // With certain conditions of course
-    // Like:
-    // - How many files? Like 1 is cool, 2000 not cool
-    // - Size? Like moving realtime 'Sync' 2TB back to TEMP to MD5-it not cool
-    $metadata = [];
-    // Check if we should even run the file id service
-    // Reasons why we can not are:
-    // - Wrong path settings.
-    // - Disabled.
-
-    if (!$this->extractFileMetadata) {
-      // early return if not allowed.
-      return $metadata;
-    }
-    // I'm assuming binaries exists and are there.
-    // Should we check everytime?
-    // Or just when saving via the form?
-
-    $exif_exec_path = trim(
-      $this->config->get(
-        'exif_exec_path'
-      )
-    );
-    $fido_exec_path = trim($this->config->get('fido_exec_path'));
-    $identify_exec_path = trim($this->config->get('identify_exec_path'));
-    $pdfinfo_exec_path = trim($this->config->get('pdfinfo_exec_path'));
-
-    $uri = $file->getFileUri();
-    $mime = $file->getMimeType();
-
-    /** @var \Drupal\Core\File\FileSystem $file_system */
-    $scheme = $this->streamWrapperManager->getScheme($uri);
-    $templocation = NULL;
-
-    // If the file isn't stored locally make a temporary copy.
-    if (!isset(
-      $this->streamWrapperManager->getWrappers(
-        StreamWrapperInterface::LOCAL
-      )[$scheme]
-    )) {
-      // Local stream.
-      $cache_key = md5($uri);
-      $ext = pathinfo($uri, PATHINFO_EXTENSION);
-      // Check first if the file is already around in temp?
-      // @TODO can be sure its the same one? Ideas?
-      if (is_readable(
-        $this->fileSystem->realpath(
-          'temporary://sbr_' . $cache_key . '.' . $ext
-        )
-      )) {
-        $templocation = $this->fileSystem->realpath(
-          'temporary://sbr_' . $cache_key . '.' . $ext
-        );
-      }
-      else {
-        $templocation = $this->fileSystem->copy(
-          $uri,
-          'temporary://sbr_' . $cache_key . '.' . $ext,
-          FileSystemInterface::EXISTS_REPLACE
-        );
-        $templocation = $this->fileSystem->realpath(
-          $templocation
-        );
-      }
-    }
-    else {
-      $templocation = $this->fileSystem->realpath(
-        $file->getFileUri()
-      );
-    }
-
-    if (!$templocation) {
-      $this->loggerFactory->get('strawberryfield')->warning(
-        'Could not adquire a local accessible location for metadata extraction for file with URL @fileurl. Aborted processing. Please check you have space in your temporary storage location.',
-        [
-          '@fileurl' => $file->getFileUri(),
-        ]
-      );
-      return $metadata;
-    }
-
-
-    if ($templocation) {
-      $templocation_for_exec = escapeshellarg($templocation);
-      // In case i need to replace values/cleanup the name but we control the name
-      // So it should not be an issue?
-      // @TODO MOVE CHECKSUM here
-      $output_exif = '';
-      $output_fido = '';
-      $output_identify = '';
-      $output_pdfinfo = '';
-      // Silly really. This needs to be tighter but then unix allows any alias to exist.
-      if (strlen($exif_exec_path) > 0) {
-        $result_exif = exec(
-          $exif_exec_path . ' -json -q -a -gps:all -Common "-gps*" -xmp:all -XMP-tiff:Orientation -ImageWidth -ImageHeight -Canon -Nikon-AllDates -pdf:all -ee -MIMEType ' . $templocation_for_exec,
-          $output_exif,
-          $status_exif
-        );
-
-        // First EXIF
-        if ($status_exif != 0) {
-          // Means exiftool did not work
-          $this->loggerFactory->get('strawberryfield')->warning(
-            'Could not process EXIF on @templocation for @fileurl',
-            [
-              '@fileurl' => $file->getFileUri(),
-              '@templocation' => $templocation,
-            ]
-          );
-        }
-        else {
-          // JSON-ify EXIF data
-          // remove RW Properties?
-          $output_exif = implode('', $output_exif);
-          $exif_full = json_decode($output_exif, TRUE);
-          $json_error = json_last_error();
-          if ($json_error == JSON_ERROR_NONE && isset($exif_full[0])) {
-            $exif = $exif_full[0];
-            unset($exif['FileName']);
-            unset($exif['SourceFile']);
-            unset($exif['Directory']);
-            unset($exif['FilePermissions']);
-            unset($exif['ThumbnailImage']);
-            foreach ($exif as &$exifitem) {
-              $exifitem = is_array($exifitem) ? array_unique(
-                $exifitem
-              ) : $exifitem;
-            }
-            $metadata['flv:exif'] = $exif;
-          }
-        }
-      }
-      else {
-        $this->loggerFactory->get('strawberryfield')->warning(
-          '@fileurl was not processed using EXIF extraction because the path is not set. <a href="@url">Please configure it here</a>',
-          [
-            '@fileurl' => $file->getFileUri(),
-            '@url' => Url::fromRoute(
-              'strawberryfield.file_persister_settings_form'
-            )->toString(),
-          ]
-        );
-      }
-
-      if (strlen($fido_exec_path) > 0) {
-        $result_fido = exec(
-          $fido_exec_path . ' ' . $templocation_for_exec,
-          $output_fido,
-          $status_fido
-        );
-
-        // Second FIDO
-        if ($status_fido != 0) {
-          // Means Fido did not work
-          $this->loggerFactory->get('strawberryfield')->warning(
-            'Could not process FIDO on @templocation for @fileurl',
-            [
-              '@fileurl' => $file->getFileUri(),
-              '@templocation' => $templocation,
-            ]
-          );
-        }
-        else {
-          // JSON-ify EXIF data
-          // remove RW Properties?
-          $output_fido = explode(',', str_replace('"', '', $result_fido));
-          if (count($output_fido) && $output_fido[0] == 'OK') {
-            // Means FIDO could do its JOB
-            $pronom['pronom_id'] = isset($output_fido[2]) ? 'info:pronom/' . $output_fido[2] : NULL;
-            $pronom['label'] = $output_fido[3] ?: NULL;
-            $pronom['mimetype'] = $output_fido[7] ?: NULL;
-            $pronom['detection_type'] = $output_fido[8] ?: NULL;
-            $metadata['flv:pronom'] = $pronom;
-          }
-        }
-      }
-      else {
-        $this->loggerFactory->get('strawberryfield')->warning(
-          '@fileurl was not processed using FIDO (Pronom) because the path is not set. <a href="@url">Please configure it here</a>',
-          [
-            '@fileurl' => $file->getFileUri(),
-            '@url' => Url::fromRoute(
-              'strawberryfield.file_persister_settings_form'
-            )->toString(),
-          ]
-        );
-      }
-      // Only run identify on Images/Documents?
-      // Do we need an exact list?
-      if (strlen($identify_exec_path) > 0) {
-        if (in_array($askey, ['image', 'video'])) {
-          $result_identify = exec(
-            $identify_exec_path . " -format 'format:%m|width:%w|height:%h|orientation:%[orientation]@' -quiet " . $templocation_for_exec,
-            $output_identify,
-            $status_identify
-          );
-
-          if ($status_identify != 0) {
-            // Means Identify did not work
-            $this->loggerFactory->get('strawberryfield')->warning(
-              'Could not process Identify on @templocation for @fileurl',
-              [
-                '@fileurl' => $file->getFileUri(),
-                '@templocation' => $templocation,
-              ]
-            );
-          }
-          else {
-            // JSON-ify Identify data
-            $identify_meta = [];
-            if (count($output_identify) && isset($output_identify[0])) {
-              $output_identify = array_filter(
-                explode(
-                  '@',
-                  $output_identify[0]
-                )
-              );
-              foreach ($output_identify as $sequencenumber => $pageinfo) {
-                if (is_string($pageinfo)) {
-                  $pageinfo_array = array_filter(explode('|', $pageinfo));
-                  $identify = [];
-                  if (count($pageinfo_array)) {
-                    foreach ($pageinfo_array as $value) {
-                      if (is_string($value) && (strlen($value) > 1)) {
-                        $pair = array_filter(explode(':', $value));
-                        if (count($pair)) {
-                          $identify[$pair[0]] = isset($pair[1]) ? $pair[1] : NULL;
-                        }
-                      }
-                    }
-                  }
-                  $identify_meta[$sequencenumber + 1] = $identify;
-                }
-              }
-              $metadata['flv:identify'] = $identify_meta;
-            }
-          }
-        }
-      }
-      else {
-        $this->loggerFactory->get('strawberryfield')->warning(
-          '@fileurl was not processed using Identify (Media characterization) because the path is not set. <a href="@url">Please configure it here</a>',
-          [
-            '@fileurl' => $file->getFileUri(),
-            '@url' => Url::fromRoute(
-              'strawberryfield.file_persister_settings_form'
-            )->toString(),
-          ]
-        );
-      }
-
-      if (strlen($pdfinfo_exec_path) > 0) {
-        if (in_array($mime, ['application/pdf', 'application/postscript'])) {
-          $result_pdfinfo = exec(
-            $pdfinfo_exec_path . ' ' . $templocation_for_exec . " | grep '^Pages:' ",
-            $output_pdfinfo,
-            $status_pdfinfo
-          );
-
-          // Second FIDO
-          if ($status_pdfinfo != 0) {
-            // Means Fido did not work
-            $this->loggerFactory->get('strawberryfield')->warning(
-              'Could not process PDFinfo page count on @templocation for @fileurl',
-              [
-                '@fileurl' => $file->getFileUri(),
-                '@templocation' => $templocation,
-              ]
-            );
-          }
-          else {
-            // We need the number of pages first
-            $pagecount = explode(':', $output_pdfinfo[0]);
-            if (count($pagecount) == 2) {
-              $pagecount_int = (int) $pagecount[1];
-              // Second pass now
-              $result_pages_pdfinfo = exec(
-                $pdfinfo_exec_path . ' ' . $templocation_for_exec . " -f 1 -l $pagecount_int |grep '^Page' ",
-                $output_pdfinfo_pages,
-                $status_pdfinfo_pages
-              );
-              if ($status_pdfinfo_pages != 0) {
-                // Means Fido did not work
-                $this->loggerFactory->get('strawberryfield')->warning(
-                  'Could not process PDFinfo page dimensions on @templocation for @fileurl',
-                  [
-                    '@fileurl' => $file->getFileUri(),
-                    '@templocation' => $templocation,
-                  ]
-                );
-              }
-              else {
-                $pdfinfo_metadata = [];
-                // Rotation to Orientation/pdfinfo will give is the first
-                //  0 (no rotation), TopLeft
-                //(rotation to the East, or 90 degrees clockwise), LeftBottom
-                // (rotation to the South, tumbled page image, upside-down, or 180 degrees clockwise), BottomRight
-                // (rotation to the West, or 90 degrees counter-clockwise, or 270 degrees clockwise). RightTop
-                // @see https://stackoverflow.com/questions/9371273/how-can-i-display-the-orientation-of-a-jpeg-file
-                $rot_to_orient = [
-                  '0' => 'TopLeft',
-                  '90' => 'LeftBottom',
-                  '180' => 'BottomRight',
-                  '270' => 'RightTop',
-                ];
-                if (count($output_pdfinfo_pages) > 1) {
-                  $i = 0;
-                  /* $output_pdfinfo_pages will be something like this
-                   0 => "Pages:          100"
-                   1 => "Page    1 size: 635.05 x 797.05 pts"
-                   2 => "Page    1 rot:  0"
-                   3 => "Page    2 size: 623 x 795.95 pts"
-                   4 => "Page    2 rot:  0"
-                  */
-                  foreach ($output_pdfinfo_pages as $value) {
-                    $i++;
-                    if ($i == 1) {
-                      // Skip first line
-                      continue;
-                    }
-                    $page_info = preg_split(
-                      '/(:|[\s]+|x)/',
-                      $value,
-                      -1,
-                      PREG_SPLIT_NO_EMPTY
-                    );
-                    if (count($page_info) >= 4) {
-                      if (trim($page_info[2]) == "size") {
-                        $pdfinfo_metadata[trim(
-                          $page_info[1]
-                        )]['width'] = $page_info[3];
-                        $pdfinfo_metadata[trim(
-                          $page_info[1]
-                        )]['height'] = $page_info[4];
-                      }
-                      elseif (trim($page_info[2]) == "rot") {
-                        $pdfinfo_metadata[trim(
-                          $page_info[1]
-                        )]['rotation'] = $page_info[3];
-
-                        $pdfinfo_metadata[trim(
-                          $page_info[1]
-                        )]['orientation'] = $rot_to_orient[$page_info[3]];
-                      }
-                    }
-                  }
-                  if (count($pdfinfo_metadata) >= 1) {
-                    $metadata['flv:pdfinfo'] = $pdfinfo_metadata;
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-      else {
-        $this->loggerFactory->get('strawberryfield')->warning(
-          '@fileurl was not processed using PDFinfo because the path is not set. <a href="@url">Please configure it here</a>',
-          [
-            '@fileurl' => $file->getFileUri(),
-            '@url' => Url::fromRoute(
-              'strawberryfield.file_persister_settings_form'
-            )->toString(),
-          ]
-        );
-      }
-
-    }
-    return $metadata;
-  }
-
 }
