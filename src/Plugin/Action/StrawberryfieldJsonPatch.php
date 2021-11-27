@@ -281,6 +281,14 @@ JSON;
 
           ]);
           if (!$this->configuration['simulate']) {
+            if ($entity->getEntityType()->isRevisionable()) {
+              // Forces a New Revision for Not-create Operations.
+              $entity->setNewRevision(TRUE);
+              $entity->setRevisionCreationTime(\Drupal::time()->getRequestTime());
+              // Set data for the revision
+              $entity->setRevisionLogMessage('ADO modified via JSON Patch Search And Replace with Patch:'. $this->configuration['jsonpatch']);
+              $entity->setRevisionUserId($this->currentUser->id());
+            }
             $entity->save();
           }
         }
