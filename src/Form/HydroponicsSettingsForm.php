@@ -133,7 +133,7 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
     $config = $this->config('strawberryfield.hydroponics_settings');
 
     $active =  $config->get('active') ? $config->get('active') : FALSE;
-    $time_to_expire =  $config->get('time_to_expire') ? $config->get('time_to_expire') : 720;
+    $time_to_expire =  $config->get('time_to_expire') !== null ? $config->get('time_to_expire') : 720;
     $drush_path = $config->get('drush_path') ?  $config->get('drush_path') : NULL;
     $home_path = $config->get('home_path') ?  $config->get('home_path') : NULL;
     $enabled_queues =  !empty($config->get('queues')) ? array_flip($config->get('queues')) : [];
