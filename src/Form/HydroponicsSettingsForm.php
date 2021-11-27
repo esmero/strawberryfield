@@ -133,6 +133,7 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
     $config = $this->config('strawberryfield.hydroponics_settings');
 
     $active =  $config->get('active') ? $config->get('active') : FALSE;
+    $time_to_expire =  $config->get('time_to_expire') ? $config->get('time_to_expire') : 720;
     $drush_path = $config->get('drush_path') ?  $config->get('drush_path') : NULL;
     $home_path = $config->get('home_path') ?  $config->get('home_path') : NULL;
     $enabled_queues =  !empty($config->get('queues')) ? array_flip($config->get('queues')) : [];
@@ -177,6 +178,17 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
       '#required' => FALSE,
       '#default_value' => $active,
     ];
+
+    $form['time_to_expire'] = [
+      '#title' => 'Time to live (stay awake) for the Hydroponics Service.',
+      '#description' => 'A value of 0 will force the Service to finish all pending queues before shutting down',
+      '#type' => 'number',
+      '#step' => 60,
+      '#min' => 0,
+      '#required' => TRUE,
+      '#default_value' => $time_to_expire,
+    ];
+
     $form['advanced'] =  [
       '#type' => 'details',
       '#title' => 'Advanced settings',
@@ -307,6 +319,7 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
     $global_active = (bool) $form_state->getValue('active');
     $drush_path = rtrim($form_state->getValue('drush_path'), '/');
     $home_path = rtrim($form_state->getValue('home_path'), '/');
+    $time_to_expire = (int) trim($form_state->getValue('time_to_expire', 720));
     foreach($form_state->getValue('table-row') as $queuename => $queue) {
       if ($queue['active'] == 1) {
         $enabled[] = $queuename;
@@ -318,6 +331,7 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
       ->set('drush_path', $drush_path)
       ->set('home_path', $home_path)
       ->set('queues', $enabled)
+      ->set('time_to_expire', $time_to_expire)
       ->save();
     parent::submitForm($form, $form_state);
   }

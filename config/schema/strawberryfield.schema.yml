@@ -219,7 +219,10 @@ strawberryfield.hydroponics_settings:
   mapping:
     active:
       type: boolean
-      label: If Hydroponics Service is enabled or not
+      label: 'If Hydroponics Service is enabled or not'
+    time_to_expire:
+      type: integer
+      label: 'How long Hydroponics Service should stay awake, 0 means until done with all queues'
     drush_path:
       type: string
       label: 'Full system path to the /vendor composer Drush installation including drush script'
