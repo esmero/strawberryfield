@@ -11,7 +11,7 @@ namespace Drupal\strawberryfield\Commands;
 use Drush\Commands\DrushCommands;
 use Drush\Exec\ExecTrait;
 use Drush\Runtime\Runtime;
-use React\EventLoop\Factory;
+use React\EventLoop\Loop;
 
 
 /**
@@ -37,7 +37,7 @@ class HydroponicsDrushCommands extends DrushCommands {
   public function hydroponics(
   ) {
 
-    $loop = Factory::create();
+    $loop = Loop::get();
     $timer_ping = $loop->addPeriodicTimer(3.0, function () {
       // store a heartbeat every 3 seconds.
       $currenttime = \Drupal::time()->getCurrentTime();
@@ -106,22 +106,30 @@ class HydroponicsDrushCommands extends DrushCommands {
         \Drupal::logger('hydroponics')->info("All queues are idle, closing timers");
 
         $loop->cancelTimer($timer);
+        $loop->stop();
         }
       }
     );
-
-    $securitytimer = $loop->addTimer(720.0, function ($timer) use ($loop, $timer_ping, $idle_timer, &$done) {
-      // Finish all if 720 seconds are reached
-      \Drupal::logger('hydroponics')->info("720 seconds passed closing Hydroponics Service");
-      $loop->cancelTimer($timer_ping);
-      foreach($done as $queue_timer) {
-        $loop->cancelTimer($queue_timer);
-      }
-      \Drupal::state()->set('hydroponics.queurunner_last_pid', 0);
-      $loop->cancelTimer($idle_timer);
-      $loop->stop();
-      }
-    );
+    $time_to_expire = (int) \Drupal::config('strawberryfield.hydroponics_settings')->get('time_to_expire');
+    if ($time_to_expire > 0 ) {
+      $time_to_expire = round($time_to_expire, 1);
+      $securitytimer = $loop->addTimer($time_to_expire,
+        function ($timer) use ($loop, $timer_ping, $idle_timer, &$done, $time_to_expire) {
+          // Finish all if Time to live in seconds is reached
+          \Drupal::logger('hydroponics')
+            ->info("@time_to_expire seconds passed closing Hydroponics Service", [
+              '@time_to_expire' => $time_to_expire,
+            ]);
+          $loop->cancelTimer($timer_ping);
+          foreach ($done as $queue_timer) {
+            $loop->cancelTimer($queue_timer);
+          }
+          \Drupal::state()->set('hydroponics.queurunner_last_pid', 0);
+          $loop->cancelTimer($idle_timer);
+          $loop->stop();
+        }
+      );
+    }
 
     /* TODO recompile with PCNTL enabled
     \pcntl_signal(SIGINT, 'signalhandler');
