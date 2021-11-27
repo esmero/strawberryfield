@@ -115,7 +115,7 @@ class HydroponicsDrushCommands extends DrushCommands {
       $time_to_expire = round($time_to_expire, 1);
       $securitytimer = $loop->addTimer($time_to_expire,
         function ($timer) use ($loop, $timer_ping, $idle_timer, &$done, $time_to_expire) {
-          // Finish all if 720 seconds are reached
+          // Finish all if Time to live in seconds is reached
           \Drupal::logger('hydroponics')
             ->info("@time_to_expire seconds passed closing Hydroponics Service", [
               '@time_to_expire' => $time_to_expire,
