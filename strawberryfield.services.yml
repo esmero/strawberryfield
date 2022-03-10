@@ -40,6 +40,11 @@ services:
      tags:
        - {name: event_subscriber}
      arguments: ['@string_translation', '@messenger', '@logger.factory', '@current_user']
+  strawberryfield.presave_invalidate_parents_caches_subscriber:
+    class: Drupal\strawberryfield\EventSubscriber\StrawberryfieldEventPresaveSubscriberInvalidateParentCaches
+    tags:
+      - { name: event_subscriber }
+    arguments: [ '@string_translation', '@messenger', '@logger.factory', '@current_user', '@cache_tags.invalidator']
   strawberryfield.insertdeposit_subscriber:
     class: Drupal\strawberryfield\EventSubscriber\StrawberryfieldEventInsertSubscriberDepositDO
     tags:
