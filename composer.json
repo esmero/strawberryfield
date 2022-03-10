@@ -13,25 +13,25 @@
         }
     ],
     "require": {
-        "php": ">=7.2",
+        "php": ">=7.3",
         "ext-json": "*",
         "drupal/core": "^8.9 || ^9",
-        "ml/json-ld": "^1.1",
-        "mtdowling/jmespath.php":"^2.5",
-        "swaggest/json-schema":"^0.12.29",
-        "swaggest/json-diff":"^3.7.5",
+        "ml/json-ld": "~1.1",
+        "mtdowling/jmespath.php":"~2.5",
+        "swaggest/json-schema":"~0.12",
+        "swaggest/json-diff":"~3.7",
         "frictionlessdata/datapackage": "dev-main",
         "drupal/search_api": "~1.19",
-        "drupal/search_api_solr": "^4.1.10",
+        "drupal/search_api_solr": "~4.1",
         "professional-wiki/edtf": "~2.0",
-        "mhor/php-mediainfo": "^5.4"
+        "mhor/php-mediainfo": "~5.4"
     },
     "minimum-stability": "dev",
     "prefer-stable": true,
     "extra": {
         "drush": {
             "services": {
-                "drush.services.yml": "^10"
+                "drush.services.yml": "~10"
             }
         }
     }
