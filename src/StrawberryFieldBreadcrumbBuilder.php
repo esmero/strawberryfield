@@ -137,7 +137,7 @@ class StrawberryFieldBreadcrumbBuilder implements BreadcrumbBuilderInterface {
    *  The current Forked/flat Path (Key)
    * @param \Drupal\Core\Breadcrumb\Breadcrumb $breadcrumb
    */
-  protected function recursiveParentPaths(EntityInterface $node, array &$trail = [], array &$visited = [], int $depth, string $current_path, Breadcrumb $breadcrumb) {
+  protected function recursiveParentPaths(EntityInterface $node, array &$trail, array &$visited, int $depth, string $current_path, Breadcrumb $breadcrumb) {
     if ($depth >= 5) { return; }
     // Everytime we diverge/multiple parents (like in git) we need to create a
     // new Path ID/array that includes the previous one

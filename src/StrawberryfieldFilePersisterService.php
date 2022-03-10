@@ -452,7 +452,7 @@ class StrawberryfieldFilePersisterService {
    *
    */
   public function generateAsFileStructure(
-    array $file_id_list = [],
+    array $file_id_list,
     $file_source_key,
     array $cleanjson = [],
     bool $force = FALSE,
