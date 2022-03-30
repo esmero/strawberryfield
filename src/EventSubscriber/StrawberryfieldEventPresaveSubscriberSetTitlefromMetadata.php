@@ -30,7 +30,6 @@ class StrawberryfieldEventPresaveSubscriberSetTitlefromMetadata extends Strawber
    */
   protected $messenger;
 
-
   /**
    * The Storage Destination Scheme.
    *
@@ -52,7 +51,7 @@ class StrawberryfieldEventPresaveSubscriberSetTitlefromMetadata extends Strawber
   protected $account;
 
   /**
-   * StrawberryfieldEventPresaveSubscriberFilePersister constructor.
+   * StrawberryfieldEventPresaveSubscriberSetTitlefromMetadata constructor.
    *
    * @param \Drupal\Core\StringTranslation\TranslationInterface $string_translation
    * @param \Drupal\Core\Messenger\MessengerInterface $messenger
