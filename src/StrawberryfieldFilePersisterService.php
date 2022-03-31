@@ -28,6 +28,7 @@ use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\strawberryfield\Event\StrawberryfieldJsonProcessEvent;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
+use Drupal\Core\Utility\Error;
 
 /**
  * Provides a SBF File persisting class.
@@ -147,11 +148,19 @@ class StrawberryfieldFilePersisterService {
 
 
   /**
-   * If getBaseFileMetadata should be processed
+   * If getBaseFileMetadata should be processed.
    *
    * @var bool
    */
   protected $extractFileMetadata = FALSE;
+
+  /**
+   *
+   * The Full ConfigFactory.
+   *
+   * @var \Drupal\Core\Config\ConfigFactoryInterface
+   */
+  private $configFactory;
 
   /**
    * StrawberryfieldFilePersisterService constructor.
@@ -198,6 +207,7 @@ class StrawberryfieldFilePersisterService {
     $this->storageConfig = $config_factory->get(
       'strawberryfield.storage_settings'
     );
+    $this->configFactory = $config_factory;
     $this->destinationScheme = $this->storageConfig->get('file_scheme');
     $this->languageManager = $language_manager;
     $this->transliteration = $transliteration;
@@ -384,6 +394,7 @@ class StrawberryfieldFilePersisterService {
       if ($force && $file->isPermanent()) {
         $file->setTemporary();
         // Ensure its temporary so persisting Event Handler actually reacts to it.
+        //$file->save();
       }
       return $desired_scheme . '://' . $destination_folder . '/' . $destination_filename;
     }
@@ -574,9 +585,6 @@ class StrawberryfieldFilePersisterService {
         $mime = $file->getMimeType();
         // Desired destination. Passes also Clean JSON around.
         $destinationuri = $this->getDestinationUri($file, $md5, $cleanjson, $force);
-        // Add exception here for PDFs. We need the number of pages
-        // @TODO add a mime type based hook/plugin or event. Idea is to allow modules
-        // to intercept this
 
         $fileinfo = [
           'type' => ucfirst($askey),
@@ -761,13 +769,14 @@ class StrawberryfieldFilePersisterService {
 
               //@TODO. We used to allow this service to act on any file
               // Allowing users to renamed/move files
-              // Now only if it is temporary
+              // Now only if it is temporary or scheme is temporary://
               // Because all not temporaries are already persisted.
               // This clashes with the fact that the file structure
               // Naming service will always try to name things in a certain
               // way. So either we allow both to act everytime or we
               // have a other 'move your files' service?
-              if ($file && $file->isTemporary()) {
+              $scheme = $file ? $this->streamWrapperManager::getScheme($file->getFileUri()) : NULL;
+              if ($file && ($file->isTemporary() || $scheme == 'temporary')) {
                 // This is tricky. We will allow non temporary to be moved if
                 // The only usage is the current node!
                 $uuid = $file->uuid();
@@ -1205,5 +1214,91 @@ class StrawberryfieldFilePersisterService {
    */
   public function sortByFileName($a, $b) {
     return strnatcmp($a['name'], $b['name']);
+  }
+
+  /**
+   *
+   * Checks if a file managed by S3FS exists and caches its url if so.
+   *
+   * This function also allows an optional checksum to be passed
+   * and used as comparison. If no match it returns FALSE
+   *
+   * @param string $uri
+   *    An URI with stream wrapper protocol
+   * @param string|null $checksum
+   *    An optional MD5 Checksum to compare against
+   *
+   * @return bool
+   *    TRUE if exists. IF checksum passed and exists and does not match, FALSE.
+   */
+  public function fileS3Exists(string $uri, string $checksum = NULL) {
+
+    $exists = FALSE;
+    // Soft dependency, if S3FS module is not enabled we return silently.
+    if (empty(\Drupal::hasService('s3fs'))) {
+      return FALSE;
+    }
+    $wrapper = $this->streamWrapperManager->getViaUri($uri);
+    if (!$wrapper) {
+      return FALSE;
+    }
+    if (get_class($wrapper) === 'Drupal\s3fs\StreamWrapper\S3fsStream') {
+      $parts = explode('://', $uri);
+      if (count($parts) == 2) {
+        $protocol = $parts[0];
+        $key = $parts[1];
+      }
+      else {
+        // The URI is not even valid, do not bother on informing here
+        return FALSE;
+      }
+
+      /* @var $s3fs \Drupal\s3fs\S3fsServiceInterface */
+      $s3fs = \Drupal::Service('s3fs');
+      $s3fsConfig = $this->configFactory->get('s3fs.settings');
+      foreach ($s3fsConfig->get() as $prop => $value) {
+        $config[$prop] = $value;
+      }
+      try {
+        $client = $s3fs->getAmazonS3Client($config);
+        $args = ['Bucket' => $config['bucket']];
+        if ($protocol == 'private') {
+          $key = $config['private_folder'] . '/' . $key;
+        }
+        elseif ($protocol == 'public') {
+          $key = $config['public_folder'] . '/' . $key;
+        }
+        if (!empty($config['root_folder'])) {
+          $key = $config['root_folder'] . '/' . $key;
+        }
+        // Longer than the max Key for an S3 Object Path
+        if (mb_strlen(rtrim($key, '/')) > 255) {
+          return FALSE;
+        }
+        $args['Key'] = $key;
+        $response = $client->headObject($args);
+        $data = $response->toArray();
+        if (isset($data['ETag']) || isset($data['Etag'])) {
+          // Means it is there
+          $exists = TRUE;
+          if ($checksum && trim($data['ETag'], '"') !== $checksum) {
+            $exists = FALSE;
+          }
+        }
+      }
+      catch (\Exception $exception) {
+        $variables = Error::decodeException($exception);
+        \Drupal::logger('sbf')
+          ->error('%type: @message in %function (line %line of %file).',
+            $variables);
+        return FALSE;
+      }
+    }
+    if ($exists) {
+      // This may take up to 10 seconds for a non existing file
+      // So we check upfront if its there before going this route
+      $wrapper->writeUriToCache($uri);
+    }
+    return $exists;
   }
 }
