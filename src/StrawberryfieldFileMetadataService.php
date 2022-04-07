@@ -605,7 +605,18 @@ class StrawberryfieldFileMetadataService {
       $mediaInfo->setConfig('command', $exec_path);
       try {
         $mediaInfoContainer = $mediaInfo->getInfo($templocation, TRUE);
-        $metadata['flv:mediainfo'] = $mediaInfoContainer->__toArray();
+        $metadata['flv:mediainfo'] = $mediaInfoContainer ?? [];
+        $metadata['flv:mediainfo'] = json_decode(json_encode($metadata['flv:mediainfo']), TRUE);
+        if ($error = json_last_error()) {
+          $metadata['flv:mediainfo'] = [];
+          $this->loggerFactory->get('strawberryfield')->warning(
+            'Could not process MediaInfo on @templocation for @fileurl',
+            [
+              '@fileurl' => $file->getFileUri(),
+              '@templocation' => $templocation,
+            ]
+          );
+        }
         if ($reduced) {
           // These are the basics needed to construct a IIIF Manifest.
           $temp['videos'][0]['width']['absoluteValue'] = $metadata['flv:mediainfo']['videos'][0]['width']['absoluteValue'] ?? NULL;
