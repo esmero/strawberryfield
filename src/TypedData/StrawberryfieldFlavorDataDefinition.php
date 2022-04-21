@@ -49,6 +49,8 @@ class StrawberryfieldFlavorDataDefinition extends ComplexDataDefinitionBase {
       $info['where'] = ListDataDefinition::create('string')->setLabel('Ordered list of places');
       $info['when'] = ListDataDefinition::create('string')->setLabel('Ordered list of dates in string format');
       $info['sentiment'] = DataDefinition::create('string')->setLabel('Sentiment in integer range');
+      $info['nlplang'] = ListDataDefinition::create('string')->setLabel('Ordered list of nlp detected languages');
+      $info['processlang'] = ListDataDefinition::create('string')->setLabel('Ordered list of languages provided to process nnmodified data body');
       $info['ts'] = DataDefinition::create('string')->setLabel('A Time stamp');
       //§/ required by Content Access processor , maybe we can disable it in some manner
       $info['status'] = DataDefinition::create('boolean')->setLabel('Status');
