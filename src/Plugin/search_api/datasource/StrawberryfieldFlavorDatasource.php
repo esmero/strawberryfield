@@ -579,6 +579,10 @@ XML;
           $sentiment = isset($processed_data->sentiment) ? (is_scalar($processed_data->sentiment) ? $processed_data->sentiment : 0) : 0;
           $uri = isset($processed_data->uri) ? (string) $processed_data->uri : '';
           $sequence_total = isset($processed_data->sequence_total) ? (string) $processed_data->sequence_total : $sequence_id;
+          $sequence_id = isset($processed_data->sequence_id) ? (int) $processed_data->sequence_id : $sequence_id;
+          $config_processor_id = isset($processed_data->config_processor_id) ? $processed_data->config_processor_id : '';
+          $nlplang = isset($processed_data->nlplang) ? $processed_data->nlplang : [];
+          $processlang = isset($processed_data->processlang) ? $processed_data->processlang : [];
           if ($checksum) {
             $data = [
               'item_id' => $item_id,
@@ -589,11 +593,14 @@ XML;
               'parent_id' => $splitted_id_for_node[0],
               'file_uuid' => $fid_uuid,
               'target_fileid' => $file->id(),
+              'config_processor_id' => $config_processor_id,
               'processor_id' => $plugin_id,
               'fulltext' => '',
               'plaintext' => '',
               'metadata' => $metadata,
               'who' => $who,
+              'nlplang' => $nlplang,
+              'processlang' => $processlang,
               'where' => $where,
               'when' => $when,
               'ts' => $ts,

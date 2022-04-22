@@ -62,12 +62,16 @@ class StrawberryEventSaveFlavorSubscriber extends StrawberryfieldEventSaveSubscr
       $file = OcflHelper::resolvetoFIDtoURI($file_id);
       // No need to review if the file is being used somewhere else as we're
       // removing the tracking contextually to the entity.
-      $tracked_deleted = $this->trackFilesDeleted($entity, $file);
+      if ($file) {
+        $tracked_deleted = array_merge($tracked_deleted, $this->trackFilesDeleted($entity, $file));
+      }
     }
+
+    $tracked_deleted = array_unique($tracked_deleted);
+
     if ($entity->isPublished() != $original_entity->isPublished() || $entity->getOwnerId() != $original_entity->getOwnerId()) {
       $this->trackFlavorsNeedUpdate($entity, $tracked_deleted);
     }
-
 
     $current_class = get_called_class();
     $event->setProcessedBy($current_class, TRUE);
