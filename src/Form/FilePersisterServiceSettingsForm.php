@@ -3,6 +3,8 @@
 namespace Drupal\strawberryfield\Form;
 
 use Drupal\Core\Ajax\AjaxResponse;
+use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\Datetime\DateFormatterInterface;
 use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\StreamWrapper\StreamWrapperInterface;
@@ -10,6 +12,7 @@ use Drupal\strawberryfield\StrawberryfieldFilePersisterService;
 use Drupal\strawberryfield\Tools\Ocfl\OcflHelper;
 use Drupal\Core\Ajax\InvokeCommand;
 use Drupal\Core\Ajax\MessageCommand;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * ConfigurationForm for Strawberryfield File Storage.
@@ -31,6 +34,36 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
    */
   public function getFormId() {
     return 'strawberryfield_filepersister_settings_form';
+  }
+
+  /**
+   * The date formatter service.
+   *
+   * @var \Drupal\Core\Datetime\DateFormatterInterface
+   */
+  protected $dateFormatter;
+
+  /**
+   * Constructs a FileSystemForm object.
+   *
+   * @param \Drupal\Core\Config\ConfigFactoryInterface $config_factory
+   *   The factory for configuration objects.
+   * @param \Drupal\Core\Datetime\DateFormatterInterface $date_formatter
+   *   The date formatter service.
+   */
+  public function __construct(ConfigFactoryInterface $config_factory, DateFormatterInterface $date_formatter) {
+    parent::__construct($config_factory);
+    $this->dateFormatter = $date_formatter;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function create(ContainerInterface $container) {
+    return new static(
+      $container->get('config.factory'),
+      $container->get('date.formatter'),
+    );
   }
 
   /**
@@ -97,6 +130,17 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
         'method' => 'replace',
         'event' => 'change',
       ],
+    ];
+
+    $intervals = [21600, 43200, 86400, 604800, 2419200, 7776000];
+    $period = array_combine($intervals, array_map([$this->dateFormatter, 'formatInterval'], $intervals));
+
+    $form['compost_maximum_age'] = [
+      '#type' => 'select',
+      '#title' => $this->t('Compost (delete) Archipelago generated Temporary Files older than'),
+      '#default_value' => $config_storage->get('compost_maximum_age') ?? 21600,
+      '#options' => $period,
+      '#description' => $this->t('Temporary Files are left overs of Archipelago processing and associated modules. They are safe to be removed. <strong>NOTE:</strong> Cleanup frequency (check/delete) is different to this setting. Temporary Files might fill up your filesystem. Make sure the "Archipelago Temporary File Composter Queue Worker" queue is programmed to run frequently.'),
     ];
 
     $form['extractmetadata'] = [
@@ -214,8 +258,8 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
 
     $form['delete_tempfiles'] = [
       '#type' => 'checkbox',
-      '#title' => $this->t('Delete Temporary Local files immediatelly after File Metadata Processing'),
-      '#description' => $this->t('If checked and the Local File is not a preservation master, then deletion will be instant. This may have Performance penalties on subsequente processing or when Running other parts of the stack that require locally accessible files for remote stored ones.'),
+      '#title' => $this->t('Also delete Temporary Local files needed for Metadata Processing right away after File Metadata Processing'),
+      '#description' => $this->t('If checked and the local temporary file is not a "Golden Copy", then deletion will be instant. This may have Performance penalties on subsequente processing or when Running other parts of the stack that require locally accessible files for remote stored ones.'),
       '#default_value' => $config->get('delete_tempfiles') ?? FALSE,
     ];
 
@@ -547,6 +591,7 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
       ->set('object_file_scheme', $form_state->getValue('object_file_scheme'))
       ->set('object_file_strategy', $form_state->getValue('object_file_strategy'))
       ->set('object_file_path', trim($form_state->getValue('object_file_path')," \n\r\t\v\0/"))
+      ->set('compost_maximum_age', (int) $form_state->getValue('compost_maximum_age'))
       ->save();
     parent::submitForm($form, $form_state);
   }
