@@ -324,7 +324,7 @@ class StrawberryfieldJsonHelper {
 
 
   /**
-   * Array helper that checks if an array is associative or not
+   * Array helper that checks if an array is associative or not.
    *
    * @param array $sourcearray
    *
@@ -333,6 +333,27 @@ class StrawberryfieldJsonHelper {
    */
   public static function arrayIsMultiSimple(array $sourcearray =  []) {
       return !empty(array_filter(array_keys($sourcearray), 'is_string'));
+  }
+
+  /**
+   * Array helper that checks if an array is associative with URN/URI keys.
+   *
+   *
+   * @param array $sourcearray
+   *
+   * @return bool
+   *  TRUE if is associative and each key is an URI. Useful for detecging Object
+   *  JSON type of Arrays with no repeating patterns like we use for
+   *  as:images, etc
+   */
+  public static function arrayIsMultiURIkeys(array $sourcearray = []) {
+    $keys = array_keys($sourcearray);
+    $keys_URIS = array_filter($keys, function ($value) {
+      if (filter_var($value, FILTER_VALIDATE_URL) || static::validateURN($value)) {
+        return TRUE;
+      }
+    });
+    return (count($keys) > 0 && (count($keys) == count($keys_URIS)));
   }
 
   /**
