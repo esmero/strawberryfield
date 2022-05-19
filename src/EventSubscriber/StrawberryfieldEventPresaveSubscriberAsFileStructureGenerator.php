@@ -157,7 +157,7 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
 
           $fullvalues = $this->cleanUpEntityMappingStructure($fullvalues, $for_from_as);
           // 'ap:entitymapping' will always exists because of ::cleanUpEntityMappingStructure
-          $entity_mapping_structure = $fullvalues['ap:entitymapping'];
+          $entity_mapping_structure = $fullvalues['ap:entitymapping'] ?? [];
           $allprocessedAsValues = [];
           $flipped_json_keys_with_filenumids = [];
           // All fids we have in this doc.
@@ -224,7 +224,10 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
 
             foreach (StrawberryfieldJsonHelper::AS_FILE_TYPE as $askey) {
               // We get for AS_FILE_TYPE the existing values
-              $previous_info = isset($fullvalues[$askey]) && is_array($fullvalues[$askey]) ? $fullvalues[$askey] : [];
+              // Make sure previous as:filetype has at least the right top structure
+              // By using arrayIsMultiURIkeys we ensure each key is an URN/URI
+              // @TODO make as:structure a JSON SCHEMA Validation?
+              $previous_info = isset($fullvalues[$askey]) && is_array($fullvalues[$askey]) && StrawberryfieldJsonHelper::arrayIsMultiURIkeys($fullvalues[$askey]) ? $fullvalues[$askey] : [];
               // We Check if we got for AS_FILE_TYPE new values
               $info = isset($allprocessedAsValues[$askey]) && is_array($allprocessedAsValues[$askey]) ? $allprocessedAsValues[$askey] : [];
               // Ensures non managed files inside structure are preserved!
@@ -237,6 +240,7 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
                 $fullvalues[$askey] = $new_info;
                 // Now Sort Files here, after all the cleanup and removing of old files
                 $sortmode = $fullvalues['ap:tasks']['ap:sortfiles'] ?? 'natural';
+                // @TODO document this.
                 $sortmode = in_array($sortmode, ['natural','index', 'manual']) ? $sortmode : 'natural';
                 $fullvalues[$askey] = $this->strawberryfilepersister->sortFileStructure($fullvalues[$askey], $flipped_json_keys_with_filenumids, $sortmode);
               }
@@ -293,10 +297,11 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
 
     // Only try this once we are sure $fullvalues['ap:entitymapping']
     // Is already an array (no string offsets) or not there at all
-    if (((is_array($fullvalues['ap:entitymapping']) &&
-      !isset($fullvalues['ap:entitymapping']['entity:file'])) ||
-      empty($fullvalues['ap:entitymapping']))
-       && is_array($for_from_as) && !empty($for_from_as)) {
+    if (((isset($fullvalues['ap:entitymapping']) &&
+          is_array($fullvalues['ap:entitymapping']) &&
+          !isset($fullvalues['ap:entitymapping']['entity:file'])) ||
+        empty($fullvalues['ap:entitymapping']))
+      && !empty($for_from_as) && is_array($for_from_as) ) {
       $fullvalues['ap:entitymapping']['entity:file'] = $for_from_as;
     }
 

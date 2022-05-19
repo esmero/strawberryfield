@@ -8,11 +8,13 @@
 
 namespace Drupal\strawberryfield;
 
+use Drupal\Core\Datetime\DrupalDateTime;
 use Drupal\Core\File\FileSystemInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\file\FileUsage\FileUsageInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Component\Transliteration\TransliterationInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
@@ -21,6 +23,7 @@ use Drupal\Core\Archiver\ArchiverManager;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\file\FileInterface;
 use Drupal\Core\Messenger\MessengerTrait;
+use Drupal\strawberryfield\Event\StrawberryfieldFileEvent;
 use Drupal\strawberryfield\Field\StrawberryFieldItemList;
 use Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException;
 use Drupal\Component\Plugin\Exception\PluginNotFoundException;
@@ -146,7 +149,6 @@ class StrawberryfieldFilePersisterService {
    */
   protected $strawberryfieldFileMetadataService;
 
-
   /**
    * If getBaseFileMetadata should be processed.
    *
@@ -163,21 +165,27 @@ class StrawberryfieldFilePersisterService {
   private $configFactory;
 
   /**
+   * @var \Symfony\Component\EventDispatcher\EventDispatcherInterface
+   */
+  protected $eventDispatcher;
+
+  /**
    * StrawberryfieldFilePersisterService constructor.
    *
-   * @param \Drupal\Core\File\FileSystemInterface $file_system
-   * @param \Drupal\file\FileUsage\FileUsageInterface $file_usage
-   * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entity_type_manager
-   * @param \Drupal\Core\StreamWrapper\StreamWrapperManagerInterface $stream_wrapper_manager
-   * @param \Drupal\Core\Archiver\ArchiverManager $archiver_manager
-   * @param \Drupal\Core\Config\ConfigFactoryInterface $config_factory
-   * @param \Drupal\Core\Session\AccountInterface $current_user
-   * @param \Drupal\Core\Language\LanguageManagerInterface $language_manager
-   * @param \Drupal\Component\Transliteration\TransliterationInterface $transliteration
-   * @param \Drupal\Core\Extension\ModuleHandlerInterface $module_handler
-   * @param \Drupal\Core\Logger\LoggerChannelFactoryInterface $logger_factory
-   * @param StrawberryfieldUtilityService $strawberryfield_utility_service
-   * @param \Drupal\strawberryfield\StrawberryfieldFileMetadataService $strawberryfield_file_metadata_service
+   * @param \Drupal\Core\File\FileSystemInterface                       $file_system
+   * @param \Drupal\file\FileUsage\FileUsageInterface                   $file_usage
+   * @param \Drupal\Core\Entity\EntityTypeManagerInterface              $entity_type_manager
+   * @param \Drupal\Core\StreamWrapper\StreamWrapperManagerInterface    $stream_wrapper_manager
+   * @param \Drupal\Core\Archiver\ArchiverManager                       $archiver_manager
+   * @param \Drupal\Core\Config\ConfigFactoryInterface                  $config_factory
+   * @param \Drupal\Core\Session\AccountInterface                       $current_user
+   * @param \Drupal\Core\Language\LanguageManagerInterface              $language_manager
+   * @param \Drupal\Component\Transliteration\TransliterationInterface  $transliteration
+   * @param \Drupal\Core\Extension\ModuleHandlerInterface               $module_handler
+   * @param \Drupal\Core\Logger\LoggerChannelFactoryInterface           $logger_factory
+   * @param StrawberryfieldUtilityService                               $strawberryfield_utility_service
+   * @param \Drupal\strawberryfield\StrawberryfieldFileMetadataService  $strawberryfield_file_metadata_service
+   * @param \Symfony\Component\EventDispatcher\EventDispatcherInterface $event_dispatcher
    */
   public function __construct(
     FileSystemInterface $file_system,
@@ -192,7 +200,8 @@ class StrawberryfieldFilePersisterService {
     ModuleHandlerInterface $module_handler,
     LoggerChannelFactoryInterface $logger_factory,
     StrawberryfieldUtilityService $strawberryfield_utility_service,
-    StrawberryfieldFileMetadataService $strawberryfield_file_metadata_service
+    StrawberryfieldFileMetadataService $strawberryfield_file_metadata_service,
+    EventDispatcherInterface $event_dispatcher
   ) {
     $this->fileSystem = $file_system;
     $this->fileUsage = $file_usage;
@@ -214,6 +223,7 @@ class StrawberryfieldFilePersisterService {
     $this->moduleHandler = $module_handler;
     $this->loggerFactory = $logger_factory;
     $this->strawberryfieldUtility = $strawberryfield_utility_service;
+    $this->eventDispatcher = $event_dispatcher;
   }
 
 
@@ -613,9 +623,8 @@ class StrawberryfieldFilePersisterService {
           $cleanjson,
           $fileinfo
         );
-        /** @var \Symfony\Component\EventDispatcher\EventDispatcherInterface $dispatcher */
-        $dispatcher = \Drupal::service('event_dispatcher');
-        $dispatcher->dispatch($event_type, $event);
+
+        $this->eventDispatcher->dispatch($event, $event_type);
         if ($event->wasModified()) {
           // Note: When the event gets an object passed,
           // We don't need to retrieve the changes. But our JSON is an array.
@@ -815,7 +824,15 @@ class StrawberryfieldFilePersisterService {
                       try {
                         $file->save();
                         $persisted++;
-                      } catch (\Drupal\Core\Entity\EntityStorageException $e) {
+                        $event_type = StrawberryfieldEventType::TEMP_FILE_CREATION;
+                        $current_timestamp = (new DrupalDateTime())->getTimestamp();
+                        $event = new StrawberryfieldFileEvent($event_type, 'strawberryfield', $current_uri, $current_timestamp);
+
+                        // This will allow any temp file on ADO save to be managed
+                        // IN a queue by \Drupal\strawberryfield\EventSubscriber\StrawberryfieldEventCompostBinSubscriber
+                        $this->eventDispatcher->dispatch($event, $event_type);
+                      }
+                      catch (\Drupal\Core\Entity\EntityStorageException $e) {
                         $this->messenger()->addError(
                           t(
                             'Something went wrong when saving file @filename:, please check your logs.',
