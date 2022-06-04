@@ -66,5 +66,16 @@ function hook_strawberryfield_file_destination_alter(array &$processed_file_part
 }
 
 /**
+ * Lets modules alter the which Paths as considered safe for Composting removal
+ *
+ * @param array $base_uris
+ *    An array with fully qualified basepaths with a streamwrapper prefix.
+ */
+function hook_strawberryfield_compost_safe_basepaths_alter(array &$base_uris) {
+  // Example alter
+  $base_uris[] = 'private://webform/';
+}
+
+/**
  * @} End of "addtogroup hooks".
  */

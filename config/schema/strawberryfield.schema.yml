@@ -93,6 +93,10 @@ strawberryfield.storage_settings:
       type: string
       label: 'Storage Path under the Storage Scheme, for Persisting Digital Objects in JSON format'
       default: "dostorage"
+    compost_maximum_age:
+      type: integer
+      label: 'Max time to live of Archipelago generated Temporary Files'
+      default: 21600
 
 strawberryfield.archipelago_solr_settings:
   type: config_object
@@ -254,6 +258,6 @@ strawberryfield.breadcrumb_settings:
       label: 'Type of Breadcrumb to process for ADOs'
       default: 'longest'
     enabled:
-      type: boolan
+      type: boolean
       label: 'If Breadcrumb processing is enabled or not'
       default: TRUE

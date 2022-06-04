@@ -184,4 +184,18 @@ final class StrawberryfieldEventType {
    */
   const DELETE_FLAVOUR = 'sbf.flavour.delete';
 
+
+  /**
+   * Name of the event fired when generating a temp file.
+   *
+   * This event allows modules to perform an action on Temp file creation
+   * A default Subscriber will enqueue these for removal
+   *
+   * @Event
+   *
+   * @see \Drupal\strawberryfield\Event\StrawberryfieldFileEvent
+   *
+   * @var string
+   */
+  const TEMP_FILE_CREATION = 'sbf.file.tmp';
 }
