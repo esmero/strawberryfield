@@ -233,7 +233,7 @@ class StrawberryfieldJsonHelper {
    * @param string $propertypath;
    *   Use to accumulate the propertypath between recursive calls.
    * @param array $excludepaths;
-   *   Use to pass a list of blacklisted paths
+   *   Use to pass a list of paths to exclude
    *
    * @return array
    */
