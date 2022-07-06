@@ -65,16 +65,26 @@ class StrawberryKeysFromJson extends ItemList {
     }
     $values = [];
     $item = $this->getParent();
+    $definition = $this->getDataDefinition();
+    // This key is passed by the property definition in the field class
+    // jsonkey in this context is a string containing one or more
+    // jmespath's separated by comma.
+    $filter_empties = $definition['settings']['filter_empties'] ?? FALSE;
     if (!empty($item->value)) {
       // Should 10 be enough? this is json-ld not github.. so maybe...
       $jsonArray = json_decode($item->value, TRUE, 50);
       //@TODO deal with JSON exceptions as we have done before
 
       $flattened = [];
-      $blacklist = ['ap:importeddata.content'];
+      $exclude = ['ap:importeddata.content'];
       $flattened = StrawberryfieldJsonHelper::arrayToFlatJsonPropertypaths(
-        $jsonArray, '', $blacklist
+        $jsonArray, '', $exclude
       );
+      if ($filter_empties) {
+        $flattened = array_filter($flattened, function($value) {
+          return ($value !== null && $value !== '' && $value !== []);
+        });
+      }
       $this->processed = array_keys($flattened);
       $this->computed = TRUE;
       foreach ($this->processed as $delta => $item) {
