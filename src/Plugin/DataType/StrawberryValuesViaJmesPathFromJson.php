@@ -110,15 +110,25 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
                 }
                 break;
               default:
-                $values_parsed[] = date('c', $edtf_value->getMin());
-                $values_parsed[] = date('c', $edtf_value->getMax());
+                // Make sure we do not index same day twice
+                $start_day = date('Y-m-d', $edtf_value->getMin());
+                $end_day = date('Y-m-d', $edtf_value->getMax());
+                if ($start_day === $end_day) {
+                  // if this is the same day just index one.
+                  $values_parsed[] = date('c', $edtf_value->getMin());
+                }
+                else {
+                  $values_parsed[] = date('c', $edtf_value->getMin());
+                  $values_parsed[] = date('c', $edtf_value->getMax());
+                }
                 break;
             }
           }
           else {
             // If not EDTF (e.g an already ISO8601 date)
             // try with string based parsing
-            $values_parsed[] = $this->parseStringToDate($value);
+            $parsed_from_string = $this->parseStringToDate($value);
+            $values_parsed[] = $parsed_from_string ? $parsed_from_string: NULL;
           }
         }
         $values = array_unique($values_parsed);

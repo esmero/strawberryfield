@@ -88,6 +88,7 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
      $reserved_keys = [
        'value',
        'str_flatten_keys',
+       'str_flatten_keys_unfiltered',
      ];
 
      // @TODO mapDataDefinition() is the next step.
@@ -106,6 +107,19 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
          '\Drupal\strawberryfield\Plugin\DataType\StrawberryKeysFromJson'
        )
        ->setInternal(FALSE)
+       ->setSetting('filter_empties', TRUE)
+       ->setReadOnly(TRUE);
+
+     // All properties as Property keys.
+     // Handy when dealing with Field formatters
+     $properties['str_flatten_keys_unfiltered'] = ListDataDefinition::create('string')
+       ->setLabel('JSON keys defined in this field')
+       ->setComputed(TRUE)
+       ->setClass(
+         '\Drupal\strawberryfield\Plugin\DataType\StrawberryKeysFromJson'
+       )
+       ->setInternal(TRUE)
+       ->setSetting('filter_empties', FALSE)
        ->setReadOnly(TRUE);
 
      $keynamelist = [];
