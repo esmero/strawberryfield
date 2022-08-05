@@ -57,27 +57,42 @@ function strawberryfield_update_9101() {
 }
 /**
  * Update node type conditions from node_type to entity_bundle.
- * (Copied and slightly modified from pathauto.install)
+ * (Adapted from pathauto.install)
  */
 function strawberryfield_update_9102() {
-  $pathauto_configs = \Drupal::configFactory()->listAll('pathauto.pattern.');
-  $block_configs = \Drupal::configFactory()->listAll('block.block.');
-  $views_configs = \Drupal::configFactory()->listAll('views.view.');
-  $combined_configs = array_merge($pathauto_configs, $block_configs, $views_configs);
-  // Load all pattern configuration entities.
-  foreach ( $combined_configs as $pattern_config_name) {
-    $pattern_config = \Drupal::configFactory()->getEditable($pattern_config_name);
 
-    // Loop patterns and swap the node_type plugin by the entity_bundle:node
-    // plugin.
-    if ($pattern_config->get('type') === 'canonical_entities:node') {
-      $selection_criteria = $pattern_config->get('selection_criteria');
-      foreach ($selection_criteria as $uuid => $condition) {
-        if ($condition['id'] === 'node_type') {
-          $pattern_config->set("selection_criteria.$uuid.id", 'entity_bundle:node');
-          $pattern_config->save();
-          break;
-        }
+  // Refactor the below to target blocks and view that need updating.
+  //$pathauto_configs = \Drupal::configFactory()->listAll('pathauto.pattern.');
+  //$block_configs = \Drupal::configFactory()->listAll('block.block.');
+  //$views_configs = \Drupal::configFactory()->listAll('views.view.');
+  //$combined_configs = array_merge($pathauto_configs, $block_configs, $views_configs);
+  //// Load all pattern configuration entities.
+  //foreach ( $combined_configs as $pattern_config_name) {
+  //  $pattern_config = \Drupal::configFactory()->getEditable($pattern_config_name);
+
+  //  // Loop patterns and swap the node_type plugin by the entity_bundle:node
+  //  // plugin.
+  //  if ($pattern_config->get('type') === 'canonical_entities:node') {
+  //    $selection_criteria = $pattern_config->get('selection_criteria');
+  //    foreach ($selection_criteria as $uuid => $condition) {
+  //      if ($condition['id'] === 'node_type') {
+  //        $pattern_config->set("selection_criteria.$uuid.id", 'entity_bundle:node');
+  //        $pattern_config->save();
+  //        break;
+  //      }
+  //    }
+  //  }
+  //}
+
+  // Check and update pathauto
+  $selection_criteria = \Drupal::configFactory()->get('pathauto.pattern.digital_object_uuid')->get('selection_criteria');
+  if($selection_criteria) {
+    $pattern_config = \Drupal::configFactory()->getEditable('pathauto.pattern.digital_object_uuid');
+    foreach ($selection_criteria as $uuid => $condition) {
+      if ($condition['id'] === 'node_type') {
+        $pattern_config->set("selection_criteria.$uuid.id", 'entity_bundle:node');
+        $pattern_config->save();
+        break;
       }
     }
   }
