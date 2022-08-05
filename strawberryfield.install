@@ -57,11 +57,15 @@ function strawberryfield_update_9101() {
 }
 /**
  * Update node type conditions from node_type to entity_bundle.
- * (Copied from pathauto.install)
+ * (Copied and slightly modified from pathauto.install)
  */
 function strawberryfield_update_9102() {
+  $pathauto_configs = \Drupal::configFactory()->listAll('pathauto.pattern.');
+  $block_configs = \Drupal::configFactory()->listAll('block.block.');
+  $views_configs = \Drupal::configFactory()->listAll('views.view.');
+  $combined_configs = array_merge($pathauto_configs, $block_configs, $views_configs);
   // Load all pattern configuration entities.
-  foreach (\Drupal::configFactory()->listAll('pathauto.pattern.') as $pattern_config_name) {
+  foreach ( $combined_configs as $pattern_config_name) {
     $pattern_config = \Drupal::configFactory()->getEditable($pattern_config_name);
 
     // Loop patterns and swap the node_type plugin by the entity_bundle:node
