@@ -61,29 +61,6 @@ function strawberryfield_update_9101() {
  */
 function strawberryfield_update_9102() {
 
-  // Refactor the below to target blocks and view that need updating.
-  //$pathauto_configs = \Drupal::configFactory()->listAll('pathauto.pattern.');
-  //$block_configs = \Drupal::configFactory()->listAll('block.block.');
-  //$views_configs = \Drupal::configFactory()->listAll('views.view.');
-  //$combined_configs = array_merge($pathauto_configs, $block_configs, $views_configs);
-  //// Load all pattern configuration entities.
-  //foreach ( $combined_configs as $pattern_config_name) {
-  //  $pattern_config = \Drupal::configFactory()->getEditable($pattern_config_name);
-
-  //  // Loop patterns and swap the node_type plugin by the entity_bundle:node
-  //  // plugin.
-  //  if ($pattern_config->get('type') === 'canonical_entities:node') {
-  //    $selection_criteria = $pattern_config->get('selection_criteria');
-  //    foreach ($selection_criteria as $uuid => $condition) {
-  //      if ($condition['id'] === 'node_type') {
-  //        $pattern_config->set("selection_criteria.$uuid.id", 'entity_bundle:node');
-  //        $pattern_config->save();
-  //        break;
-  //      }
-  //    }
-  //  }
-  //}
-
   // Check and update pathauto
   $selection_criteria = \Drupal::configFactory()->get('pathauto.pattern.digital_object_uuid')->get('selection_criteria');
   if($selection_criteria) {
@@ -95,5 +72,39 @@ function strawberryfield_update_9102() {
         break;
       }
     }
+  }
+
+  // Check and update blocks
+  $block_config_names = [
+    'block.block.breadcrumbs',
+    'block.block.views_block__creative_work_series_children_block_1_2',
+    'block.block.views_block__creative_work_series_children_block_1',
+    'block.block.views_block__collection_membership_block_1_2',
+    'block.block.views_block__ld_display_for_digital_objects_sql_block_1',
+    'block.block.views_block__collection_membership_block_1'
+  ];
+  foreach ($block_config_names as $block_config_name) {
+    $block_config = \Drupal::configFactory()->get($block_config_name);
+    $node_type = $block_config->get('visibility.node_type');
+    $entity_bundle_node = $block_config->get('visibility.entity_bundle:node');
+    $block_config_edit = \Drupal::configFactory()->getEditable($block_config_name);
+    if ($node_type && $entity_bundle_node) {
+      $block_config_edit->clear('visibility.node_type')->save();
+    } elseif ($node_type) {
+      $node_type_data = $block_config->get('visibility.node_type');
+      $block_config_edit->set('visibility.entity_bundle:node', $node_type_data);
+      $block_config_edit->set('visibility.entity_bundle:node.id','entity_bundle:node');
+      $block_config_edit->clear('visibility.node_type');
+      $block_config_edit->save();
+    }
+  }
+
+  // Check and update view
+  $view_config = \Drupal::configFactory()->getEditable('views.view.data_collection_manifest');
+  $display_method_node_type = $view_config->get('display.children_ismemberof_manifest_rest.display_options.fields.type.fallback_options.display_methods.node_type');
+  if ($display_method_node_type) {
+    $view_config->set('display.children_ismemberof_manifest_rest.display_options.fields.type.fallback_options.display_methods.entity_bundle:node', $display_method_node_type);
+    $view_config->clear('display.children_ismemberof_manifest_rest.display_options.fields.type.fallback_options.display_methods.node_type');
+    $view_config->save();
   }
 }
