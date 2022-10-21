@@ -27,7 +27,7 @@ class StrawberryFieldEntityComputedItemList extends EntityReferenceFieldItemList
           // dr:fid.
           if (isset($flatvalues['dr:nid']) && !empty($flatvalues['dr:nid'])) {
             $entity_ids = (array) $flatvalues['dr:nid'];
-            $node_entities = array_filter($entity_ids, 'is_scalar');
+            $node_entities = array_filter($entity_ids, 'is_int');
           }
           // Also get mapped ones
           if (isset($values["ap:entitymapping"]["entity:node"]) &&
@@ -36,13 +36,12 @@ class StrawberryFieldEntityComputedItemList extends EntityReferenceFieldItemList
             foreach ($jsonkeys_with_node_entities as $jsonkey_with_node_entity) {
               if (isset($values[$jsonkey_with_node_entity]) && !empty($values[$jsonkey_with_node_entity])) {
                 $entity_ids = (array) $values[$jsonkey_with_node_entity];
-                $node_entities = array_merge($node_entities, array_filter($entity_ids, 'is_scalar'));
+                $node_entities = array_merge($node_entities, array_filter($entity_ids, 'is_int'));
               }
             }
           }
         }
         // Now see if we got entities
-        // I will not deduplicate here since frequency could be a desired factor
         $node_entities = array_unique($node_entities);
         foreach ($node_entities as $index => $id) {
           $this->list[$index] = $this->createItem($index, (int) $id);
