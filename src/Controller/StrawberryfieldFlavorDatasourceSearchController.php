@@ -205,7 +205,12 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
 
       $query->setFulltextFields(['ocr_text']);
 
-      $query->addCondition('parent_id', $nodeid)
+      /* Forcing here two fixed options */
+      $parent_conditions = $query->createConditionGroup('OR');
+      $parent_conditions->addCondition('parent_id', $nodeid);
+      $parent_conditions->addCondition('top_parent_id', $nodeid);
+
+      $query->addConditionGroup($parent_conditions)
         ->addCondition('search_api_datasource', 'strawberryfield_flavor_datasource')
         ->addCondition('processor_id', $processor);
       // IN the case of multiple files being used in the same IIIF manifest we do not limit

@@ -340,7 +340,12 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
       $query->setParseMode($parse_mode);
       $query->sort('search_api_relevance', 'DESC');
 
-      $query->addCondition('parent_id', $entity->id())
+      /* Forcing here two fixed options */
+      $parent_conditions = $query->createConditionGroup('OR');
+      $parent_conditions->addCondition('parent_id', $entity->id());
+      $parent_conditions->addCondition('top_parent_id', $entity->id());
+
+      $query->addConditionGroup($parent_conditions)
         ->addCondition('processor_id', $processor)
         ->addCondition('search_api_datasource',
           'strawberryfield_flavor_datasource');
