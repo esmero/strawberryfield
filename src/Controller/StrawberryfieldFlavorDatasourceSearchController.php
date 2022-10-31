@@ -209,17 +209,19 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
         ->getBackend()
         ->getSolrFieldNames($query->getIndex());
       /* Forcing here two fixed options */
-
       $parent_conditions = $query->createConditionGroup('OR');
       if (isset($allfields_translated_to_solr['parent_id'])) {
         $parent_conditions->addCondition('parent_id', $nodeid);
       }
+      // The property path for this is: target_id:field_descriptive_metadata:sbf_entity_reference_ispartof:nid
+      // TODO: This needs a config form. For now let's document. Even if not present
+      // It will not fail.
       if (isset($allfields_translated_to_solr['top_parent_id'])) {
         $parent_conditions->addCondition('top_parent_id', $nodeid);
       }
-     if (count($parent_conditions->getConditions())) {
-       $query->addConditionGroup($parent_conditions);
-     }
+      if (count($parent_conditions->getConditions())) {
+        $query->addConditionGroup($parent_conditions);
+      }
 
       $query->addCondition('search_api_datasource', 'strawberryfield_flavor_datasource')
         ->addCondition('processor_id', $processor);
@@ -230,18 +232,14 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
       // And preprocess everything here.
       // Its like having the same Twig template on front and back?
       // @giancarlobi. Maybe an idea for the future once this "works".
-
-      // *    $solarium_query->createFilterQuery('language_filter')->setQuery(
-      //          $this->createFilterQuery($unspecific_field_names['search_api_language'], $language_ids, 'IN', new Field($index, 'search_api_language'), $options)
-
-
+      // $solarium_query->createFilterQuery('language_filter')->setQuery(
+      // $this->createFilterQuery($unspecific_field_names['search_api_language'], $language_ids, 'IN', new Field($index, 'search_api_language'), $options)
 
       if ($file_uuid != 'all') {
         if (Uuid::isValid($file_uuid)) {
           $query->addCondition('file_uuid', $file_uuid);
         }
       }
-
 
       if (isset($allfields_translated_to_solr['ocr_text'])) {
         // Will be used by \strawberryfield_search_api_solr_query_alter
@@ -259,7 +257,10 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
       if (isset($allfields_translated_to_solr['file_uuid'])) {
         $fields_to_retrieve[] = $allfields_translated_to_solr['file_uuid'];
       }
-
+      // This is documented at the API level but maybe our processing level
+      // Does not trigger it?
+      // Still keeping it because maybe/someday it will work out!
+      $fields_to_retrieve = array_combine($fields_to_retrieve, $fields_to_retrieve);
       $query->setOption('search_api_retrieved_field_values', $fields_to_retrieve);
       // If we allow Extra processing here Drupal adds Content Access Check
       // That does not match our Data Source \Drupal\search_api\Plugin\search_api\processor\ContentAccess
@@ -276,26 +277,49 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
 
       $query->setProcessingLevel(QueryInterface::PROCESSING_BASIC);
       $results = $query->execute();
-      $extradata = $results->getAllExtraData();
+      $extradata = $results->getAllExtraData() ?? [];
       // Just in case something goes wrong with the returning region text
       $region_text = $term;
+      $page_number_by_id = [];
       if ($results->getResultCount() >= 1) {
         if (isset($extradata['search_api_solr_response']['ocrHighlighting']) && count(
             $extradata['search_api_solr_response']['ocrHighlighting']
           ) > 0) {
-         // $result_snippets_base = [];
+          foreach ($results as $result) {
+            $extradata_from_item = $result->getAllExtraData() ?? [];
+            if (isset($allfields_translated_to_solr['parent_sequence_id']) &&
+              isset($extradata_from_item['search_api_solr_document'][$allfields_translated_to_solr['parent_sequence_id']])) {
+              $sequence_number = (array) $extradata_from_item['search_api_solr_document'][$allfields_translated_to_solr['parent_sequence_id']];
+              if (isset($sequence_number[0]) && !empty($sequence_number[0]) && ($sequence_number[0] != 0)) {
+                // We do all this checks to avoid adding a strange offset e.g a collection instead of a CWS
+                $page_number_by_id[$extradata_from_item['search_api_solr_document']['id']] = $sequence_number[0];
+              }
+            }
+            // If we use getField we can access the RAW/original source without touching Solr
+            // Not right now needed but will keep this around.
+            //e.g $sequence_id = $result->getField('sequence_id')->getValues();
+          }
+
           foreach ($extradata['search_api_solr_response']['ocrHighlighting'] as $sol_doc_id => $field) {
             $result_snippets_base = [];
             $previous_text = '';
             $accumulated_text = [];
-            if (isset($field[$allfields_translated_to_solr['ocr_text']]['snippets'])) {
+            if (isset($field[$allfields_translated_to_solr['ocr_text']]['snippets']) &&
+              is_array($field[$allfields_translated_to_solr['ocr_text']]['snippets'])) {
               foreach ($field[$allfields_translated_to_solr['ocr_text']]['snippets'] as $snippet) {
                 // IABR uses 0 to N-1. We may want to reprocess this for other endpoints.
                 //$page_number = strpos($snippet['pages'][0]['id'], $page_prefix) === 0 ? (int) substr(
                 //  $snippet['pages'][0]['id'],
                 //  $page_prefix_len
                 //) : (int) $snippet['pages'][0]['id'];
-                $page_number = preg_replace('/\D/', '', $snippet['pages'][0]['id']);
+                if (isset($page_number_by_id[$sol_doc_id])) {
+                  // If we have a Solr doc (means children) and their own page number use them here.
+                  $page_number = $page_number_by_id[$sol_doc_id];
+                }
+                else {
+                  // If not the case (e.g a PDF) go for it.
+                  $page_number = preg_replace('/\D/', '', $snippet['pages'][0]['id']);
+                }
                 // Just some check in case something goes wrong and page number is 0 or negative?
                 // and rebase page number starting with 0
                 $page_number = ($page_number > 0) ? (int) ($page_number - 1) : 0;
