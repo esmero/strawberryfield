@@ -336,17 +336,32 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
         'limit' => 1,
         'offset' => 0,
       ]);
+
+      $allfields_translated_to_solr = $index->getServerInstance()
+        ->getBackend()
+        ->getSolrFieldNames($index);
       $parse_mode = $this->parseModeManager->createInstance('terms');
       $query->setParseMode($parse_mode);
       $query->sort('search_api_relevance', 'DESC');
 
       /* Forcing here two fixed options */
       $parent_conditions = $query->createConditionGroup('OR');
-      $parent_conditions->addCondition('parent_id', $entity->id());
-      $parent_conditions->addCondition('top_parent_id', $entity->id());
 
-      $query->addConditionGroup($parent_conditions)
-        ->addCondition('processor_id', $processor)
+      if (isset($allfields_translated_to_solr['parent_id'])) {
+        $parent_conditions->addCondition('parent_id',  $entity->id());
+      }
+      // The property path for this is: target_id:field_descriptive_metadata:sbf_entity_reference_ispartof:nid
+      // TODO: This needs a config form. For now let's document. Even if not present
+      // It will not fail.
+      if (isset($allfields_translated_to_solr['top_parent_id'])) {
+        $parent_conditions->addCondition('top_parent_id',  $entity->id());
+      }
+
+      if (count($parent_conditions->getConditions())) {
+        $query->addConditionGroup($parent_conditions);
+      }
+
+      $query->addCondition('processor_id', $processor)
         ->addCondition('search_api_datasource',
           'strawberryfield_flavor_datasource');
 
