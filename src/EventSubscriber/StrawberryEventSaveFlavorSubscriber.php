@@ -69,9 +69,16 @@ class StrawberryEventSaveFlavorSubscriber extends StrawberryfieldEventSaveSubscr
 
     $tracked_deleted = array_unique($tracked_deleted);
 
-    if ($entity->isPublished() != $original_entity->isPublished() || $entity->getOwnerId() != $original_entity->getOwnerId()) {
+    /* if ($entity->isPublished() != $original_entity->isPublished() || $entity->getOwnerId() != $original_entity->getOwnerId()) {
       $this->trackFlavorsNeedUpdate($entity, $tracked_deleted);
-    }
+    } */
+    // Small change in approach here, Nov 2022.
+    // Even if more expensive we will retrack any SBF flavor on 'any' ADO change
+    // This allows parent-parent changes to apply on a direct parent change
+    // @TODO. We could also do this for parent-parent changes. Would
+    // Require an extra SOLR query/means also a config form to set the field that
+    // Connects... so not yet ok?
+    $this->trackFlavorsNeedUpdate($entity, $tracked_deleted);
 
     $current_class = get_called_class();
     $event->setProcessedBy($current_class, TRUE);
