@@ -118,3 +118,16 @@ strawberryfield.strawberryfield_keynameprovider_overview_form:
     _permission: 'access administration pages'
   options:
     _admin_route: TRUE
+
+strawberryfield.ado_tools:
+  path: '/node/{node}/adotools'
+  defaults:
+    _form: '\Drupal\strawberryfield\Form\StrawberryfieldToolsForm'
+    _title: 'ADO Tools'
+  requirements:
+    _entity_access: 'node.update'
+  options:
+    _node_operation_route: TRUE
+    parameters:
+      node:
+        type: 'entity:node'

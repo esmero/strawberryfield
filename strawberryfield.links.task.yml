@@ -1,10 +1,9 @@
 # Add an additional tab to the node page.
 strawberryfield.custom_node_edit: # The ID of local task is the same as route, to make it easier to control.
   route_name: 'strawberryfield.custom_node_edit'
-  title: 'Edit' 
+  title: 'Edit'
   base_route: 'entity.node.canonical'
   weight: 3
-
 
 strawberryfield_keynameprovider_collection:
   title: 'JSON Key Name Providers'
@@ -17,3 +16,8 @@ strawberryfield_keynameprovider_overview_form:
   title: 'JSON Key Name Providers Overview'
   base_route: 'entity.strawberry_keynameprovider.collection'
   weight: 3
+
+strawberryfield.ado_tools:
+  route_name: strawberryfield.ado_tools
+  base_route: entity.node.canonical
+  title: 'ADO Tools'
