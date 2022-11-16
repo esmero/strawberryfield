@@ -43,7 +43,7 @@ class UpdateCodeMirrorCommand implements CommandInterface
   public function render() {
 
     return [
-      'command' => 'strawberry_runners_codemirror',
+      'command' => 'strawberryfield_codemirror',
       'selector' => $this->selector,
       'content' => $this->content,
     ];
