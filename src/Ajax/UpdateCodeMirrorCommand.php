@@ -8,8 +8,8 @@
 
 namespace Drupal\strawberryfield\Ajax;
 use Drupal\Core\Ajax\CommandInterface;
-class UpdateCodeMirrorCommand implements CommandInterface
-{
+
+class UpdateCodeMirrorCommand implements CommandInterface {
 
   /**
    * The Content that will be updated on the Code Mirror text area
