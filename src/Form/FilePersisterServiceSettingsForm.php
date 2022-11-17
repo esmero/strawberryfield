@@ -132,7 +132,7 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
       ],
     ];
 
-    $intervals = [21600, 43200, 86400, 604800, 2419200, 7776000];
+    $intervals = [3600, 10800, 21600, 43200, 86400, 604800, 2419200, 7776000];
     $period = array_combine($intervals, array_map([$this->dateFormatter, 'formatInterval'], $intervals));
 
     $form['compost_maximum_age'] = [
