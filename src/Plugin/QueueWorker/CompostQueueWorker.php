@@ -162,6 +162,8 @@ class CompostQueueWorker extends QueueWorkerBase implements ContainerFactoryPlug
         'module' => 'strawberryfield',
         'timestamp' => 1652919451,
     )
+    SBR might pass the 'uri' as absolute starting with /tmp so we also add that into the
+    Safe paths.
 */
     if (!function_exists('str_starts_with')) {
       function str_starts_with($haystack, $needle) {
@@ -186,6 +188,7 @@ class CompostQueueWorker extends QueueWorkerBase implements ContainerFactoryPlug
 
     $safe_paths
       = $safe_paths_default = [
+      $this->fileSystem->getTempDirectory(),
       'temporary://',
       'private://webform/',
       's3://webform/'
@@ -213,7 +216,6 @@ class CompostQueueWorker extends QueueWorkerBase implements ContainerFactoryPlug
     }
 
     $base_name = $this->fileSystem->basename($data->uri);
-
     foreach ($unsafe_prefix as $prefix) {
       if (str_starts_with($base_name, $prefix)) {
         $safe = FALSE;
