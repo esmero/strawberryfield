@@ -67,7 +67,6 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
     $this->strawberryfieldUtility = $strawberryfield_utility_service;
     $this->entityTypeManager = $entitytype_manager;
     $this->parseModeManager = $parse_mode_manager;
-
   }
 
   /**
@@ -247,20 +246,22 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
         // We are already checking if the Node can be viewed. Custom Datasources can not depend on Solr node access policies.
         $query->setOption('search_api_bypass_access', TRUE);
       }
-      $fields_to_retrieve[] = 'id';
+      $fields_to_retrieve['id'] = 'id';
       if (isset($allfields_translated_to_solr['parent_sequence_id'])) {
-        $fields_to_retrieve[] = $allfields_translated_to_solr['parent_sequence_id'];
+        $fields_to_retrieve['parent_sequence_id'] = $allfields_translated_to_solr['parent_sequence_id'];
       }
       if (isset($allfields_translated_to_solr['sequence_id'])) {
-        $fields_to_retrieve[] = $allfields_translated_to_solr['sequence_id'];
+        $fields_to_retrieve['sequence_id'] = $allfields_translated_to_solr['sequence_id'];
       }
       if (isset($allfields_translated_to_solr['file_uuid'])) {
-        $fields_to_retrieve[] = $allfields_translated_to_solr['file_uuid'];
+        $fields_to_retrieve['file_uuid'] = $allfields_translated_to_solr['file_uuid'];
+      }
+      if (isset($allfields_translated_to_solr['sbf_file_uri'])) {
+        $fields_to_retrieve['sbf_file_uri'] = $allfields_translated_to_solr['sbf_file_uri'];
       }
       // This is documented at the API level but maybe our processing level
       // Does not trigger it?
       // Still keeping it because maybe/someday it will work out!
-      $fields_to_retrieve = array_combine($fields_to_retrieve, $fields_to_retrieve);
       $query->setOption('search_api_retrieved_field_values', $fields_to_retrieve);
       // If we allow Extra processing here Drupal adds Content Access Check
       // That does not match our Data Source \Drupal\search_api\Plugin\search_api\processor\ContentAccess
@@ -278,6 +279,9 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
       $query->setProcessingLevel(QueryInterface::PROCESSING_BASIC);
       $results = $query->execute();
       $extradata = $results->getAllExtraData() ?? [];
+      // remove the ID and the parent, not needed for file matching
+      unset($fields_to_retrieve['id']);
+      unset($fields_to_retrieve['parent_sequence_id']);
       // Just in case something goes wrong with the returning region text
       $region_text = $term;
       $page_number_by_id = [];
@@ -294,6 +298,9 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
                 // We do all this checks to avoid adding a strange offset e.g a collection instead of a CWS
                 $page_number_by_id[$extradata_from_item['search_api_solr_document']['id']] = $sequence_number[0];
               }
+            }
+            foreach($fields_to_retrieve as $machine_name => $field) {
+              $filedata_by_id[$extradata_from_item['search_api_solr_document']['id']][$machine_name] = $extradata_from_item['search_api_solr_document'][$field] ?? NULL;
             }
             // If we use getField we can access the RAW/original source without touching Solr
             // Not right now needed but will keep this around.
@@ -338,6 +345,7 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
                     ],
                   ],
                 ];
+
                 foreach ($snippet['highlights'] as $highlight) {
 
                   $region_text = str_replace(
@@ -376,6 +384,12 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
                 }
               }
               $result_snippets_base['text'] = !empty($accumulated_text) ? implode(" ... ", array_unique($accumulated_text)) : $term;
+              // Add extra data that IAB does not need/nor understand but we do need
+              // To match Image IDs against sequences/canvases on an arbitrary
+              // IIIF manifest driven by a twig template.
+              foreach($fields_to_retrieve as $machine_name => $field) {
+                $result_snippets_base['sbf_metadata'][$machine_name] = $filedata_by_id[$sol_doc_id][$machine_name];
+              }
             }
             $result_snippets[] = $result_snippets_base;
           }
