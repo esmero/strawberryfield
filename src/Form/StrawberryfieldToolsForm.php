@@ -86,12 +86,6 @@ class StrawberryfieldToolsForm extends FormBase {
               '#executes_submit_callback' => TRUE,
               '#submit' =>  ['::submitForm']
             ];
-            $form['test_jmespath_input'] = [
-              '#type' => 'codemirror',
-              '#codemirror' => $settings,
-              '#default_value' => $json,
-              '#rows' => 15,
-            ];
             $form['test_output'] = [
               '#type' => 'codemirror',
               '#prefix' => '<div id="jmespathoutput">',
@@ -104,6 +98,12 @@ class StrawberryfieldToolsForm extends FormBase {
                   'strawberryfield/jmespath_codemirror_strawberryfield',
                 ],
               ],
+            ];
+            $form['test_jmespath_input'] = [
+              '#type' => 'codemirror',
+              '#codemirror' => $settings,
+              '#default_value' => $json,
+              '#rows' => 15,
             ];
           }
         }
