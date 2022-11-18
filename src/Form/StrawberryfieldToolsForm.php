@@ -18,13 +18,6 @@ use Drupal\strawberryfield\Ajax\UpdateCodeMirrorCommand;
 class StrawberryfieldToolsForm extends FormBase {
 
   /**
-   * The entity repository service.
-   *
-   * @var \Drupal\Core\Entity\EntityRepositoryInterface
-   */
-  protected $entityRepository;
-
-  /**
    * Constructs a StrawberryfieldToolsForm object.
    *
    * @param \Drupal\Core\Render\RendererInterface $renderer
