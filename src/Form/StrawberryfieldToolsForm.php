@@ -2,12 +2,9 @@
 
 namespace Drupal\strawberryfield\Form;
 
-use Drupal\Core\Entity\EntityRepositoryInterface;
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\Core\Render\RendererInterface;
 use Drupal\node\NodeInterface;
-use Symfony\Component\DependencyInjection\ContainerInterface;
 use Drupal\Core\Ajax\AjaxResponse;
 use Drupal\strawberryfield\Ajax\UpdateCodeMirrorCommand;
 
@@ -15,28 +12,6 @@ use Drupal\strawberryfield\Ajax\UpdateCodeMirrorCommand;
  * Returns responses for Node routes.
  */
 class StrawberryfieldToolsForm extends FormBase {
-
-  /**
-   * Constructs a StrawberryfieldToolsForm object.
-   *
-   * @param \Drupal\Core\Render\RendererInterface $renderer
-   *   The renderer service.
-   * @param \Drupal\Core\Entity\EntityRepositoryInterface $entity_repository
-   *   The entity repository.
-   */
-  public function __construct(RendererInterface $renderer, EntityRepositoryInterface $entity_repository) {
-    $this->entityRepository = $entity_repository;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public static function create(ContainerInterface $container) {
-    return new static(
-      $container->get('renderer'),
-      $container->get('entity.repository')
-    );
-  }
 
   public function getFormId() {
     return 'strawberryfield_tools_form';
