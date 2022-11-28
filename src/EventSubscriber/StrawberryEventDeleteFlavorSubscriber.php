@@ -3,6 +3,7 @@
 namespace Drupal\strawberryfield\EventSubscriber;
 
 use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Field\EntityReferenceFieldItemListInterface;
 use Drupal\search_api\Query\QueryInterface;
 use Drupal\search_api\Utility\Utility;
 use Drupal\Core\KeyValueStore\KeyValueFactoryInterface;
@@ -60,6 +61,7 @@ class StrawberryEventDeleteFlavorSubscriber extends StrawberryfieldEventDeleteSu
 
     $datasource_id = 'strawberryfield_flavor_datasource';
     $limit = 200;
+    $parent_entity_index_needs_update = FALSE;
     foreach (StrawberryfieldFlavorDatasource::getValidIndexes() as $index) {
       $query = $index->query(['offset' => 0, 'limit' => $limit]);
       $query->addCondition('search_api_datasource', $datasource_id)
@@ -96,6 +98,7 @@ class StrawberryEventDeleteFlavorSubscriber extends StrawberryfieldEventDeleteSu
         }
         // Untrack after all possible query calls with offsets.
         if (count($tracked_ids) > 0) {
+          $parent_entity_index_needs_update = TRUE;
           $index->trackItemsDeleted($datasource_id, $tracked_ids);
           // Removes temporary stored Flavors from Key Collection
           $this->keyValue
@@ -105,6 +108,17 @@ class StrawberryEventDeleteFlavorSubscriber extends StrawberryfieldEventDeleteSu
       }
       catch (SearchApiException $searchApiException) {
         watchdog_exception('strawberryfield', $searchApiException, 'We could not untrack Strawberry Flavor Documents from Index because the Solr Query returned an exception at server level.');
+      }
+    }
+    // This is a simpler method than the one found on
+    // \Drupal\strawberryfield\Plugin\search_api\datasource\StrawberryfieldFlavorDatasource::loadMultiple
+    // Because this works on a single ADO, and the other one might be of a batch of many Entries
+    // For multiple ones.
+    if ($parent_entity_index_needs_update && $entity->field_sbf_nodetonode instanceof EntityReferenceFieldItemListInterface) {
+      $tracking_manager = \Drupal::getContainer()
+        ->get('search_api.entity_datasource.tracking_manager');
+      foreach ($entity->field_sbf_nodetonode->referencedEntities() as $key => $referencedEntity) {
+        $tracking_manager->entityUpdate($referencedEntity);
       }
     }
   }
