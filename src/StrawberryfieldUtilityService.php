@@ -387,6 +387,77 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
   /**
    * {@inheritdoc}
    */
+  public function getContentByProcessorInSolr(
+    EntityInterface $entity,
+    string $processor,
+    array $indexes = [],
+    string $checksum = NULL
+  ): int {
+    $count = 0;
+
+    // If no index specified, query all that implement the strawberry flavor
+    // datasource.
+    if (empty($indexes)) {
+      $indexes = StrawberryfieldFlavorDatasource::getValidIndexes();
+    }
+
+    foreach ($indexes as $index) {
+      // Create the query.
+      $query = $index->query([
+        'limit' => 1,
+        'offset' => 0,
+      ]);
+
+      $allfields_translated_to_solr = $index->getServerInstance()
+        ->getBackend()
+        ->getSolrFieldNames($index);
+      $parse_mode = $this->parseModeManager->createInstance('terms');
+      $query->setParseMode($parse_mode);
+      $query->sort('search_api_relevance', 'DESC');
+
+      /* Forcing here two fixed options */
+      $parent_conditions = $query->createConditionGroup('OR');
+
+      if (isset($allfields_translated_to_solr['parent_id'])) {
+        $parent_conditions->addCondition('parent_id',  $entity->id());
+      }
+      // The property path for this is: target_id:field_descriptive_metadata:sbf_entity_reference_ispartof:nid
+      // TODO: This needs a config form. For now let's document. Even if not present
+      // It will not fail.
+      if (isset($allfields_translated_to_solr['top_parent_id'])) {
+        $parent_conditions->addCondition('top_parent_id',  $entity->id());
+      }
+
+      if (count($parent_conditions->getConditions())) {
+        $query->addConditionGroup($parent_conditions);
+      }
+
+      $query->addCondition('processor_id', $processor)
+        ->addCondition('search_api_datasource',
+          'strawberryfield_flavor_datasource');
+
+      if ($checksum) {
+        $query->addCondition('checksum', $checksum);
+      }
+
+      // Another solution would be to make our conditions all together an OR
+      // But no post processing here is also good, faster and we just want
+      // to know if its there or not.
+      $query->setProcessingLevel(QueryInterface::PROCESSING_NONE);
+      // @see strawberryfield_search_api_solr_query_alter()
+      $query->setOption('ocr_highlight', 'on');
+      $results = $query->execute();
+
+      // In case of more than one Index with the same Data Source we accumulate.
+      $count += (int) $results->getResultCount();
+    }
+
+    return $count;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   public function filePathIsValid(string $scheme, string $path): bool {
     // Empty path is always valid.
     if (empty($path)) {
