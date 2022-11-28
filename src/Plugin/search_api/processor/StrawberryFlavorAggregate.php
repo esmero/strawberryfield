@@ -282,7 +282,7 @@ class StrawberryFlavorAggregate extends ProcessorPluginBase {
         $results = $query->execute();
       }
       catch (\Exception $exception) {
-        $this->logException($e, '%type while trying to fetch Strawberry Flavors');
+        $this->logException($exception, '%type while trying to fetch Strawberry Flavors from Search API');
         return $values;
       }
       // remove the ID and the parent, not needed for file matching
