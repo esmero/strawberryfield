@@ -23,7 +23,7 @@ class StrawberryFlavorAggregatedItemProperty extends ConfigurablePropertyBase {
   public function defaultConfiguration() {
     return [
       'roles' => [AccountInterface::ANONYMOUS_ROLE],
-      'processor_ids' => [],
+      'processor_ids' => '',
 
     ];
   }
