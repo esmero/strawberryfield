@@ -261,3 +261,19 @@ strawberryfield.breadcrumb_settings:
       type: boolean
       label: 'If Breadcrumb processing is enabled or not'
       default: TRUE
+
+search_api.property_configuration.sbf_flavor_aggregated_item:
+  type: mapping
+  label: 'Aggregated SBF Flavor field configuration'
+  mapping:
+    role:
+      type: sequence
+      label: 'The selected roles'
+      orderby: key
+      sequence:
+        type: string
+        label: 'The user roles which will be active when the entity is harvested for children'
+    processor_ids:
+      type:
+        type: string
+        label: 'Comma separated list of Drupal machine names (IDs) of Strawberry Runner Post processor Configuration entities.e.g "ocr,text"'
