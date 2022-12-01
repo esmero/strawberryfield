@@ -213,15 +213,28 @@ class StrawberryEventSaveFlavorSubscriber extends StrawberryfieldEventSaveSubscr
       }
     }
 
-    // This is a simpler method than the one found on
-    // \Drupal\strawberryfield\Plugin\search_api\datasource\StrawberryfieldFlavorDatasource::loadMultiple
-    // Because this works on a single ADO, and the other one might be of a batch of many Entries
-    // For multiple ones.
     if ($parent_entity_index_needs_update && $entity->field_sbf_nodetonode instanceof EntityReferenceFieldItemListInterface) {
+      $indexes = [];
+      /** @var \Drupal\search_api\Plugin\search_api\datasource\ContentEntityTrackingManager $tracking_manager */
       $tracking_manager = \Drupal::getContainer()
         ->get('search_api.entity_datasource.tracking_manager');
       foreach ($entity->field_sbf_nodetonode->referencedEntities() as $key => $referencedEntity) {
-          $tracking_manager->entityUpdate($referencedEntity);
+        if (!isset($indexes[$referencedEntity->getType()])) {
+          $indexes[$referencedEntity->getType()]
+            = $tracking_manager->getIndexesForEntity($referencedEntity);
+        }
+        $updated_item_ids = [];
+        $entity_id = $referencedEntity->id();
+        $langcode = [$referencedEntity->language()->getId()];
+        $combine_id = function ($langcode) use ($entity_id) {
+          return $entity_id . ':' . $langcode;
+        };
+        $updated_item_ids = array_map($combine_id, array_values($langcode));
+        if (isset($indexes[$referencedEntity->getType()])) {
+          foreach ($indexes[$referencedEntity->getType()] as $index) {
+            $index->trackItemsUpdated('entity:node', $updated_item_ids);
+          }
+        }
       }
     }
   }
