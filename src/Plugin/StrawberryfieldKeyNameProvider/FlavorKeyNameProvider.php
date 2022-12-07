@@ -23,7 +23,7 @@ use Drupal\Core\Cache\CacheBackendInterface;
  *
  * @StrawberryfieldKeyNameProvider(
  *    id = "flavor",
- *    label = @Translation("Flavor/Embeded JSON Service Strawberry Field Key Name Provider"),
+ *    label = @Translation("Flavor/Embedded JSON Service Strawberry Field Key Name Provider"),
  *    processor_class = "\Drupal\strawberryfield\Plugin\DataType\StrawberryValuesFromFlavorJson",
  *    item_type = "map"
  * )
