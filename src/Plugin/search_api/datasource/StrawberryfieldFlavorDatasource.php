@@ -638,6 +638,23 @@ XML;
             // Needed if we e.g are gonna use this for Book search/IIIF search
             // to make sure it at least exists!
             if (!empty(trim($fulltext))) {
+              try {
+                // This only meant for backwards compat
+                // for existing Solr Documents/ Data Sources.
+                // @TODO remove in 1.2.0
+                // Make this change persist in the backend.
+                $doc = new \DOMDocument();
+                $doc->preserveWhiteSpace = false;
+                $doc->loadxml($fulltext);
+                $xpath = new \DOMXPath($doc);
+                foreach( $xpath->query('//*[not(node())]') as $node ) {
+                  $node->parentNode->removeChild($node);
+                }
+                $doc->formatOutput = true;
+                $fulltext = $doc->savexml();
+              }
+              catch (\Exception $e) {
+              }
               $data['fulltext'] = trim($fulltext);
             }
             if (!empty(trim($plaintext))) {
@@ -669,20 +686,11 @@ XML;
             // But we do know ispartof (static for now)
             // Putting a collection to be updated in the index
             // is cheaper than querying for the actual property.
-            $content_item_ids_to_update[$entity->getType()][$entity_id
-            . ':'
-            . $translation_id]
-              = $entity;
+            $content_item_ids_to_update[$entity->getType()][$entity_id . ':' . $translation_id] = $entity;
             // Fetch also second level of parent. We don't aggregate further than that
             if ($entity->field_sbf_nodetonode instanceof EntityReferenceFieldItemListInterface) {
-              foreach (
-                $entity->field_sbf_nodetonode->referencedEntities() as $key =>
-                $referencedEntity
-              ) {
-                $content_item_ids_to_update[$referencedEntity->getType(
-                )][$referencedEntity->id()
-                . ':'
-                . $translation_id];
+              foreach ($entity->field_sbf_nodetonode->referencedEntities() as $key => $referencedEntity) {
+                $content_item_ids_to_update[$referencedEntity->getType()][$referencedEntity->id() . ':' . $translation_id] = $referencedEntity;
               }
             }
           }
