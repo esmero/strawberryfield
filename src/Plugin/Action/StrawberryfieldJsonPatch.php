@@ -241,7 +241,6 @@ JSON;
                 );
               };
               if ($this->configuration['simulate']) {
-                $this->messenger()->addMessage('In simulation Mode');
                 $r = new JsonDiff(
                   $fullvaluesoriginal,
                   $fullvalues,
