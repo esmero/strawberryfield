@@ -62,9 +62,10 @@ class JmesPathNameProvider extends StrawberryfieldKeyNameProviderBase {
 
     $element['source_key'] = [
       '#id' => 'source_key',
-      '#type' => 'textfield',
+      '#type' => 'textarea',
       '#title' => $this->t('One or more comma separated valid JMESPaths.'),
       '#size' => 40,
+      '#rows' => 4,
       '#maxlength' => 255,
       '#default_value' => $this->getConfiguration()['source_key'],
       '#description' => $this->t('JMespath(s) will be evaluated against your <em>Strawberry field</em> JSON to extract data.<br> e.g. subject_loc[*].label'),
