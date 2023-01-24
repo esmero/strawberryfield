@@ -277,3 +277,33 @@ search_api.property_configuration.sbf_flavor_aggregated_item:
       type:
         type: string
         label: 'Comma separated list of Drupal machine names (IDs) of Strawberry Runner Post processor Configuration entities.e.g "ocr,text"'
+
+plugin.plugin_configuration.search_api_processor.sbf_highlight:
+  type: search_api.default_processor_configuration
+  label: 'Advanced Highlight processor configuration'
+  mapping:
+    prefix:
+      type: string
+      label: 'Text/HTML that will be prepended to all occurrences of search keywords in highlighted text'
+    suffix:
+      type: string
+      label: 'Text/HTML that will be appended to all occurrences of search keywords in highlighted text'
+    excerpt:
+      type: boolean
+      label: 'When enabled, an excerpt will be created for searches with keywords, containing all occurrences of keywords in a fulltext field.'
+    excerpt_length:
+      type: integer
+      label: 'The requested length of the excerpt, in characters'
+    exclude_fields:
+      type: sequence
+      label: 'Fields excluded from excerpt'
+      orderby: value
+      sequence:
+        type: string
+        label: 'An excluded field''s ID'
+    highlight:
+      type: string
+      label: 'Defines whether returned fields should be highlighted (always/if returned/never).'
+    highlight_partial:
+      type: boolean
+      label: 'Whether matches in parts of words should be highlighted'
