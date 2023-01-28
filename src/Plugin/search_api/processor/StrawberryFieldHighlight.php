@@ -3,20 +3,11 @@
 namespace Drupal\strawberryfield\Plugin\search_api\processor;
 
 use Drupal\Component\Utility\Html;
-use Drupal\Component\Utility\Unicode;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Plugin\PluginFormInterface;
-use Drupal\Core\Render\Element;
-use Drupal\Core\Session\AccountInterface;
-use Drupal\search_api\LoggerTrait;
-use Drupal\search_api\Plugin\PluginFormTrait;
 use Drupal\search_api\Plugin\search_api\processor\Highlight;
-use Drupal\search_api\Processor\ProcessorPluginBase;
 use Drupal\search_api\Query\QueryInterface;
 use Drupal\search_api\Query\ResultSetInterface;
-use Drupal\search_api\SearchApiException;
-use Drupal\search_api\Utility\DataTypeHelperInterface;
-use Drupal\user\Entity\User;
 
 /**
  * Adds a highlighted excerpt to results and highlights returned fields.
@@ -38,6 +29,137 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
   /**
    * {@inheritdoc}
    */
+  public function defaultConfiguration() {
+    return [
+      'prefix' => '<strong>',
+      'suffix' => '</strong>',
+      'excerpt' => TRUE,
+      'excerpt_clean' => TRUE,
+      'excerpt_length' => 256,
+      'highlight_link' => TRUE,
+      'highlight_processing' => 'backend',
+      'highlight_partial' => FALSE,
+      'exclude_fields' => [],
+    ];
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function buildConfigurationForm(array $form, FormStateInterface $form_state) {
+    $parent_name = 'processors[sbf_highlight][settings]';
+    if (!empty($form['#parents'])) {
+      $parents = $form['#parents'];
+      $parent_name = $root = array_shift($parents);
+      if ($parents) {
+        $parent_name = $root . '[' . implode('][', $parents) . ']';
+      }
+    }
+    $form['highlight_processing'] = [
+      '#type' => 'select',
+      '#title' => $this->t('Highlight processing type'),
+      '#description' => $this->t('Defines whether highlight and excerpt (if enabled) should be processed from backend highlighter or via Front end post processing. Backend is recommended.'),
+      '#options' => [
+        'backend' => $this->t('Backend'),
+        'frontend' => $this->t('Front End'),
+      ],
+      '#default_value' => $this->configuration['highlight_processing'],
+    ];
+    $form['highlight_partial'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Highlight partial matches'),
+      '#description' => $this->t('When enabled, matches in parts of words will be highlighted as well.'),
+      '#default_value' => $this->configuration['highlight_partial'],
+    ];
+    $form['excerpt'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Create excerpt'),
+      '#description' => $this->t('When enabled, an excerpt will be created for searches with keywords, containing all occurrences of keywords in a fulltext field.'),
+      '#default_value' => $this->configuration['excerpt'],
+    ];
+    $form['excerpt_length'] = [
+      '#type' => 'number',
+      '#title' => $this->t('Excerpt length'),
+      '#description' => $this->t('The requested length of the excerpt, in characters'),
+      '#default_value' => $this->configuration['excerpt_length'],
+      '#min' => 50,
+      '#states' => [
+        'visible' => [
+          ":input[name=\"{$parent_name}[excerpt]\"]" => [
+            'checked' => TRUE,
+          ],
+        ],
+      ],
+    ];
+    $form['excerpt_clean'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Sort and dedupe returned fields for the excerpt'),
+      '#description' => $this->t('When enabled and excerpt creation is selected, the returned fields (or backend highlight if highlight_processing is set to "backend" will be sorted by longest text first and deduplicated giving a more representative snippet but not taking the order of the results in account'),
+      '#default_value' => $this->configuration['excerpt_clean'],
+      '#states' => [
+        'visible' => [
+          ":input[name=\"{$parent_name}[excerpt]\"]" => [
+            'checked' => TRUE,
+          ],
+        ],
+      ],
+    ];
+    $form['highlight_link'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Add Content Entity Links on a separate Strawberry flavor backed excerpt'),
+      '#description' => $this->t('When enabled,  Strawberry Flavor Data Source type and Strawberry Flavor Aggregator types will have their own excerpt. The first occurrences of a keywords in a fulltext field of these types will get a link with the keyword as a URL fragment to the Original Content Entity.'),
+      '#default_value' => $this->configuration['highlight_link'],
+      '#states' => [
+        'visible' => [
+          ":input[name=\"{$parent_name}[excerpt]\"]" => [
+            'checked' => TRUE,
+          ],
+        ],
+      ],
+    ];
+
+    // Exclude certain fulltext fields.
+    $fields = $this->index->getFields();
+    $fulltext_fields = [];
+    foreach ($this->index->getFulltextFields() as $field_id) {
+      $fulltext_fields[$field_id] = $fields[$field_id]->getLabel() . ' (' . $field_id . ')';
+    }
+    $form['exclude_fields'] = [
+      '#type' => 'checkboxes',
+      '#title' => $this->t('Exclude fields from excerpt'),
+      '#description' => $this->t('Exclude certain fulltext fields from being included in the excerpt.'),
+      '#options' => $fulltext_fields,
+      '#default_value' => $this->configuration['exclude_fields'],
+      '#attributes' => ['class' => ['search-api-checkboxes-list']],
+      '#states' => [
+        'visible' => [
+          ":input[name=\"{$parent_name}[excerpt]\"]" => [
+            'checked' => TRUE,
+          ],
+        ],
+      ],
+    ];
+    $form['prefix'] = [
+      '#type' => 'textfield',
+      '#title' => $this->t('Highlighting prefix'),
+      '#description' => $this->t('Text/HTML that will be prepended to all occurrences of search keywords in highlighted text'),
+      '#default_value' => $this->configuration['prefix'],
+    ];
+    $form['suffix'] = [
+      '#type' => 'textfield',
+      '#title' => $this->t('Highlighting suffix'),
+      '#description' => $this->t('Text/HTML that will be appended to all occurrences of search keywords in highlighted text'),
+      '#default_value' => $this->configuration['suffix'],
+    ];
+
+
+    return $form;
+  }
+
+
+  /**
+   * {@inheritdoc}
+   */
   public function postprocessSearchResults(ResultSetInterface $results) {
     $query = $results->getQuery();
     if (!$results->getResultCount()
@@ -55,7 +177,7 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
     if ($this->configuration['excerpt']) {
       $this->addExcerpts($result_items, $excerpt_fulltext_fields, $keys);
     }
-    if ($this->configuration['highlight'] != 'never') {
+    if ($this->configuration['highlight_processing'] != 'backend') {
       $highlighted_fields = $this->highlightFields($result_items, $keys);
       foreach ($highlighted_fields as $item_id => $item_fields) {
         $item = $result_items[$item_id];
@@ -84,15 +206,19 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
       if (!$item) {
         continue;
       }
-      if ($this->configuration['highlight_from_solr'] ?? TRUE) {
+      if ($this->configuration['highlight_processing'] == 'backend') {
         $backed_highlight = $results[$item_id]->getExtraData('highlighted_fields',[]);
-        foreach( $backed_highlight as $key => $backed_highlight_values) {
-          if (in_array($key,$items['linkable_fields'])) {
+        foreach($backed_highlight as $key => $backed_highlight_values) {
+          if ($this->configuration['highlight_link'] && in_array($key,$items['linkable_fields'])) {
             $linkable_text = array_merge($linkable_text, $backed_highlight_values ?? []);
           }
           else {
-            $text = call_user_func_array('array_merge', array_values($backed_highlight));
+            $text = array_merge($text, $backed_highlight_values ?? []);
           }
+        }
+        if ($this->configuration['excerpt_clean']) {
+          $linkable_text = $this->sortAndDedupe($linkable_text);
+          $text = $this->sortAndDedupe($text);
         }
       }
       else {
@@ -100,7 +226,11 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
         // use it in a loop because it is a resource greedy construction.
         // @see https://github.com/kalessil/phpinspectionsea/blob/master/docs/performance.md#slow-array-function-used-in-loop
         $text = call_user_func_array('array_merge', array_values($item));
+        if ($this->configuration['excerpt_clean']) {
+          $text = $this->sortAndDedupe($text);
+        }
       }
+
       $item_keys = $keys;
 
       // If the backend already did highlighting and told us the exact keys it
@@ -111,7 +241,7 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
       if ($highlighted_keys) {
         $item_keys = array_unique(array_merge($keys, $highlighted_keys));
       }
-      if ($this->configuration['highlight_link'] ?? TRUE) {
+      if ($this->configuration['highlight_link'] ?? FALSE) {
         try {
           $uri = $results[$item_id]->getDatasource()->getItemUrl($results[$item_id]->getOriginalObject());
           $uri->setOptions(['fragment' => 'search/'.reset($item_keys)]);
@@ -126,21 +256,16 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
           $this->getLogger()->warning('Error happened trying to load the entity for Linked and generate a link highlight', []);
         }
       }
-      $excerpt = '';
       $excerpt_return = [];
-      $linked_excerpt = '';
       if (is_array($text) && count($text)) {
         $excerpt = $this->createExcerpt(
           implode($this->getEllipses()[1], $text), $item_keys
         );
         $excerpt_return[] = $this->highlightField($excerpt, $item_keys, FALSE);
       }
-      if (is_array($linkable_text) && count($linkable_text)) {
-        uasort(
-          $linkable_text, function ($a, $b) {
-          return strlen($b) - strlen($a);
-        }
-        );
+      // Bit of an overkill to check for the config again
+      // but i do overcheck.
+      if ($this->configuration['highlight_link'] && is_array($linkable_text) && count($linkable_text)) {
         $linked_excerpt = $this->createExcerpt(
           implode($this->getEllipses()[1], $linkable_text), $item_keys
         );
@@ -151,6 +276,23 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
 
       $results[$item_id]->setExcerpt(implode('<br/>', $excerpt_return));
     }
+  }
+
+  /**
+   * Deduplicates and sorts array by value length
+   *
+   * @param array $text
+   *
+   * @return array
+   */
+  protected function sortAndDedupe(array $text) {
+    $text = array_unique($text);
+    uasort(
+      $text, function ($a, $b) {
+      return strlen($b) - strlen($a);
+    }
+    );
+    return $text;
   }
 
   /**
@@ -234,9 +376,9 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
             ) == 'strawberryfield_flavor_datasource')) {
           $fulltext_sbf_might_link[] = $field_id;
         }
-          $fields_by_datasource[$field->getDatasourceId(
-          )][$field->getPropertyPath()]
-            = $field_id;
+        $fields_by_datasource[$field->getDatasourceId(
+        )][$field->getPropertyPath()]
+          = $field_id;
       }
     }
 
@@ -248,9 +390,9 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
   }
 
   /**
-   * Returns snippets from a piece of text, with certain keywords highlighted.
+   * Returns snippets from a piece of text, but does not highlight.
    *
-   * Largely copied from search_excerpt().
+   * Modified from the parent class to not run highlight.
    *
    * @param string $text
    *   The text to extract fragments from.
@@ -258,7 +400,7 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
    *   The search keywords entered by the user.
    *
    * @return string|null
-   *   A string containing HTML for the excerpt. Or NULL if no excerpt could be
+   *   A string containing text for the excerpt. Or NULL if no excerpt could be
    *   created.
    */
   protected function createExcerpt($text, array $keys) {
@@ -471,6 +613,56 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
     // Ensures that we can always trim and we add double quotes.
     $text = $text_with_links !== '  ' ?  '&ldquo;'.$text_with_links.'&rdquo;' : $text;
     return trim($text);
+  }
+
+  /**
+   * Retrieves highlighted field values for the given result items.
+   *
+   * @param \Drupal\search_api\Item\ItemInterface[] $results
+   *   The result items whose fields should be highlighted.
+   * @param array $keys
+   *   The search keys to use for highlighting.
+   *
+   * @return string[][][]
+   *   An array keyed by item IDs, containing arrays that map field IDs to the
+   *   highlighted versions of the values for that field.
+   */
+  protected function highlightFields(array $results, array $keys) {
+    $highlighted_fields = [];
+    foreach ($results as $item_id => $item) {
+      // Maybe the backend or some other processor has already set highlighted
+      // field values.
+      $highlighted_fields[$item_id] = $item->getExtraData('highlighted_fields', []);
+    }
+    // This is our override of ::getFulltextFields that returns a upper level set
+    // of keys. Be careful dear coder/extender.
+    $item_fields = $this->getFulltextFields($results, NULL, FALSE);
+    foreach ($item_fields['fulltext'] as $item_id => $fields) {
+      foreach ($fields as $field_id => $values) {
+        if (empty($highlighted_fields[$item_id][$field_id])) {
+          $change = FALSE;
+          foreach ($values as $i => $value) {
+            if (is_string($value)) {
+              $values[$i] = $this->highlightField($value, $keys);
+            }
+            elseif (is_array($value)) {
+              foreach ($value as $j => $value_item) {
+                if (is_string($value_item)) {
+                  $values[$i][$j] = $this->highlightField($value_item, $keys);
+                }
+              }
+            }
+            if ($values[$i] !== $value) {
+              $change = TRUE;
+            }
+          }
+          if ($change) {
+            $highlighted_fields[$item_id][$field_id] = $values;
+          }
+        }
+      }
+    }
+    return $highlighted_fields;
   }
 
 }

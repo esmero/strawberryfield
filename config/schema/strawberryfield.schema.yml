@@ -293,7 +293,13 @@ plugin.plugin_configuration.search_api_processor.sbf_highlight:
       label: 'When enabled, an excerpt will be created for searches with keywords, containing all occurrences of keywords in a fulltext field.'
     excerpt_length:
       type: integer
-      label: 'The requested length of the excerpt, in characters'
+      label: 'The requested length of the excerpt, in characters.'
+    excerpt_clean:
+      type: boolean
+      label: 'When enabled, the returned fields (or backend highlight if highlight_processing is set to "backend" will be sorted by longest text first and deduplicated giving a more representative snippet but not taking the order of the results in account'
+    highlight_link:
+      type: boolean
+      label: 'When enabled,  Strawberry Flavor Data Source type and Strawberry Flavor Aggregator types will have their own excerpt. The first occurrences of a keywords in a fulltext field of these types will get a link with the keyword as a URL fragment to the Original Content Entity.'
     exclude_fields:
       type: sequence
       label: 'Fields excluded from excerpt'
@@ -301,9 +307,9 @@ plugin.plugin_configuration.search_api_processor.sbf_highlight:
       sequence:
         type: string
         label: 'An excluded field''s ID'
-    highlight:
+    highlight_processing:
       type: string
-      label: 'Defines whether returned fields should be highlighted (always/if returned/never).'
+      label: 'Defines whether highlight and excerpt should be processed from backend highlighter or via post processing.'
     highlight_partial:
       type: boolean
       label: 'Whether matches in parts of words should be highlighted'
