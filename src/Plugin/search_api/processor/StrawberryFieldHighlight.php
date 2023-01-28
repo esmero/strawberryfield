@@ -257,6 +257,7 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
         }
       }
       $excerpt_return = [];
+
       if (is_array($text) && count($text)) {
         $excerpt = $this->createExcerpt(
           implode($this->getEllipses()[1], $text), $item_keys
