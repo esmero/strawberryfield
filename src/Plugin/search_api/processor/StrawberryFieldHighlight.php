@@ -468,7 +468,7 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
       $replacements[] = $this->configuration['prefix'].$v.$this->configuration['suffix'];
     }
     $text_with_links = preg_replace($patterns, $replacements, ' ' . $text . ' ', 1);
-    // Ensures that we can always trim
+    // Ensures that we can always trim and we add double quotes.
     $text = $text_with_links !== '  ' ?  '&ldquo;'.$text_with_links.'&rdquo;' : $text;
     return trim($text);
   }
