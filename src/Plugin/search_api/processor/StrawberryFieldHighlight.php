@@ -607,7 +607,7 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
     $replacements = [];
 
     foreach ($keys as $k => $v) {
-      $patterns[] = '/' . preg_quote($this->configuration['prefix'],'/') . $k . preg_quote($this->configuration['suffix'],'/'). '/i';  // use i to ignore case
+      $patterns[] = '/' . preg_quote($this->configuration['prefix'],'/') . preg_quote($k,'/') . preg_quote($this->configuration['suffix'],'/'). '/i';  // use i to ignore case
       $replacements[] = $this->configuration['prefix'].$v.$this->configuration['suffix'];
     }
     $text_with_links = preg_replace($patterns, $replacements, ' ' . $text . ' ', 1);
