@@ -330,14 +330,14 @@ class StrawberryfieldFileMetadataService {
 
     if (!$reduced) {
       $result_exif = exec(
-        $exec_path . ' -json -q -a -gps:all -Common "-gps*" -xmp:all -XMP-tiff:Orientation -ImageWidth -ImageHeight -Canon -Nikon-AllDates -pdf:all -ee -MIMEType ' . $templocation_for_exec,
+        $exec_path . ' -json -q -a -gps:all -Common "-gps*" "-keywords*" -xmp:all -XMP-tiff:Orientation -ImageWidth -ImageHeight -Canon -Nikon-AllDates -pdf:all -ee -MIMEType ' . $templocation_for_exec,
         $output_exif,
         $status_exif
       );
     }
     else {
       $result_exif = exec(
-        $exec_path . ' -json -q -ImageWidth -ImageHeight -MIMEType -XMP-tiff:Orientation -common -Aperture -FocalLength -ModifyDate ' . $templocation_for_exec,
+        $exec_path . ' -json -q -ImageWidth -ImageHeight -MIMEType "-keywords*" -XMP-tiff:Orientation -common -Aperture -FocalLength -ModifyDate ' . $templocation_for_exec,
         $output_exif,
         $status_exif
       );
@@ -716,6 +716,4 @@ class StrawberryfieldFileMetadataService {
       return $templocation;
     }
   }
-
-
 }
