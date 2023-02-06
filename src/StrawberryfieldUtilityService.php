@@ -387,6 +387,123 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
   /**
    * {@inheritdoc}
    */
+  public function getCountAndExpectedByProcessorInSolr(
+    EntityInterface $entity,
+    string $processor,
+    array $indexes = [],
+    string $checksum = NULL
+  ): array {
+    $count = 0;
+    $expected = 0;
+
+    // If no index specified, query all that implement the strawberry flavor
+    // datasource.
+    if (empty($indexes)) {
+      $indexes = StrawberryfieldFlavorDatasource::getValidIndexes();
+    }
+
+    foreach ($indexes as $index) {
+      // Create the query.
+      $query = $index->query([
+        'limit' => 1,
+        'offset' => 0,
+      ]);
+
+      $allfields_translated_to_solr = $index->getServerInstance()
+        ->getBackend()
+        ->getSolrFieldNames($index);
+      $parse_mode = $this->parseModeManager->createInstance('terms');
+      $query->setParseMode($parse_mode);
+      $query->sort('search_api_relevance', 'DESC');
+
+      /* Forcing here two fixed options */
+      $parent_conditions = $query->createConditionGroup('OR');
+
+      if (isset($allfields_translated_to_solr['parent_id'])) {
+        $parent_conditions->addCondition('parent_id',  $entity->id());
+      }
+      // The property path for this is: target_id:field_descriptive_metadata:sbf_entity_reference_ispartof:nid
+      // TODO: This needs a config form. For now let's document. Even if not present
+      // It will not fail.
+      if (isset($allfields_translated_to_solr['top_parent_id'])) {
+        $parent_conditions->addCondition('top_parent_id',  $entity->id());
+      }
+
+      if (count($parent_conditions->getConditions())) {
+        $query->addConditionGroup($parent_conditions);
+      }
+
+      $query->addCondition('processor_id', $processor)
+        ->addCondition('search_api_datasource',
+          'strawberryfield_flavor_datasource');
+
+      if ($checksum) {
+        $query->addCondition('checksum', $checksum);
+      }
+      if (isset($allfields_translated_to_solr['sbf_sequence_total']) && $index->getServerInstance()->supportsFeature('search_api_facets')) {
+        $facet_field = "sbf_sequence_total";
+        // sequence_total
+        $facet_options['facet:' . $facet_field] = [
+          'field'     => $facet_field,
+          'limit'     => 100,
+          'operator'  => 'and',
+          'min_count' => 1,
+          'missing'   => FALSE,
+        ];
+
+        $query->setOption('search_api_facets', $facet_options);
+      }
+
+      // Another solution would be to make our conditions all together an OR
+      // But no post processing here is also good, faster and we just want
+      // to know if its there or not.
+      $query->setProcessingLevel(QueryInterface::PROCESSING_NONE);
+      // @see strawberryfield_search_api_solr_query_alter()
+      $query->setOption('ocr_highlight', 'on');
+      $results = $query->execute();
+
+      // In case of more than one Index with the same Data Source we accumulate.
+      $count += (int) $results->getResultCount();
+      $facet_result = $results->getExtraData('search_api_facets', []);
+      if (isset($facet_result['facet:'.$facet_field])) {
+        foreach ($facet_result['facet:'.$facet_field] as $facet_filters) {
+
+          // OK, this is not as easy as i thought!
+          // If i get as facet "label" 10 and i get 10 count. Means i was expecting 10
+          // If i get as facet "label" 1 and i get 13 count. Means i was expecting 13 ? Gosh.
+          // let's say i have 5 PDFs. 2 of 10 pages, one of 2 pages, two of 1 pages.
+          // How many should i expect? 20 + 2 + 2  = 24 if all OK?
+          // facets will be "10" (20 count), 2 (2 count) and 1 (2 count)
+
+          // If i have 5 pages missing from the first
+          // facets will be "10" (15 count), 2 (2 count) and 1 (2 count)
+          // Total will be 19.
+          // How do i know i'm missing 5? Facet count - Value? mmmm
+
+          if (isset($facet_filters['filter'])) {
+            $value = trim($facet_filters['filter'], '"');
+            // Modulus to the rescue
+            // MOD the Count by the label. The rest is what is missing. Use the count add the rest
+            // If rest  == 0 use the largest of both .
+            $rest = $facet_filters['count'] % $value;
+            if ($rest > 0 ) {
+              $value = $facet_filters['count'] + $rest;
+            }
+            else {
+              $value = $facet_filters['count'] > $value ? $facet_filters['count'] : $value;
+            }
+            $expected += (int) $value;
+          }
+        }
+      }
+    }
+
+    return [$count, $expected];
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   public function getContentByProcessorInSolr(
     EntityInterface $entity,
     string $processor,
