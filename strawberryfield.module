@@ -23,6 +23,9 @@ use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Field\FieldItemListInterface;
 use Solarium\Core\Query\QueryInterface as SolariumQueryInterface;
+use Drupal\Core\Entity\Display\EntityViewDisplayInterface;
+use Drupal\Core\Entity\EntityInterface;
+use Drupal\node\NodeInterface;
 
 /**
  * Implements hook_ENTITY_TYPE_presave().
@@ -379,5 +382,33 @@ function strawberryfield_cron() {
   // Is invoked but never with `drush cron`
   if (PHP_SAPI != 'cli') {
     \Drupal::getContainer()->get('strawberryfield.hydroponics')->run();
+  }
+}
+
+/**
+ * Implements hook_entity_view_alter().
+ */
+function strawberryfield_entity_view_alter(array &$build, EntityInterface $entity, EntityViewDisplayInterface $display) {
+  $excerpt_component = $display->getComponent('search_api_excerpt');
+  if ($excerpt_component !== NULL && $entity instanceof NodeInterface && $entity->view ?? NULL) {
+    if (\Drupal::request()->getMethod() == 'GET' ) {
+      // Check if the current index has lazy_excerpt enabled...
+      if ($processor = ($entity->view->getQuery()->getIndex()->getProcessors(
+        )['sbf_highlight'] ?? NULL)
+      ) {
+        if ($processor->getConfiguration()['lazy_excerpt']) {
+          $cid = 'entity:' . $entity->getEntityTypeId() . '/' . $entity->id()
+            . ':'
+            . $entity->language()->getId();
+          $build['search_api_excerpt'] = [
+            '#lazy_builder'       => [
+              'strawberryfield.lazy_builders:renderExcerpt',
+              [$cid, 'node:'.$entity->id()]
+            ],
+            '#create_placeholder' => TRUE,
+          ];
+        }
+      }
+    }
   }
 }

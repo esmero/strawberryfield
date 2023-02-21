@@ -8,6 +8,7 @@ use Drupal\Core\Plugin\PluginFormInterface;
 use Drupal\search_api\Plugin\search_api\processor\Highlight;
 use Drupal\search_api\Query\QueryInterface;
 use Drupal\search_api\Query\ResultSetInterface;
+use Drupal\search_api\Utility\Utility;
 
 /**
  * Adds a highlighted excerpt to results and highlights returned fields.
@@ -40,6 +41,7 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
       'highlight_processing' => 'backend',
       'highlight_partial' => FALSE,
       'exclude_fields' => [],
+      'lazy_excerpt' => FALSE,
     ];
   }
 
@@ -117,6 +119,21 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
         ],
       ],
     ];
+
+    $form['lazy_excerpt'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Use lazy loader to deliver excerpts on GET http calls'),
+      '#description' => $this->t('When enabled, we will try to deliver on GET requests Excerpts via a Lazy Loading mechanism to bypass global Entity Cache. This is experimental and might deliver stale caches.'),
+      '#default_value' => $this->configuration['lazy_excerpt'],
+      '#states' => [
+        'visible' => [
+          ":input[name=\"{$parent_name}[excerpt]\"]" => [
+            'checked' => TRUE,
+          ],
+        ],
+      ],
+    ];
+
 
     // Exclude certain fulltext fields.
     $fields = $this->index->getFields();
@@ -197,6 +214,7 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
    *   The search keys to use for highlighting.
    */
   protected function addExcerpts(array $results, array $fulltext_fields, array $keys) {
+
     $items = $this->getFulltextFields($results, $fulltext_fields, FALSE);
 
     foreach ($items['fulltext'] as $item_id => $item) {
@@ -275,6 +293,12 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
           ) ?? '';
       }
 
+      if (\Drupal::request()->getMethod() == 'GET' && $this->configuration['lazy_excerpt']) {
+        $cid = $results[$item_id]->getId();
+        $this->getLazyLoader()->setExcerpt(
+          $cid, implode('<br/>', $excerpt_return)
+        );
+      }
       $results[$item_id]->setExcerpt(implode('<br/>', $excerpt_return));
     }
   }

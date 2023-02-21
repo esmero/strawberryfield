@@ -313,3 +313,6 @@ plugin.plugin_configuration.search_api_processor.sbf_highlight:
     highlight_partial:
       type: boolean
       label: 'Whether matches in parts of words should be highlighted'
+    lazy_excerpt:
+      type: boolean
+      label: 'Whether the lazy loading workaround is enabled to deliver fresh(er) Excerpts on GET requests'
