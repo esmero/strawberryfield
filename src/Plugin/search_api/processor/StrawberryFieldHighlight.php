@@ -33,7 +33,7 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
    * @var \Drupal\strawberryfield\StrawberryfieldLazyBuilders|null
    */
   protected $lazyLoader;
-  
+
   /**
    * {@inheritdoc}
    */
@@ -141,16 +141,6 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
       ],
     ];
 
-    /**
-     * Retrieves the data type helper.
-     *
-     * @return \Drupal\search_api\Utility\DataTypeHelperInterface
-     *   The data type helper.
-     */
-    public function getLazyLoader() {
-      return $this->lazyLoader ?: \Drupal::service('strawberryfield.lazy_builders');
-    }
-
     // Exclude certain fulltext fields.
     $fields = $this->index->getFields();
     $fulltext_fields = [];
@@ -187,6 +177,16 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
 
 
     return $form;
+  }
+
+  /**
+   * Retrieves the data type helper.
+   *
+   * @return \Drupal\search_api\Utility\DataTypeHelperInterface
+   *   The data type helper.
+   */
+  public function getLazyLoader() {
+    return $this->lazyLoader ?: \Drupal::service('strawberryfield.lazy_builders');
   }
 
   /**
