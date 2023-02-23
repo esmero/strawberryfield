@@ -28,6 +28,13 @@ use Drupal\search_api\Utility\Utility;
 class StrawberryFieldHighlight extends Highlight implements PluginFormInterface {
 
   /**
+   * The data lazy loader for the excerpt.
+   *
+   * @var \Drupal\strawberryfield\StrawberryfieldLazyBuilders|null
+   */
+  protected $lazyLoader;
+  
+  /**
    * {@inheritdoc}
    */
   public function defaultConfiguration() {
@@ -134,6 +141,15 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
       ],
     ];
 
+    /**
+     * Retrieves the data type helper.
+     *
+     * @return \Drupal\search_api\Utility\DataTypeHelperInterface
+     *   The data type helper.
+     */
+    public function getLazyLoader() {
+      return $this->lazyLoader ?: \Drupal::service('strawberryfield.lazy_builders');
+    }
 
     // Exclude certain fulltext fields.
     $fields = $this->index->getFields();
