@@ -173,7 +173,6 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
     return $form;
   }
 
-
   /**
    * {@inheritdoc}
    */
@@ -285,7 +284,7 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
       // Bit of an overkill to check for the config again
       // but i do overcheck.
       if ($this->configuration['highlight_link'] && is_array($linkable_text) && count($linkable_text)) {
-        $linked_excerpt = $this->createExcerpt(
+        $linked_excerpt = $this->createExcerptFromBackend(
           implode($this->getEllipses()[1], $linkable_text), $item_keys
         );
         $excerpt_return[] = $this->highlightFieldWithLinks(
@@ -575,6 +574,177 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
     if (!$out) {
       return NULL;
     }
+
+    $ellipses = $this->getEllipses();
+    $excerpt = $ellipses[0] . implode($ellipses[1], $out) . $ellipses[2];
+
+    // Since we stripped the tags at the beginning, highlighting doesn't need to
+    // handle HTML anymore.
+    return $excerpt;
+  }
+
+  /**
+   * Returns snippets from a piece of text, but does not highlight.
+   *
+   * Modified from the parent class to not run highlight.
+   *
+   * @param string $text
+   *   The text to extract fragments from.
+   * @param array $keys
+   *   The search keywords entered by the user.
+   *
+   * @return string|null
+   *   A string containing text for the excerpt. Or NULL if no excerpt could be
+   *   created.
+   */
+  protected function createExcerptFromBackend($text, array $keys) {
+    // Remove HTML tags <script> and <style> with all of their contents.
+    $text = preg_replace('#<(style|script).*?>.*?</\1>#is', ' ', $text);
+
+    // Prepare text by stripping HTML tags and decoding HTML entities.
+    $text = strip_tags(str_replace(['<', '>'], [' <', '> '], $text),['HIGHLIGHT']);
+    $text = Html::decodeEntities($text);
+    $text = preg_replace('/\s+/', ' ', $text);
+    $text = trim($text, ' ');
+    $text_length = mb_strlen($text);
+
+    // Try to reach the requested excerpt length with about two fragments (each
+    // with a keyword and some context).
+    $ranges = [];
+    $length = 0;
+    $look_start = [];
+    $remaining_keys = $keys;
+
+    // Get the set excerpt length from the configuration. If the length is too
+    // small, only use one fragment.
+    $excerpt_length = $this->configuration['excerpt_length'];
+    $context_length = round($excerpt_length / 4) - 3;
+    if ($context_length < 32) {
+      $context_length = round($excerpt_length / 2) - 1;
+    }
+
+    while ($length < $excerpt_length && !empty($remaining_keys)) {
+      $found_keys = [];
+      foreach ($remaining_keys as $key) {
+        if ($length >= $excerpt_length) {
+          break;
+        }
+
+        // Remember where we last found $key, in case we are coming through a
+        // second time.
+        if (!isset($look_start[$key])) {
+          $look_start[$key] = 0;
+        }
+
+        // See if we can find $key after where we found it the last time. Since
+        // we are requiring a match on a word boundary, make sure $text starts
+        // and ends with a space.
+        $matches = [];
+
+        if (!$this->configuration['highlight_partial']) {
+          $found_position = FALSE;
+          $regex = '/' . static::$boundary . preg_quote($key, '/') . static::$boundary . '/iu';
+          // $look_start contains the position as character offset, while
+          // preg_match() takes a byte offset.
+          $offset = $look_start[$key];
+          if ($offset > 0) {
+            $offset = strlen(mb_substr(' ' . $text, 0, $offset));
+          }
+          if (preg_match($regex, ' ' . $text . ' ', $matches, PREG_OFFSET_CAPTURE, $offset)) {
+            $found_position = $matches[0][1];
+            // Convert the byte position into a multi-byte character position.
+            $found_position = mb_strlen(substr(" $text", 0, $found_position));
+          }
+        }
+        else {
+          $found_position = mb_stripos($text, $key, $look_start[$key], 'UTF-8');
+        }
+        if ($found_position !== FALSE) {
+          $look_start[$key] = $found_position + 1;
+          // Keep track of which keys we found this time, in case we need to
+          // pass through again to find more text.
+          $found_keys[] = $key;
+
+          // Locate a space before and after this match, leaving some context on
+          // each end.
+          if ($found_position > $context_length) {
+            $before = mb_strpos($text, ' ', $found_position - $context_length);
+            if ($before !== FALSE) {
+              ++$before;
+            }
+            // If we can’t find a space anywhere within the context length, just
+            // settle for a non-space.
+            if ($before === FALSE || $before > $found_position) {
+              $before = $found_position - $context_length;
+            }
+          }
+          else {
+            $before = 0;
+          }
+          if ($before !== FALSE && $before <= $found_position) {
+            if ($text_length > $found_position + $context_length) {
+              $after = mb_strrpos(mb_substr($text, 0, $found_position + $context_length), ' ', $found_position);
+            }
+            else {
+              $after = $text_length;
+            }
+            if ($after !== FALSE && $after > $found_position) {
+              if ($before < $after) {
+                // Save this range.
+                $ranges[$before] = $after;
+                $length += $after - $before;
+              }
+            }
+          }
+        }
+      }
+      // Next time through this loop, only look for keys we found this time,
+      // if any.
+      $remaining_keys = $found_keys;
+    }
+
+    if (!$ranges) {
+      // We didn't find any keyword matches, return NULL.
+      return NULL;
+    }
+
+    // Sort the text ranges by starting position.
+    ksort($ranges);
+
+    // Collapse overlapping text ranges into one. The sorting makes it O(n).
+    $new_ranges = [];
+    $working_from = $working_to = NULL;
+    foreach ($ranges as $this_from => $this_to) {
+      if ($working_from === NULL) {
+        // This is the first time through this loop: initialize.
+        $working_from = $this_from;
+        $working_to = $this_to;
+        continue;
+      }
+      if ($this_from <= $working_to) {
+        // The ranges overlap: combine them.
+        $working_to = max($working_to, $this_to);
+      }
+      else {
+        // The ranges do not overlap: save the working range and start a new
+        // one.
+        $new_ranges[$working_from] = $working_to;
+        $working_from = $this_from;
+        $working_to = $this_to;
+      }
+    }
+    // Save the remaining working range.
+    $new_ranges[$working_from] = $working_to;
+
+    // Fetch text within the combined ranges we found.
+    $out = [];
+    foreach ($new_ranges as $from => $to) {
+      $out[] = Html::escape(mb_substr($text, $from, $to - $from));
+    }
+    if (!$out) {
+      return NULL;
+    }
+    //^.+?(?=<HIGLIGHT>)+|(?<=<\/HIGHLIGHT>).*
 
     $ellipses = $this->getEllipses();
     $excerpt = $ellipses[0] . implode($ellipses[1], $out) . $ellipses[2];

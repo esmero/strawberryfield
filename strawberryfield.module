@@ -370,6 +370,27 @@ function strawberryfield_search_api_solr_query_alter(SolariumQueryInterface $sol
       $solarium_query->addParam('hl.method', 'UnifiedHighlighter');
     }
   }
+  elseif ($query->getOption('highlight_reduce_return', FALSE)) {
+    // ELSEIF bc OCR and these ones are incompatible
+    /* @var \Solarium\Component\Highlighting\Highlighting $hl */
+    $hl = $solarium_query->getHighlighting();
+    $highlight_fields = $query->getOption('highlight_reduce_return',[]);
+    if ($highlight_fields != ['*']) {
+      $highlight_fields = array_filter(
+        $highlight_fields, function ($v) {
+        return preg_match('/^t.?[sm]_/', $v) || preg_match('/^s[sm]_/', $v);
+      }
+      );
+    }
+
+    foreach ($highlight_fields as $highlighted_field) {
+      // We must not set the fields at once using setFields() to not break
+      // the altered queries.
+      $hl->addField($highlighted_field);
+    }
+    // This needs a setting. 500K is a lot, but there are books with millions.
+    $solarium_query->addParam('hl.maxAnalyzedChars', '500000');
+  }
 }
 
 /**
