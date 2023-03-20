@@ -131,3 +131,15 @@ strawberryfield.ado_tools:
     parameters:
       node:
         type: 'entity:node'
+strawberryfield.ado_tools_children:
+  path: '/node/{node}/adotools/children'
+  defaults:
+    _controller: '\Drupal\strawberryfield\Controller\StrawberryfieldAdoRenderChildrenController::renderAdoChildrenViews'
+    _title: 'Ado Children'
+  requirements:
+    _entity_access: 'node.update'
+  options:
+    _node_operation_route: TRUE
+    parameters:
+      node:
+        type: 'entity:node'

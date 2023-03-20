@@ -21,3 +21,14 @@ strawberryfield.ado_tools:
   route_name: strawberryfield.ado_tools
   base_route: entity.node.canonical
   title: 'ADO Tools'
+strawberryfield.ado_tools_jmespath:
+  route_name: strawberryfield.ado_tools
+  base_route: entity.node.canonical
+  title: 'JMESPATH'
+  parent_id: strawberryfield.ado_tools
+
+strawberryfield.ado_tools_children:
+  route_name: strawberryfield.ado_tools_children
+  base_route: entity.node.canonical
+  title: 'ADO Children'
+  parent_id: strawberryfield.ado_tools
