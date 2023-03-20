@@ -32,12 +32,6 @@ class StrawberryfieldAdoRenderChildrenController extends ControllerBase {
         }
       }
     }
-    if(!empty($return)) {
-      return $return;
-    } else {
-      \Drupal::logger('strawberryfield')
-      ->notice('To view ADO tools children create views called ado_tools_children and/or ado_tools_children_creative_work_series.');
-      return $return;
-    }
+    return $return;
   }
 }
