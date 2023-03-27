@@ -110,7 +110,7 @@ class StrawberryfieldEventPresaveSubscriberSetTitlefromMetadata extends Strawber
           $title = NULL;
           if ($jmespath_for_label) {
             try {
-              // Evaluate the JMESPATH.
+              // Evaluate the JMESPath Expression.
               $title = $itemfield->searchPath($jmespath_for_label);
               $title = is_array($title) ? reset($title) : $title;
               if (!is_scalar($title) || strlen(trim($title)) == 0) {
@@ -134,7 +134,8 @@ class StrawberryfieldEventPresaveSubscriberSetTitlefromMetadata extends Strawber
           }
 
           if (!$title) {
-            // Always default to original label in case the JMESPATH expression failed.
+            // Defaults to the original label key in case the JMESPATH expression failed.
+            // But will preserve the NODE Title if that was present during the failure
             $labelsource = isset($full['label']) ? $full : $itemfield->provideFlatten();
             // @TODO Should we allow which JSON key sets the label a setting?
             if (isset($labelsource['label'])) {
@@ -162,7 +163,7 @@ class StrawberryfieldEventPresaveSubscriberSetTitlefromMetadata extends Strawber
       }
 
       // If at this stage we have no entity label, but maybe its just not in our metadata,
-      // or someone forget to set a label key and the jmespath failed.
+      // or someone forget to set a label key and/or the an `ap:tasks` set jmespath failed.
       if (!$entity->label()) {
         // Means we need a title, got nothing from metadata or node, dealing with it.
         $title = $this->t(
