@@ -6,6 +6,7 @@ use Drupal\Component\Utility\Html;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Plugin\PluginFormInterface;
 use Drupal\search_api\Plugin\search_api\processor\Highlight;
+use Drupal\search_api\Query\Query;
 use Drupal\search_api\Query\QueryInterface;
 use Drupal\search_api\Query\ResultSetInterface;
 use Drupal\search_api\Utility\Utility;
@@ -193,7 +194,13 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
    * {@inheritdoc}
    */
   public function postprocessSearchResults(ResultSetInterface $results) {
+
     $query = $results->getQuery();
+    $tags = $query->getTags();
+    // Don't run this on autocompletes!
+    if (isset($tags['search_api_autocomplete'])) {
+      return;
+    }
     if (!$results->getResultCount()
       || $query->getProcessingLevel() != QueryInterface::PROCESSING_FULL
       || !($keys = $this->getKeywordsParseModeAware($query, $query->getParseMode()->getPluginId()))) {
@@ -206,6 +213,42 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
     }
 
     $result_items = $results->getResultItems();
+
+    // If a join query is present we will use its current config to trigger a quick
+    // strawberry flavor solr query to highlight the current returned ADOs/NODE IDs
+    // based on the existing $results->getQuery()->getOption('sbf_join_flavor') array
+    if ($results->getQuery()->getOption('sbf_join_flavor') &&
+      $this->configuration['highlight_processing'] == 'backend') {
+      $fetched_ids = [];
+      $from_solr_highlight_fields = [];
+      foreach ($result_items as $item) {
+        // The tracker methods above prepend the datasource id, so we need to
+        // workaround it by removing it beforehand.
+        [$datasource, $raw_id] = Utility::splitCombinedId($item->getId());
+        $raw_id = explode(':', $raw_id);
+        if ($raw_id) {
+          $fetched_ids[] = reset($raw_id);
+        }
+      }
+      if (count($fetched_ids)) {
+        // Calls direct Solr Highlight from Source.
+        $from_solr_highlight_fields = $this->highlightFlavorsFromIndex($query, $fetched_ids);
+        foreach ($from_solr_highlight_fields as $item_id => $highlights) {
+          // Check if there are highlights for our matches
+          if (isset($result_items[$item_id]) && is_array($highlights)) {
+            $item_highlight = [];
+            $item_highlight_keys = [];
+            $item_highlight = $result_items[$item_id]->getExtraData('highlighted_fields', []);
+            $item_highlight_keys = $result_items[$item_id]->getExtraData('highlighted_keys', []);
+            $item_highlight = array_merge($item_highlight, $highlights['highlighted_fields']);
+            $item_highlight_keys = array_unique(array_merge($item_highlight_keys, $highlights['highlighted_keys']));
+            $result_items[$item_id]->setExtraData('highlighted_fields', $item_highlight);
+            $result_items[$item_id]->setExtraData('highlighted_keys', $item_highlight_keys);
+          }
+        }
+      }
+    }
+
     if ($this->configuration['excerpt']) {
       $this->addExcerpts($result_items, $excerpt_fulltext_fields, $keys);
     }
@@ -242,7 +285,7 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
       if ($this->configuration['highlight_processing'] == 'backend') {
         $backed_highlight = $results[$item_id]->getExtraData('highlighted_fields',[]);
         foreach($backed_highlight as $key => $backed_highlight_values) {
-          if ($this->configuration['highlight_link'] && in_array($key,$items['linkable_fields'])) {
+          if ($this->configuration['highlight_link'] && in_array($key, $items['linkable_fields'])) {
             $linkable_text = array_merge($linkable_text, $backed_highlight_values ?? []);
           }
           else {
@@ -370,7 +413,7 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
     if (!$keywords_in) {
       return [];
     }
-    // Assure there are no duplicates. (This is actually faster than
+    // Ensure there are no duplicates. (This is actually faster than
     // array_unique() by a factor of 3 to 4.)
     // Remove quotes from keywords.
     $keywords = [];
@@ -876,4 +919,67 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
     return $highlighted_fields;
   }
 
+  /**
+   * Fetches highlighted matches for SB Flavours from backend.
+   *
+   * @param \Drupal\search_api\Query\QueryInterface $query
+   * @param  array $entities
+   *   A list of NODE IDs to limit the query against.
+   *
+   * @return array
+   * @throws \Drupal\search_api\SearchApiException
+   */
+  public function highlightFlavorsFromIndex(QueryInterface $query, array $entities) {
+
+    $parse_mode_manager = $query->getParseModeManager();
+    $highlighted_fields = [];
+    $results = [];
+    //@TODO make which Flavors (OCR, web, etc) are fetched either a config or part of
+    // $query->getOption('sbf_join_flavor') structure.
+    if ($parse_mode_manager && count($entities)) {
+      /** @var \Drupal\search_api\ParseMode\ParseModeInterface $parse_mode_direct */
+      $parse_mode_direct = $parse_mode_manager->createInstance('direct');
+      $flavor_query = new Query($this->index,  [
+        'limit'  => 200, //count($entities)?,
+        'offset' => 0,
+      ]);
+
+      $flavor_query->setParseMode($parse_mode_direct);
+      $combined_keys = $query->getOption('sbf_join_flavor')['v'];
+      $group_options = [
+        'use_grouping' => TRUE,
+        'fields' => ['parent_id'],
+        'truncate' => TRUE,
+        'group_limit' => 1,
+        'group_sort' => [],
+      ];
+      $flavor_query->setOption('search_api_grouping', $group_options);
+      $flavor_query->keys("{$combined_keys}");
+      $flavor_query->addCondition('parent_id', $entities, 'IN');
+
+      // This is just to avoid Search API rewriting the query
+      $flavor_query->setOption('solr_param_defType', 'edismax');
+      // This will allow us to remove the edismax processor on a hook/event subscriber.
+      $flavor_query->setOption('sbf_advanced_highlight_flavor', TRUE);
+      $flavor_query->addCondition('search_api_datasource', 'strawberryfield_flavor_datasource');
+      // Flavors inherit permissions of a NODE. If not accesible this will never be called
+      $flavor_query->setOption('search_api_bypass_access', TRUE);
+      $flavor_query->setFulltextFields([]);
+      $flavor_query->setProcessingLevel(QueryInterface::PROCESSING_BASIC);
+      $flavor_query->setOption('search_api_retrieved_field_values', ['parent_id' => 'parent_id','processor_id'=> 'processor_id']);
+      $results = $flavor_query->execute();
+      foreach ($results as $item_id => $item) {
+        [$unused, $item_id] = Utility::splitCombinedId($item->getId());
+        $item_id = explode(':', $item_id);
+        if ($item_id && count($item_id) == 5) {
+          // For now this is fixed SBF can not be generated by other Entity Types
+          $node_id = 'entity:node/' . $item_id[0].':'.$item_id[2];
+          // ocr is 4, File id is 1,
+          $highlighted_fields[$node_id]['highlighted_fields'] = $item->getExtraData('highlighted_fields', []);
+          $highlighted_fields[$node_id]['highlighted_keys'] = $item->getExtraData('highlighted_keys', []);
+        }
+      }
+    }
+    return $highlighted_fields;
+  }
 }

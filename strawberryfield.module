@@ -23,9 +23,11 @@ use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Field\FieldItemListInterface;
 use Solarium\Core\Query\QueryInterface as SolariumQueryInterface;
+use Solarium\Component\ComponentAwareQueryInterface;
 use Drupal\Core\Entity\Display\EntityViewDisplayInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\node\NodeInterface;
+
 
 /**
  * Implements hook_ENTITY_TYPE_presave().
@@ -382,14 +384,41 @@ function strawberryfield_search_api_solr_query_alter(SolariumQueryInterface $sol
       }
       );
     }
+    else {
+      $hl->setRequireFieldMatch(TRUE);
+    }
 
     foreach ($highlight_fields as $highlighted_field) {
       // We must not set the fields at once using setFields() to not break
       // the altered queries.
       $hl->addField($highlighted_field);
     }
-    // This needs a setting. 500K is a lot, but there are books with millions.
-    $solarium_query->addParam('hl.maxAnalyzedChars', '500000');
+    $hl->setRequireFieldMatch(TRUE);
+  }
+}
+
+function strawberryfield_search_api_solr_converted_query_alter(SolariumQueryInterface $solarium_query, QueryInterface $query) {
+  if ($query->getOption('sbf_advanced_highlight_flavor',FALSE)) {
+    $components = $solarium_query->getComponents();
+    if (isset($components['edismax'])) {
+      $solarium_query->removeComponent(
+        ComponentAwareQueryInterface::COMPONENT_EDISMAX
+      );
+      $solarium_query->addParam('defType', 'lucene');
+      $hl = $solarium_query->getHighlighting();
+      $hl->setRequireFieldMatch(TRUE);
+      //$hl->setMethod('unified'); This requires omitTermFreqAndPositions=FALSE;
+      // @TODO make this a setting? 128 feels like a decent number TBH.
+      $hl->setFragSize(128);
+      $hl->setDefaultSummary(TRUE);
+      // Because the Query Sets a few Fields to retrieve (to make it faster)
+      // But Search API is silly and decides that when that happens
+      // I want only those fields highlighted
+      // By setting the to all but limiting it to setRequireFieldMatch we only the matched ones.
+      $hl->setFields(['*']);
+      $hl->setFragsizeIsMinimum(FALSE);
+
+    }
   }
 }
 
