@@ -23,6 +23,11 @@ use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Field\FieldItemListInterface;
 use Solarium\Core\Query\QueryInterface as SolariumQueryInterface;
+use Solarium\Component\ComponentAwareQueryInterface;
+use Drupal\Core\Entity\Display\EntityViewDisplayInterface;
+use Drupal\Core\Entity\EntityInterface;
+use Drupal\node\NodeInterface;
+
 
 /**
  * Implements hook_ENTITY_TYPE_presave().
@@ -367,6 +372,54 @@ function strawberryfield_search_api_solr_query_alter(SolariumQueryInterface $sol
       $solarium_query->addParam('hl.method', 'UnifiedHighlighter');
     }
   }
+  elseif ($query->getOption('highlight_reduce_return', FALSE)) {
+    // ELSEIF bc OCR and these ones are incompatible
+    /* @var \Solarium\Component\Highlighting\Highlighting $hl */
+    $hl = $solarium_query->getHighlighting();
+    $highlight_fields = $query->getOption('highlight_reduce_return',[]);
+    if ($highlight_fields != ['*']) {
+      $highlight_fields = array_filter(
+        $highlight_fields, function ($v) {
+        return preg_match('/^t.?[sm]_/', $v) || preg_match('/^s[sm]_/', $v);
+      }
+      );
+    }
+    else {
+      $hl->setRequireFieldMatch(TRUE);
+    }
+
+    foreach ($highlight_fields as $highlighted_field) {
+      // We must not set the fields at once using setFields() to not break
+      // the altered queries.
+      $hl->addField($highlighted_field);
+    }
+    $hl->setRequireFieldMatch(TRUE);
+  }
+}
+
+function strawberryfield_search_api_solr_converted_query_alter(SolariumQueryInterface $solarium_query, QueryInterface $query) {
+  if ($query->getOption('sbf_advanced_highlight_flavor',FALSE)) {
+    $components = $solarium_query->getComponents();
+    if (isset($components['edismax'])) {
+      $solarium_query->removeComponent(
+        ComponentAwareQueryInterface::COMPONENT_EDISMAX
+      );
+      $solarium_query->addParam('defType', 'lucene');
+      $hl = $solarium_query->getHighlighting();
+      $hl->setRequireFieldMatch(TRUE);
+      //$hl->setMethod('unified'); This requires omitTermFreqAndPositions=FALSE;
+      // @TODO make this a setting? 128 feels like a decent number TBH.
+      $hl->setFragSize(128);
+      $hl->setDefaultSummary(TRUE);
+      // Because the Query Sets a few Fields to retrieve (to make it faster)
+      // But Search API is silly and decides that when that happens
+      // I want only those fields highlighted
+      // By setting the to all but limiting it to setRequireFieldMatch we only the matched ones.
+      $hl->setFields(['*']);
+      $hl->setFragsizeIsMinimum(FALSE);
+
+    }
+  }
 }
 
 /**
@@ -379,5 +432,33 @@ function strawberryfield_cron() {
   // Is invoked but never with `drush cron`
   if (PHP_SAPI != 'cli') {
     \Drupal::getContainer()->get('strawberryfield.hydroponics')->run();
+  }
+}
+
+/**
+ * Implements hook_entity_view_alter().
+ */
+function strawberryfield_entity_view_alter(array &$build, EntityInterface $entity, EntityViewDisplayInterface $display) {
+  $excerpt_component = $display->getComponent('search_api_excerpt');
+  if ($excerpt_component !== NULL && $entity instanceof NodeInterface && $entity->view ?? NULL) {
+    if (\Drupal::request()->getMethod() == 'GET' ) {
+      // Check if the current index has lazy_excerpt enabled...
+      if ($processor = ($entity->view->getQuery()->getIndex()->getProcessors(
+        )['sbf_highlight'] ?? NULL)
+      ) {
+        if ($processor->getConfiguration()['lazy_excerpt']) {
+          $cid = 'entity:' . $entity->getEntityTypeId() . '/' . $entity->id()
+            . ':'
+            . $entity->language()->getId();
+          $build['search_api_excerpt'] = [
+            '#lazy_builder'       => [
+              'strawberryfield.lazy_builders:renderExcerpt',
+              [$cid, 'node:'.$entity->id()]
+            ],
+            '#create_placeholder' => TRUE,
+          ];
+        }
+      }
+    }
   }
 }

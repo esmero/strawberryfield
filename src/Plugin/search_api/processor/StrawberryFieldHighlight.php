@@ -6,8 +6,10 @@ use Drupal\Component\Utility\Html;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Plugin\PluginFormInterface;
 use Drupal\search_api\Plugin\search_api\processor\Highlight;
+use Drupal\search_api\Query\Query;
 use Drupal\search_api\Query\QueryInterface;
 use Drupal\search_api\Query\ResultSetInterface;
+use Drupal\search_api\Utility\Utility;
 
 /**
  * Adds a highlighted excerpt to results and highlights returned fields.
@@ -27,6 +29,13 @@ use Drupal\search_api\Query\ResultSetInterface;
 class StrawberryFieldHighlight extends Highlight implements PluginFormInterface {
 
   /**
+   * The data lazy loader for the excerpt.
+   *
+   * @var \Drupal\strawberryfield\StrawberryfieldLazyBuilders|null
+   */
+  protected $lazyLoader;
+
+  /**
    * {@inheritdoc}
    */
   public function defaultConfiguration() {
@@ -40,6 +49,7 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
       'highlight_processing' => 'backend',
       'highlight_partial' => FALSE,
       'exclude_fields' => [],
+      'lazy_excerpt' => FALSE,
     ];
   }
 
@@ -118,6 +128,20 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
       ],
     ];
 
+    $form['lazy_excerpt'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Use lazy loader to deliver excerpts on GET http calls'),
+      '#description' => $this->t('When enabled, we will try to deliver on GET requests Excerpts via a Lazy Loading mechanism to bypass global Entity Cache. This is experimental and might deliver stale caches.'),
+      '#default_value' => $this->configuration['lazy_excerpt'],
+      '#states' => [
+        'visible' => [
+          ":input[name=\"{$parent_name}[excerpt]\"]" => [
+            'checked' => TRUE,
+          ],
+        ],
+      ],
+    ];
+
     // Exclude certain fulltext fields.
     $fields = $this->index->getFields();
     $fulltext_fields = [];
@@ -156,12 +180,27 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
     return $form;
   }
 
+  /**
+   * Retrieves the data type helper.
+   *
+   * @return \Drupal\search_api\Utility\DataTypeHelperInterface
+   *   The data type helper.
+   */
+  public function getLazyLoader() {
+    return $this->lazyLoader ?: \Drupal::service('strawberryfield.lazy_builders');
+  }
 
   /**
    * {@inheritdoc}
    */
   public function postprocessSearchResults(ResultSetInterface $results) {
+
     $query = $results->getQuery();
+    $tags = $query->getTags();
+    // Don't run this on autocompletes!
+    if (isset($tags['search_api_autocomplete'])) {
+      return;
+    }
     if (!$results->getResultCount()
       || $query->getProcessingLevel() != QueryInterface::PROCESSING_FULL
       || !($keys = $this->getKeywordsParseModeAware($query, $query->getParseMode()->getPluginId()))) {
@@ -174,6 +213,42 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
     }
 
     $result_items = $results->getResultItems();
+
+    // If a join query is present we will use its current config to trigger a quick
+    // strawberry flavor solr query to highlight the current returned ADOs/NODE IDs
+    // based on the existing $results->getQuery()->getOption('sbf_join_flavor') array
+    if ($results->getQuery()->getOption('sbf_join_flavor') &&
+      $this->configuration['highlight_processing'] == 'backend') {
+      $fetched_ids = [];
+      $from_solr_highlight_fields = [];
+      foreach ($result_items as $item) {
+        // The tracker methods above prepend the datasource id, so we need to
+        // workaround it by removing it beforehand.
+        [$datasource, $raw_id] = Utility::splitCombinedId($item->getId());
+        $raw_id = explode(':', $raw_id);
+        if ($raw_id) {
+          $fetched_ids[] = reset($raw_id);
+        }
+      }
+      if (count($fetched_ids)) {
+        // Calls direct Solr Highlight from Source.
+        $from_solr_highlight_fields = $this->highlightFlavorsFromIndex($query, $fetched_ids);
+        foreach ($from_solr_highlight_fields as $item_id => $highlights) {
+          // Check if there are highlights for our matches
+          if (isset($result_items[$item_id]) && is_array($highlights)) {
+            $item_highlight = [];
+            $item_highlight_keys = [];
+            $item_highlight = $result_items[$item_id]->getExtraData('highlighted_fields', []);
+            $item_highlight_keys = $result_items[$item_id]->getExtraData('highlighted_keys', []);
+            $item_highlight = array_merge($item_highlight, $highlights['highlighted_fields']);
+            $item_highlight_keys = array_unique(array_merge($item_highlight_keys, $highlights['highlighted_keys']));
+            $result_items[$item_id]->setExtraData('highlighted_fields', $item_highlight);
+            $result_items[$item_id]->setExtraData('highlighted_keys', $item_highlight_keys);
+          }
+        }
+      }
+    }
+
     if ($this->configuration['excerpt']) {
       $this->addExcerpts($result_items, $excerpt_fulltext_fields, $keys);
     }
@@ -197,6 +272,7 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
    *   The search keys to use for highlighting.
    */
   protected function addExcerpts(array $results, array $fulltext_fields, array $keys) {
+
     $items = $this->getFulltextFields($results, $fulltext_fields, FALSE);
 
     foreach ($items['fulltext'] as $item_id => $item) {
@@ -209,7 +285,7 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
       if ($this->configuration['highlight_processing'] == 'backend') {
         $backed_highlight = $results[$item_id]->getExtraData('highlighted_fields',[]);
         foreach($backed_highlight as $key => $backed_highlight_values) {
-          if ($this->configuration['highlight_link'] && in_array($key,$items['linkable_fields'])) {
+          if ($this->configuration['highlight_link'] && in_array($key, $items['linkable_fields'])) {
             $linkable_text = array_merge($linkable_text, $backed_highlight_values ?? []);
           }
           else {
@@ -267,7 +343,7 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
       // Bit of an overkill to check for the config again
       // but i do overcheck.
       if ($this->configuration['highlight_link'] && is_array($linkable_text) && count($linkable_text)) {
-        $linked_excerpt = $this->createExcerpt(
+        $linked_excerpt = $this->createExcerptFromBackend(
           implode($this->getEllipses()[1], $linkable_text), $item_keys
         );
         $excerpt_return[] = $this->highlightFieldWithLinks(
@@ -275,6 +351,12 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
           ) ?? '';
       }
 
+      if (\Drupal::request()->getMethod() == 'GET' && $this->configuration['lazy_excerpt']) {
+        $cid = $results[$item_id]->getId();
+        $this->getLazyLoader()->setExcerpt(
+          $cid, implode('<br/>', $excerpt_return)
+        );
+      }
       $results[$item_id]->setExcerpt(implode('<br/>', $excerpt_return));
     }
   }
@@ -331,7 +413,7 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
     if (!$keywords_in) {
       return [];
     }
-    // Assure there are no duplicates. (This is actually faster than
+    // Ensure there are no duplicates. (This is actually faster than
     // array_unique() by a factor of 3 to 4.)
     // Remove quotes from keywords.
     $keywords = [];
@@ -560,6 +642,177 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
     return $excerpt;
   }
 
+  /**
+   * Returns snippets from a piece of text, but does not highlight.
+   *
+   * Modified from the parent class to not run highlight.
+   *
+   * @param string $text
+   *   The text to extract fragments from.
+   * @param array $keys
+   *   The search keywords entered by the user.
+   *
+   * @return string|null
+   *   A string containing text for the excerpt. Or NULL if no excerpt could be
+   *   created.
+   */
+  protected function createExcerptFromBackend($text, array $keys) {
+    // Remove HTML tags <script> and <style> with all of their contents.
+    $text = preg_replace('#<(style|script).*?>.*?</\1>#is', ' ', $text);
+
+    // Prepare text by stripping HTML tags and decoding HTML entities.
+    $text = strip_tags(str_replace(['<', '>'], [' <', '> '], $text),['HIGHLIGHT']);
+    $text = Html::decodeEntities($text);
+    $text = preg_replace('/\s+/', ' ', $text);
+    $text = trim($text, ' ');
+    $text_length = mb_strlen($text);
+
+    // Try to reach the requested excerpt length with about two fragments (each
+    // with a keyword and some context).
+    $ranges = [];
+    $length = 0;
+    $look_start = [];
+    $remaining_keys = $keys;
+
+    // Get the set excerpt length from the configuration. If the length is too
+    // small, only use one fragment.
+    $excerpt_length = $this->configuration['excerpt_length'];
+    $context_length = round($excerpt_length / 4) - 3;
+    if ($context_length < 32) {
+      $context_length = round($excerpt_length / 2) - 1;
+    }
+
+    while ($length < $excerpt_length && !empty($remaining_keys)) {
+      $found_keys = [];
+      foreach ($remaining_keys as $key) {
+        if ($length >= $excerpt_length) {
+          break;
+        }
+
+        // Remember where we last found $key, in case we are coming through a
+        // second time.
+        if (!isset($look_start[$key])) {
+          $look_start[$key] = 0;
+        }
+
+        // See if we can find $key after where we found it the last time. Since
+        // we are requiring a match on a word boundary, make sure $text starts
+        // and ends with a space.
+        $matches = [];
+
+        if (!$this->configuration['highlight_partial']) {
+          $found_position = FALSE;
+          $regex = '/' . static::$boundary . preg_quote($key, '/') . static::$boundary . '/iu';
+          // $look_start contains the position as character offset, while
+          // preg_match() takes a byte offset.
+          $offset = $look_start[$key];
+          if ($offset > 0) {
+            $offset = strlen(mb_substr(' ' . $text, 0, $offset));
+          }
+          if (preg_match($regex, ' ' . $text . ' ', $matches, PREG_OFFSET_CAPTURE, $offset)) {
+            $found_position = $matches[0][1];
+            // Convert the byte position into a multi-byte character position.
+            $found_position = mb_strlen(substr(" $text", 0, $found_position));
+          }
+        }
+        else {
+          $found_position = mb_stripos($text, $key, $look_start[$key], 'UTF-8');
+        }
+        if ($found_position !== FALSE) {
+          $look_start[$key] = $found_position + 1;
+          // Keep track of which keys we found this time, in case we need to
+          // pass through again to find more text.
+          $found_keys[] = $key;
+
+          // Locate a space before and after this match, leaving some context on
+          // each end.
+          if ($found_position > $context_length) {
+            $before = mb_strpos($text, ' ', $found_position - $context_length);
+            if ($before !== FALSE) {
+              ++$before;
+            }
+            // If we can’t find a space anywhere within the context length, just
+            // settle for a non-space.
+            if ($before === FALSE || $before > $found_position) {
+              $before = $found_position - $context_length;
+            }
+          }
+          else {
+            $before = 0;
+          }
+          if ($before !== FALSE && $before <= $found_position) {
+            if ($text_length > $found_position + $context_length) {
+              $after = mb_strrpos(mb_substr($text, 0, $found_position + $context_length), ' ', $found_position);
+            }
+            else {
+              $after = $text_length;
+            }
+            if ($after !== FALSE && $after > $found_position) {
+              if ($before < $after) {
+                // Save this range.
+                $ranges[$before] = $after;
+                $length += $after - $before;
+              }
+            }
+          }
+        }
+      }
+      // Next time through this loop, only look for keys we found this time,
+      // if any.
+      $remaining_keys = $found_keys;
+    }
+
+    if (!$ranges) {
+      // We didn't find any keyword matches, return NULL.
+      return NULL;
+    }
+
+    // Sort the text ranges by starting position.
+    ksort($ranges);
+
+    // Collapse overlapping text ranges into one. The sorting makes it O(n).
+    $new_ranges = [];
+    $working_from = $working_to = NULL;
+    foreach ($ranges as $this_from => $this_to) {
+      if ($working_from === NULL) {
+        // This is the first time through this loop: initialize.
+        $working_from = $this_from;
+        $working_to = $this_to;
+        continue;
+      }
+      if ($this_from <= $working_to) {
+        // The ranges overlap: combine them.
+        $working_to = max($working_to, $this_to);
+      }
+      else {
+        // The ranges do not overlap: save the working range and start a new
+        // one.
+        $new_ranges[$working_from] = $working_to;
+        $working_from = $this_from;
+        $working_to = $this_to;
+      }
+    }
+    // Save the remaining working range.
+    $new_ranges[$working_from] = $working_to;
+
+    // Fetch text within the combined ranges we found.
+    $out = [];
+    foreach ($new_ranges as $from => $to) {
+      $out[] = Html::escape(mb_substr($text, $from, $to - $from));
+    }
+    if (!$out) {
+      return NULL;
+    }
+    //^.+?(?=<HIGLIGHT>)+|(?<=<\/HIGHLIGHT>).*
+
+    $ellipses = $this->getEllipses();
+    $excerpt = $ellipses[0] . implode($ellipses[1], $out) . $ellipses[2];
+
+    // Since we stripped the tags at the beginning, highlighting doesn't need to
+    // handle HTML anymore.
+    return $excerpt;
+  }
+
 
   /**
    * Marks occurrences of the search keywords in a text field.
@@ -666,4 +919,67 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
     return $highlighted_fields;
   }
 
+  /**
+   * Fetches highlighted matches for SB Flavours from backend.
+   *
+   * @param \Drupal\search_api\Query\QueryInterface $query
+   * @param  array $entities
+   *   A list of NODE IDs to limit the query against.
+   *
+   * @return array
+   * @throws \Drupal\search_api\SearchApiException
+   */
+  public function highlightFlavorsFromIndex(QueryInterface $query, array $entities) {
+
+    $parse_mode_manager = $query->getParseModeManager();
+    $highlighted_fields = [];
+    $results = [];
+    //@TODO make which Flavors (OCR, web, etc) are fetched either a config or part of
+    // $query->getOption('sbf_join_flavor') structure.
+    if ($parse_mode_manager && count($entities)) {
+      /** @var \Drupal\search_api\ParseMode\ParseModeInterface $parse_mode_direct */
+      $parse_mode_direct = $parse_mode_manager->createInstance('direct');
+      $flavor_query = new Query($this->index,  [
+        'limit'  => 200, //count($entities)?,
+        'offset' => 0,
+      ]);
+
+      $flavor_query->setParseMode($parse_mode_direct);
+      $combined_keys = $query->getOption('sbf_join_flavor')['v'];
+      $group_options = [
+        'use_grouping' => TRUE,
+        'fields' => ['parent_id'],
+        'truncate' => TRUE,
+        'group_limit' => 1,
+        'group_sort' => [],
+      ];
+      $flavor_query->setOption('search_api_grouping', $group_options);
+      $flavor_query->keys("{$combined_keys}");
+      $flavor_query->addCondition('parent_id', $entities, 'IN');
+
+      // This is just to avoid Search API rewriting the query
+      $flavor_query->setOption('solr_param_defType', 'edismax');
+      // This will allow us to remove the edismax processor on a hook/event subscriber.
+      $flavor_query->setOption('sbf_advanced_highlight_flavor', TRUE);
+      $flavor_query->addCondition('search_api_datasource', 'strawberryfield_flavor_datasource');
+      // Flavors inherit permissions of a NODE. If not accesible this will never be called
+      $flavor_query->setOption('search_api_bypass_access', TRUE);
+      $flavor_query->setFulltextFields([]);
+      $flavor_query->setProcessingLevel(QueryInterface::PROCESSING_BASIC);
+      $flavor_query->setOption('search_api_retrieved_field_values', ['parent_id' => 'parent_id','processor_id'=> 'processor_id']);
+      $results = $flavor_query->execute();
+      foreach ($results as $item_id => $item) {
+        [$unused, $item_id] = Utility::splitCombinedId($item->getId());
+        $item_id = explode(':', $item_id);
+        if ($item_id && count($item_id) == 5) {
+          // For now this is fixed SBF can not be generated by other Entity Types
+          $node_id = 'entity:node/' . $item_id[0].':'.$item_id[2];
+          // ocr is 4, File id is 1,
+          $highlighted_fields[$node_id]['highlighted_fields'] = $item->getExtraData('highlighted_fields', []);
+          $highlighted_fields[$node_id]['highlighted_keys'] = $item->getExtraData('highlighted_keys', []);
+        }
+      }
+    }
+    return $highlighted_fields;
+  }
 }
