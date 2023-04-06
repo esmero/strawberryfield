@@ -317,7 +317,17 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
       if ($highlighted_keys) {
         $item_keys = array_unique(array_merge($keys, $highlighted_keys));
       }
-      if ($this->configuration['highlight_link'] ?? FALSE) {
+
+      $excerpt_return = [];
+
+      if (is_array($text) && count($text)) {
+        $excerpt = $this->createExcerpt(
+          implode($this->getEllipses()[1], $text), $item_keys
+        );
+        $excerpt_return[] = $this->highlightField($excerpt, $item_keys, FALSE);
+      }
+
+      if (($this->configuration['highlight_link']  ?? FALSE ) && is_array($linkable_text) && count($linkable_text)) {
         try {
           $uri = $results[$item_id]->getDatasource()->getItemUrl($results[$item_id]->getOriginalObject());
           $uri->setOptions(['fragment' => 'search/'.reset($item_keys)]);
@@ -329,20 +339,9 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
           }
         }
         catch (\Exception $e) {
-          $this->getLogger()->warning('Error happened trying to load the entity for Linked and generate a link highlight', []);
+          $this->getLogger('strawberryfield')->warning('Error happened trying to load an entity to generate a link highlight', []);
         }
-      }
-      $excerpt_return = [];
 
-      if (is_array($text) && count($text)) {
-        $excerpt = $this->createExcerpt(
-          implode($this->getEllipses()[1], $text), $item_keys
-        );
-        $excerpt_return[] = $this->highlightField($excerpt, $item_keys, FALSE);
-      }
-      // Bit of an overkill to check for the config again
-      // but i do overcheck.
-      if ($this->configuration['highlight_link'] && is_array($linkable_text) && count($linkable_text)) {
         $linked_excerpt = $this->createExcerptFromBackend(
           implode($this->getEllipses()[1], $linkable_text), $item_keys
         );
@@ -409,20 +408,26 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
       return $this->flattenKeysArray($keys);
     }
 
-    $keywords_in = preg_split(static::$split, $keys);
-    if (!$keywords_in) {
+    $keywords_and_phrases = [];
+    if (preg_match_all('/"(?:\\\\.|[^\\\\"])*"|\S+/', $keys, $keywords_and_phrases)) {
+      $keywords_in = $keywords_and_phrases[0] ?? NULL;
+      if (!$keywords_in) {
+        return [];
+      }
+      // Ensure there are no duplicates. (This is actually faster than
+      // array_unique() by a factor of 3 to 4.)
+      // Remove quotes from keywords.
+      $keywords = [];
+      foreach (array_filter($keywords_in) as $keyword) {
+        if ($keyword = trim($keyword, "'\"")) {
+          $keywords[$keyword] = $keyword;
+        }
+      }
+      return $keywords;
+    }
+    else {
       return [];
     }
-    // Ensure there are no duplicates. (This is actually faster than
-    // array_unique() by a factor of 3 to 4.)
-    // Remove quotes from keywords.
-    $keywords = [];
-    foreach (array_filter($keywords_in) as $keyword) {
-      if ($keyword = trim($keyword, "'\"")) {
-        $keywords[$keyword] = $keyword;
-      }
-    }
-    return $keywords;
   }
 
   /**
@@ -837,7 +842,7 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
         $args = [
           '%error_num' => preg_last_error(),
         ];
-        $this->getLogger()->warning('A PCRE error (#%error_num) occurred during Advanced results highlighting with Links.', $args);
+        $this->getLogger('strawberryfield')->warning('A PCRE error (#%error_num) occurred during Advanced results highlighting with Links.', $args);
         return $text;
       }
       $textsCount = count($texts);
@@ -939,44 +944,68 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
     if ($parse_mode_manager && count($entities)) {
       /** @var \Drupal\search_api\ParseMode\ParseModeInterface $parse_mode_direct */
       $parse_mode_direct = $parse_mode_manager->createInstance('direct');
-      $flavor_query = new Query($this->index,  [
-        'limit'  => 200, //count($entities)?,
+      $flavor_query = new Query(
+        $this->index, [
+        'limit' => 200, //count($entities)?,
         'offset' => 0,
-      ]);
+      ]
+      );
 
       $flavor_query->setParseMode($parse_mode_direct);
-      $combined_keys = $query->getOption('sbf_join_flavor')['v'];
-      $group_options = [
-        'use_grouping' => TRUE,
-        'fields' => ['parent_id'],
-        'truncate' => TRUE,
-        'group_limit' => 1,
-        'group_sort' => [],
-      ];
-      $flavor_query->setOption('search_api_grouping', $group_options);
-      $flavor_query->keys("{$combined_keys}");
-      $flavor_query->addCondition('parent_id', $entities, 'IN');
+      // Important NOTE: e.g if you are using a global AND, means for a search
+      // ALL WORDS need to match, this in NO CASE means all the words need to match
+      // THE OCR flavor or any flavor. The combined result (JOIN time + main query) need to match
+      // SO here we can not use the 'v' from $query->getOption('sbf_join_flavor')['v']; that was used
+      // to generate the JOIN because only on rare cases (e.g ONLY OCR matched all) will give us
+      // any highlights. This is a complexity of our process
+      // and OK if we handle this differently.
+      // Just in case someone tried to copy the code without understanding, let's be safe
+      $combined_keys = $query->getOption('sbf_join_flavor')['hl'] ??
+        ($query->getOption('sbf_join_flavor')['v'] ?? NULL);
+      if ($combined_keys && is_string($combined_keys)
+        && strlen(
+          trim($combined_keys)
+        ) > 0
+      ) {
+        $group_options = [
+          'use_grouping' => TRUE,
+          'fields'       => ['parent_id'],
+          'truncate'     => TRUE,
+          'group_limit'  => 1,
+          'group_sort'   => [],
+        ];
+        $flavor_query->setOption('search_api_grouping', $group_options);
+        $flavor_query->keys("{$combined_keys}");
+        $flavor_query->addCondition('parent_id', $entities, 'IN');
 
-      // This is just to avoid Search API rewriting the query
-      $flavor_query->setOption('solr_param_defType', 'edismax');
-      // This will allow us to remove the edismax processor on a hook/event subscriber.
-      $flavor_query->setOption('sbf_advanced_highlight_flavor', TRUE);
-      $flavor_query->addCondition('search_api_datasource', 'strawberryfield_flavor_datasource');
-      // Flavors inherit permissions of a NODE. If not accesible this will never be called
-      $flavor_query->setOption('search_api_bypass_access', TRUE);
-      $flavor_query->setFulltextFields([]);
-      $flavor_query->setProcessingLevel(QueryInterface::PROCESSING_BASIC);
-      $flavor_query->setOption('search_api_retrieved_field_values', ['parent_id' => 'parent_id','processor_id'=> 'processor_id']);
-      $results = $flavor_query->execute();
-      foreach ($results as $item_id => $item) {
-        [$unused, $item_id] = Utility::splitCombinedId($item->getId());
-        $item_id = explode(':', $item_id);
-        if ($item_id && count($item_id) == 5) {
-          // For now this is fixed SBF can not be generated by other Entity Types
-          $node_id = 'entity:node/' . $item_id[0].':'.$item_id[2];
-          // ocr is 4, File id is 1,
-          $highlighted_fields[$node_id]['highlighted_fields'] = $item->getExtraData('highlighted_fields', []);
-          $highlighted_fields[$node_id]['highlighted_keys'] = $item->getExtraData('highlighted_keys', []);
+        // This is just to avoid Search API rewriting the query
+        $flavor_query->setOption('solr_param_defType', 'edismax');
+        // This will allow us to remove the edismax processor on a hook/event subscriber.
+        $flavor_query->setOption('sbf_advanced_highlight_flavor', TRUE);
+        $flavor_query->addCondition(
+          'search_api_datasource', 'strawberryfield_flavor_datasource'
+        );
+        // Flavors inherit permissions of a NODE. If not accesible this will never be called
+        $flavor_query->setOption('search_api_bypass_access', TRUE);
+        $flavor_query->setFulltextFields([]);
+        $flavor_query->setProcessingLevel(QueryInterface::PROCESSING_BASIC);
+        $flavor_query->setOption(
+          'search_api_retrieved_field_values',
+          ['parent_id' => 'parent_id', 'processor_id' => 'processor_id']
+        );
+        $results = $flavor_query->execute();
+        foreach ($results as $item_id => $item) {
+          [$unused, $item_id] = Utility::splitCombinedId($item->getId());
+          $item_id = explode(':', $item_id);
+          if ($item_id && count($item_id) == 5) {
+            // For now this is fixed SBF can not be generated by other Entity Types
+            $node_id = 'entity:node/' . $item_id[0] . ':' . $item_id[2];
+            // ocr is 4, File id is 1,
+            $highlighted_fields[$node_id]['highlighted_fields']
+              = $item->getExtraData('highlighted_fields', []);
+            $highlighted_fields[$node_id]['highlighted_keys']
+              = $item->getExtraData('highlighted_keys', []);
+          }
         }
       }
     }

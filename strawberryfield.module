@@ -369,7 +369,8 @@ function strawberryfield_search_api_solr_query_alter(SolariumQueryInterface $sol
 
       $solarium_query->addParam('hl.ocr.fl', $solr_field_names['ocr_text']);
       $solarium_query->addParam('hl.ocr.absoluteHighlights', 'on');
-      $solarium_query->addParam('hl.method', 'UnifiedHighlighter');
+      // Only place where unified is justified
+      $hl->setMethod('unified');
     }
   }
   elseif ($query->getOption('highlight_reduce_return', FALSE)) {
@@ -384,15 +385,22 @@ function strawberryfield_search_api_solr_query_alter(SolariumQueryInterface $sol
       }
       );
     }
-    else {
-      $hl->setRequireFieldMatch(TRUE);
-    }
 
     foreach ($highlight_fields as $highlighted_field) {
       // We must not set the fields at once using setFields() to not break
       // the altered queries.
-      $hl->addField($highlighted_field);
+        $hl->addField($highlighted_field);
     }
+
+    // Force HL to original for now. We can make this an option
+    // but given the Drupal nature of treating all Full Text fields as the same
+    // If a given Full text does not contain the vector index data required this will
+    // fail. Unified does not play with JOINs on Solr 9.1 throwing
+    // a class mismatch even if we are not asking for Highlights from the flavor.
+    // @TODO revisit for Solr 9.2.x
+    $hl->setUsePhraseHighlighter(TRUE);
+    $hl->setMethod('original');
+    $hl->setFragSize(128);
     $hl->setRequireFieldMatch(TRUE);
   }
 }
@@ -406,18 +414,22 @@ function strawberryfield_search_api_solr_converted_query_alter(SolariumQueryInte
       );
       $solarium_query->addParam('defType', 'lucene');
       $hl = $solarium_query->getHighlighting();
-      $hl->setRequireFieldMatch(TRUE);
-      //$hl->setMethod('unified'); This requires omitTermFreqAndPositions=FALSE;
-      // @TODO make this a setting? 128 feels like a decent number TBH.
-      $hl->setFragSize(128);
+
+      $hl->setUsePhraseHighlighter(TRUE);
       $hl->setDefaultSummary(TRUE);
+      // $hl->setMethod('fastVector');
+      $hl->setMethod('original');
+      $hl->setRequireFieldMatch(TRUE);
+      $hl->setFragsizeIsMinimum(FALSE);
+      $hl->setMergeContiguous(TRUE);
+      $hl->setFragSize(128);
+
       // Because the Query Sets a few Fields to retrieve (to make it faster)
       // But Search API is silly and decides that when that happens
       // I want only those fields highlighted
       // By setting the to all but limiting it to setRequireFieldMatch we only the matched ones.
+      // This fails with JOINS and unified so we set method original.
       $hl->setFields(['*']);
-      $hl->setFragsizeIsMinimum(FALSE);
-
     }
   }
 }
