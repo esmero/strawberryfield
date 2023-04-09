@@ -413,6 +413,7 @@ function strawberryfield_search_api_solr_converted_query_alter(SolariumQueryInte
         ComponentAwareQueryInterface::COMPONENT_EDISMAX
       );
       $solarium_query->addParam('defType', 'lucene');
+      /* @var \Solarium\Component\Highlighting\Highlighting $hl */
       $hl = $solarium_query->getHighlighting();
 
       $hl->setUsePhraseHighlighter(TRUE);
@@ -423,6 +424,10 @@ function strawberryfield_search_api_solr_converted_query_alter(SolariumQueryInte
       $hl->setFragsizeIsMinimum(FALSE);
       $hl->setMergeContiguous(TRUE);
       $hl->setFragSize(128);
+      if ($combined_keys = $query->getOption('sbf_join_flavor')['hl'] ?? NULL) {
+        $hl->setQuery($combined_keys);
+      }
+
 
       // Because the Query Sets a few Fields to retrieve (to make it faster)
       // But Search API is silly and decides that when that happens
