@@ -47,6 +47,7 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
       'excerpt_length' => 256,
       'highlight_link' => TRUE,
       'highlight_processing' => 'backend',
+      'highlight_backend_use_keys' => TRUE,
       'highlight_partial' => FALSE,
       'exclude_fields' => [],
       'lazy_excerpt' => FALSE,
@@ -75,6 +76,21 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
       ],
       '#default_value' => $this->configuration['highlight_processing'],
     ];
+
+    $form['highlight_backend_use_keys'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Use backend returned Highlighted keys'),
+      '#description' => $this->t('Solr will return the keys highlighted. These might not match 1:1 the terms (stemming/ngram) used by the user. If enabled we will use these but remove any that are already present in the actual user input'),
+      '#default_value' => $this->configuration['highlight_backend_use_keys'],
+      '#states' => [
+        'visible' => [
+          ":input[name=\"{$parent_name}[highlight_processing]\"]" => [
+            'value' => 'backend',
+          ],
+        ],
+      ],
+    ];
+
     $form['highlight_partial'] = [
       '#type' => 'checkbox',
       '#title' => $this->t('Highlight partial matches'),
@@ -313,9 +329,24 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
       // found in the item's text values, we can use those for our own
       // highlighting. This will help us take stemming, transliteration, etc.
       // into account properly.
-      $highlighted_keys = $results[$item_id]->getExtraData('highlighted_keys');
-      if ($highlighted_keys) {
-        $item_keys = array_unique(array_merge($keys, $highlighted_keys));
+      // These keys might not BE the EXACT term passed by the user so we will
+      // check if we are allowed to do this or not
+      // then we will dedup removing from the highlighted keys parts/terms
+      // already present in a phrase.
+      if ($this->configuration['highlight_processing'] == 'backend' && $this->configuration['highlight_backend_use_keys']) {
+        $highlighted_keys = $results[$item_id]->getExtraData(
+          'highlighted_keys'
+        );
+        if ($highlighted_keys && is_array($highlighted_keys)) {
+          // first implide all existing keys, makes comparing easier.
+          $joined_keys = strtolower(implode(" ", $keys));
+          foreach($highlighted_keys as $index => $highlighted_key) {
+            if (strpos($joined_keys, strtolower($highlighted_key)) !== FALSE) {
+              unset($highlighted_keys[$index]);
+            }
+          }
+          $item_keys = array_unique(array_merge($keys, $highlighted_keys));
+        }
       }
 
       $excerpt_return = [];
@@ -962,9 +993,15 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
       // Just in case someone tried to copy the code without understanding, let's be safe
       $combined_keys = $query->getOption('sbf_join_flavor')['hl'] ??
         ($query->getOption('sbf_join_flavor')['v'] ?? NULL);
-      if ($combined_keys && is_string($combined_keys)
+
+      $combined_querys_query = $query->getOption('sbf_join_flavor')['v'] ?? NULL;
+      if ($combined_keys && $combined_querys_query
+        && is_string($combined_keys) && is_string($combined_querys_query)
         && strlen(
           trim($combined_keys)
+        ) > 0
+        && strlen(
+          trim($combined_querys_query)
         ) > 0
       ) {
         $group_options = [
@@ -975,7 +1012,7 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
           'group_sort'   => [],
         ];
         $flavor_query->setOption('search_api_grouping', $group_options);
-        $flavor_query->keys("{$combined_keys}");
+        $flavor_query->keys("{$combined_querys_query}");
         $flavor_query->addCondition('parent_id', $entities, 'IN');
 
         // This is just to avoid Search API rewriting the query

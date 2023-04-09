@@ -310,6 +310,9 @@ plugin.plugin_configuration.search_api_processor.sbf_highlight:
     highlight_processing:
       type: string
       label: 'Defines whether highlight and excerpt should be processed from backend highlighter or via post processing.'
+    highlight_backend_use_keys:
+      type: boolean
+      label: 'Whether highlighted keys returned by Solr should be used.'
     highlight_partial:
       type: boolean
       label: 'Whether matches in parts of words should be highlighted'
