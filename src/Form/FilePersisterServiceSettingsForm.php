@@ -146,7 +146,6 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
       '#type' => 'checkbox',
       '#title' => $this->t('During Compost, treat dot files as safe to be deleted, if inside a safe Path.'),
       '#default_value' => $config_storage->get('compost_dot_files') ?? FALSE,
-      '#options' => $period,
       '#description' => $this->t('When enabled, we will ease the security concern for hidden files, if and only if the file to be composted is in a safe path. e.g /tmp. Safe paths by default are private://webform, temporary:// and /tmp'),
     ];
 
