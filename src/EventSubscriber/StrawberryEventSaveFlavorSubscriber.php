@@ -106,7 +106,7 @@ class StrawberryEventSaveFlavorSubscriber extends StrawberryfieldEventSaveSubscr
       $query->addCondition('file_uuid', $file->uuid())
         ->addCondition('search_api_datasource', $datasource_id)
         ->addCondition('uuid', $entity->uuid());
-      $query->setOption('search_api_retrieved_field_values', ['id']);
+      $query->setOption('search_api_retrieved_field_values', ['id' => 'id']);
       // Query breaks if not because standard hl is enabled for all fields.
       // and normal hl offsets on OCR HL specific ones.
       $query->setOption('ocr_highlight', 'on');
