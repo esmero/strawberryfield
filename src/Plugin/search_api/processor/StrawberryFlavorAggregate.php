@@ -351,7 +351,7 @@ class StrawberryFlavorAggregate extends ProcessorPluginBase {
           // I could clone and clone but that would use extra memory
           // so i remove PROCESSING to avoid returning the same 50!
           $query->range($limit * $i, $limit);
-          $results = $query_move->execute();
+          $results = $query->execute();
           $newcount = $results->getResultCount();
         }
       }
