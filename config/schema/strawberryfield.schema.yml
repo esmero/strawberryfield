@@ -97,6 +97,10 @@ strawberryfield.storage_settings:
       type: integer
       label: 'Max time to live of Archipelago generated Temporary Files'
       default: 21600
+    compost_dot_files:
+      type: boolean
+      label: 'If dot files are safe to be composted/deleted if found inside a safe Path'
+      default: false
 
 strawberryfield.archipelago_solr_settings:
   type: config_object
