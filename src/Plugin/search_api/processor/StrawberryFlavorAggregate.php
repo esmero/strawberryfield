@@ -290,6 +290,7 @@ class StrawberryFlavorAggregate extends ProcessorPluginBase {
       // gets poluted (marked as processed)
       // Drupal why is your code so messy?
       $query->setProcessingLevel(QueryInterface::PROCESSING_NONE);
+
       try {
         $fields = ['search_api_relevance','search_api_datasource','search_api_language','search_api_id'];
         foreach ($fields_with_plaintext as $key => $field_data) {
@@ -298,7 +299,8 @@ class StrawberryFlavorAggregate extends ProcessorPluginBase {
         $fields = array_combine($fields, $fields);
         $query->setOption('search_api_retrieved_field_values', $fields);
         $results = $query->execute();
-      } catch (\Exception $exception) {
+      }
+      catch (\Exception $exception) {
         $this->logException(
           $exception,
           '%type while trying to fetch Strawberry Flavors from Search API'
@@ -316,6 +318,7 @@ class StrawberryFlavorAggregate extends ProcessorPluginBase {
       $j = 0;
       $max_from_backend = $results->getResultCount();
       $max_from_backend = $newcount = $max_from_backend > $max ? $max : $max_from_backend;
+
       while ($j < $max_from_backend && $newcount > 0) {
         $i++;
         foreach ($results->getResultItems() as $resultItem) {
@@ -350,6 +353,7 @@ class StrawberryFlavorAggregate extends ProcessorPluginBase {
           // statically cached
           // I could clone and clone but that would use extra memory
           // so i remove PROCESSING to avoid returning the same 50!
+          $query = $query->getOriginalQuery();
           $query->range($limit * $i, $limit);
           $results = $query->execute();
           $newcount = $results->getResultCount();

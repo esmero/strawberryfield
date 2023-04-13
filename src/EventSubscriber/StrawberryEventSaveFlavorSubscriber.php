@@ -131,6 +131,7 @@ class StrawberryEventSaveFlavorSubscriber extends StrawberryfieldEventSaveSubscr
           }
           // If there are still more left, change the range and query again.
           if (count($tracked_ids) < $max) {
+            $query = $query->getOriginalQuery();
             $query->range($limit * $i, $limit);
             $results = $query->execute();
             $newcount = $results->getResultCount();
