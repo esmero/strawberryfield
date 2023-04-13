@@ -363,8 +363,13 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
       if (($this->configuration['highlight_link']  ?? FALSE ) && is_array($linkable_text) && count($linkable_text)) {
         try {
           $uri = $results[$item_id]->getDatasource()->getItemUrl($results[$item_id]->getOriginalObject());
-          $uri->setOptions(['fragment' => 'search/'.reset($item_keys)]);
           foreach ($item_keys as $key) {
+            if (count(explode(" ", $key)) > 1) {
+              $uri->setOptions(['fragment' => 'search/"'.$key.'"']);
+            }
+            else {
+              $uri->setOptions(['fragment' => 'search/'.$key]);
+            }
             $rendered_url = \Drupal\Core\Link::fromTextAndUrl(
               $key, $uri
             );
@@ -880,7 +885,7 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
       }
       $textsCount = count($texts);
       for ($i = 0; $i < $textsCount; $i += 2) {
-        $texts[$i] = $this->highlightFieldWithLink($texts[$i], $keys, FALSE);
+        $texts[$i] = $this->highlightFieldWithLinks($texts[$i], $keys, FALSE);
       }
       return implode('', $texts);
     }
