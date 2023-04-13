@@ -373,11 +373,12 @@ function strawberryfield_search_api_solr_query_alter(SolariumQueryInterface $sol
       $hl->setMethod('unified');
     }
   }
-  elseif ($query->getOption('highlight_reduce_return', FALSE)) {
+  elseif ($query->getOption('sbf_highlight_fields', FALSE)) {
+    //advanced_highlight_return
     // ELSEIF bc OCR and these ones are incompatible
     /* @var \Solarium\Component\Highlighting\Highlighting $hl */
     $hl = $solarium_query->getHighlighting();
-    $highlight_fields = $query->getOption('highlight_reduce_return',[]);
+    $highlight_fields = $query->getOption('sbf_highlight_fields',[]);
     if ($highlight_fields != ['*']) {
       $highlight_fields = array_filter(
         $highlight_fields, function ($v) {
