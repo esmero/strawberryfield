@@ -379,14 +379,6 @@ function strawberryfield_search_api_solr_query_alter(SolariumQueryInterface $sol
     /* @var \Solarium\Component\Highlighting\Highlighting $hl */
     $hl = $solarium_query->getHighlighting();
     $highlight_fields = $query->getOption('sbf_highlight_fields',[]);
-    if ($highlight_fields != ['*']) {
-      $highlight_fields = array_filter(
-        $highlight_fields, function ($v) {
-        return preg_match('/^t.?[sm]_/', $v) || preg_match('/^s[sm]_/', $v);
-      }
-      );
-    }
-
     foreach ($highlight_fields as $highlighted_field) {
       // We must not set the fields at once using setFields() to not break
       // the altered queries.
@@ -419,7 +411,6 @@ function strawberryfield_search_api_solr_converted_query_alter(SolariumQueryInte
 
       $hl->setUsePhraseHighlighter(TRUE);
       $hl->setDefaultSummary(TRUE);
-      // $hl->setMethod('fastVector');
       $hl->setMethod('original');
       $hl->setRequireFieldMatch(TRUE);
       $hl->setFragsizeIsMinimum(FALSE);
@@ -428,7 +419,6 @@ function strawberryfield_search_api_solr_converted_query_alter(SolariumQueryInte
       if ($combined_keys = $query->getOption('sbf_join_flavor')['hl'] ?? NULL) {
         $hl->setQuery($combined_keys);
       }
-
 
       // Because the Query Sets a few Fields to retrieve (to make it faster)
       // But Search API is silly and decides that when that happens
