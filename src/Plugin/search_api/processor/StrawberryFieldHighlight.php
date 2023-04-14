@@ -235,7 +235,8 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
     // If a join query is present we will use its current config to trigger a quick
     // strawberry flavor solr query to highlight the current returned ADOs/NODE IDs
     // based on the existing $results->getQuery()->getOption('sbf_join_flavor') array
-    if ($results->getQuery()->getOption('sbf_join_flavor') &&
+    if (($results->getQuery()->getOption('sbf_join_flavor') ||
+        $results->getQuery()->getOption('sbf_advanced_search_filter_flavor_hl')) &&
       $this->configuration['highlight_processing'] == 'backend') {
       $fetched_ids = [];
       $from_solr_highlight_fields = [];
@@ -340,7 +341,7 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
           'highlighted_keys'
         );
         if ($highlighted_keys && is_array($highlighted_keys)) {
-          // first implide all existing keys, makes comparing easier.
+          // first implode all existing keys, makes comparing easier.
           $joined_keys = strtolower(implode(" ", $keys));
           foreach($highlighted_keys as $index => $highlighted_key) {
             if (strpos($joined_keys, strtolower($highlighted_key)) !== FALSE) {
@@ -431,6 +432,9 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
       $direct_keys = $query->getOriginalKeys();
       $match = [];
       $keys = [];
+      // This assumes we are indeed using phrase escaping (see \Drupal\search_api_solr\Utility\Utility::flattenKeys)
+      // And not term escaping (which would be desired for single keys
+      // but then i will not re-write code from \Drupal\search_api_solr!
       preg_match_all('/"([^"]+)"/', $direct_keys,$match);
       if (isset($match[1]) && is_array($match[1])) {
         $keys = array_unique($match[1]);
@@ -1000,16 +1004,13 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
       // Just in case someone tried to copy the code without understanding, let's be safe
       $combined_keys = $query->getOption('sbf_join_flavor')['hl'] ??
         ($query->getOption('sbf_join_flavor')['v'] ?? NULL);
-
-      $combined_querys_query = $query->getOption('sbf_join_flavor')['v'] ?? NULL;
-      if ($combined_keys && $combined_querys_query
-        && is_string($combined_keys) && is_string($combined_querys_query)
-        && strlen(
-          trim($combined_keys)
-        ) > 0
-        && strlen(
-          trim($combined_querys_query)
-        ) > 0
+      // No join. Try with the Advanced Search Flavor Filter
+      // Sweet and made for a hit summer of advanced Searching!
+      // @See \Drupal\format_strawberryfield_views\Plugin\views\filter\AdvancedSearchApiFulltext::query
+      if (!$combined_keys) {
+        $combined_keys = $query->getOption('sbf_advanced_search_filter_flavor_hl') ?? NULL;
+      }
+      if ($combined_keys && is_string($combined_keys) && strlen(trim($combined_keys)) > 0
       ) {
         $group_options = [
           'use_grouping' => TRUE,
