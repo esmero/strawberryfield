@@ -161,9 +161,11 @@ class StrawberryFlavorAggregate extends ProcessorPluginBase {
                 array_map('trim', $processor_ids)
               );
               foreach ($processor_ids as $processor_id) {
+
                 $flavors = $this->flavorsfromSolrIndex(
-                  $node->id(), $processor_id, $indexes, $limit = 500
+                  $node->id(), $processor_id, $indexes,  50, 500
                 );
+
                 $flavors = array_filter($flavors);
                 if (count($flavors)) {
                   $flavors = array_values($flavors);
@@ -201,12 +203,13 @@ class StrawberryFlavorAggregate extends ProcessorPluginBase {
    * @param string $file_uuid
    * @param array $indexes
    * @param int $limit
-   *
+   *    The number of SBF Documents to get per query
+   * @param int $max number of SBF to fetch at all.
    * @return array[]
    * @throws \Drupal\Component\Plugin\Exception\PluginException
    * @throws \Drupal\search_api\SearchApiException
    */
-  protected function flavorsfromSolrIndex(int $nodeid, string $processor, array $indexes, $limit = 500) {
+  protected function flavorsfromSolrIndex(int $nodeid, string $processor, array $indexes, $limit = 50, $max = 500) {
     $values = [];
     /* @var \Drupal\search_api\IndexInterface[] $indexes */
     foreach ($indexes as $search_api_index) {
@@ -261,28 +264,47 @@ class StrawberryFlavorAggregate extends ProcessorPluginBase {
           'sequence_id'
         );
 
-      $query->sort('search_api_relevance', 'DESC');
+      $sorted = FALSE;
       // Override Sort if we have a sequence ID for this data source
       foreach ($fields_with_sequence_id as $field_with_sequence_id) {
         // \Drupal\search_api\Plugin\search_api\data_type\IntegerDataType
-        if ($field_with_sequence_id->getType() == 'string' || $field_with_sequence_id->getType() == 'integer') {
-          $query->sort($field_with_sequence_id->getFieldIdentifier(), 'DESC');
+        if ($field_with_sequence_id->getType() == 'integer'
+        ) {
+          $query->sort($field_with_sequence_id->getFieldIdentifier(), 'ASC');
+          $sorted = TRUE;
           break;
         }
       }
+      if (!$sorted) {
+        // No difference of sorting by string than the id itself.
+        $query->sort('search_api_id', 'ASC');
+      }
 
-      $field_with_plaintex = $this->getFieldsHelper()
+      $fields_with_plaintext = $this->getFieldsHelper()
         ->filterForPropertyPath(
           $search_api_index->getFields(), 'strawberryfield_flavor_datasource',
           'plaintext'
         );
+      // Needed to avoid statically caching the results
+      // $query->getOriginalQuery() is not reliable and eventually
+      // gets poluted (marked as processed)
+      // Drupal why is your code so messy?
+      $query->setProcessingLevel(QueryInterface::PROCESSING_NONE);
 
-      $query->setProcessingLevel(QueryInterface::PROCESSING_BASIC);
       try {
+        $fields = ['search_api_relevance','search_api_datasource','search_api_language','search_api_id'];
+        foreach ($fields_with_plaintext as $key => $field_data) {
+          $fields[] = $key;
+        }
+        $fields = array_combine($fields, $fields);
+        $query->setOption('search_api_retrieved_field_values', $fields);
         $results = $query->execute();
       }
       catch (\Exception $exception) {
-        $this->logException($exception, '%type while trying to fetch Strawberry Flavors from Search API');
+        $this->logException(
+          $exception,
+          '%type while trying to fetch Strawberry Flavors from Search API'
+        );
         return $values;
       }
       // remove the ID and the parent, not needed for file matching
@@ -292,9 +314,18 @@ class StrawberryFlavorAggregate extends ProcessorPluginBase {
         ]
       ];
 
-      if ($results->getResultCount() >= 1) {
+      $i = 0;
+      $j = 0;
+      $max_from_backend = $results->getResultCount();
+      $max_from_backend = $newcount = $max_from_backend > $max ? $max : $max_from_backend;
+
+      while ($j < $max_from_backend && $newcount > 0) {
+        $i++;
         foreach ($results->getResultItems() as $resultItem) {
-          $property_values = $this->getFieldsHelper()->extractItemValues([$resultItem], $required_properties_by_datasource, false);
+          $j++;
+          $property_values = $this->getFieldsHelper()->extractItemValues(
+            [$resultItem], $required_properties_by_datasource, FALSE
+          );
           foreach ($property_values as $plaintext) {
             if (($plaintext['plaintext'][0] ?? NULL) instanceof TextValue) {
               // Wonder if we can use __toString() here as a magic prop
@@ -308,11 +339,24 @@ class StrawberryFlavorAggregate extends ProcessorPluginBase {
             $text_to_clean = str_replace("-\n ", "", $text_to_clean);
             $text_to_clean = str_replace("\n ", " ", $text_to_clean);
             $text_to_clean = str_replace("\n", " ", $text_to_clean);
-            $text_to_clean = preg_replace(['/\h{2,}|(\h*\v{1,})/umi', '/\v{2,}/uim', '/\h{2,}/uim'], [' ', ' ', ' '], $text_to_clean);
+            $text_to_clean = preg_replace(
+              ['/\h{2,}|(\h*\v{1,})/umi', '/\v{2,}/uim', '/\h{2,}/uim'],
+              [' ', ' ', ' '], $text_to_clean
+            );
             if (strlen(trim($text_to_clean)) > 0) {
               $values[] = $text_to_clean;
             }
           }
+        }
+        if ($j < $max_from_backend && $j > 0) {
+          // Reusing the query can not be done bc it will return the original query results
+          // statically cached
+          // I could clone and clone but that would use extra memory
+          // so i remove PROCESSING to avoid returning the same 50!
+          $query = $query->getOriginalQuery();
+          $query->range($limit * $i, $limit);
+          $results = $query->execute();
+          $newcount = $results->getResultCount();
         }
       }
     }

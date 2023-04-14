@@ -4,6 +4,7 @@ namespace Drupal\strawberryfield\Plugin\search_api\processor;
 
 use Drupal\Component\Utility\Html;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\Plugin\PluginFormInterface;
 use Drupal\search_api\Plugin\search_api\processor\Highlight;
 use Drupal\search_api\Query\Query;
@@ -22,7 +23,8 @@ use Drupal\search_api\Utility\Utility;
  *   description = @Translation("Adds a highlighted excerpt to results and highlights returned fields using only Backend instead of frontend re-rendering."),
  *   stages = {
  *     "pre_index_save" = 0,
- *     "postprocess_query" = 0
+ *     "postprocess_query" = 0,
+ *     "preprocess_query" = -20,
  *   }
  * )
  */
@@ -47,6 +49,7 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
       'excerpt_length' => 256,
       'highlight_link' => TRUE,
       'highlight_processing' => 'backend',
+      'highlight_backend_use_keys' => TRUE,
       'highlight_partial' => FALSE,
       'exclude_fields' => [],
       'lazy_excerpt' => FALSE,
@@ -75,6 +78,21 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
       ],
       '#default_value' => $this->configuration['highlight_processing'],
     ];
+
+    $form['highlight_backend_use_keys'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Use backend returned Highlighted keys'),
+      '#description' => $this->t('Solr will return the keys highlighted. These might not match 1:1 the terms (stemming/ngram) used by the user. If enabled we will use these but remove any that are already present in the actual user input'),
+      '#default_value' => $this->configuration['highlight_backend_use_keys'],
+      '#states' => [
+        'visible' => [
+          ":input[name=\"{$parent_name}[highlight_processing]\"]" => [
+            'value' => 'backend',
+          ],
+        ],
+      ],
+    ];
+
     $form['highlight_partial'] = [
       '#type' => 'checkbox',
       '#title' => $this->t('Highlight partial matches'),
@@ -217,7 +235,8 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
     // If a join query is present we will use its current config to trigger a quick
     // strawberry flavor solr query to highlight the current returned ADOs/NODE IDs
     // based on the existing $results->getQuery()->getOption('sbf_join_flavor') array
-    if ($results->getQuery()->getOption('sbf_join_flavor') &&
+    if (($results->getQuery()->getOption('sbf_join_flavor') ||
+        $results->getQuery()->getOption('sbf_advanced_search_filter_flavor_hl')) &&
       $this->configuration['highlight_processing'] == 'backend') {
       $fetched_ids = [];
       $from_solr_highlight_fields = [];
@@ -313,25 +332,26 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
       // found in the item's text values, we can use those for our own
       // highlighting. This will help us take stemming, transliteration, etc.
       // into account properly.
-      $highlighted_keys = $results[$item_id]->getExtraData('highlighted_keys');
-      if ($highlighted_keys) {
-        $item_keys = array_unique(array_merge($keys, $highlighted_keys));
-      }
-      if ($this->configuration['highlight_link'] ?? FALSE) {
-        try {
-          $uri = $results[$item_id]->getDatasource()->getItemUrl($results[$item_id]->getOriginalObject());
-          $uri->setOptions(['fragment' => 'search/'.reset($item_keys)]);
-          foreach ($item_keys as $key) {
-            $rendered_url = \Drupal\Core\Link::fromTextAndUrl(
-              $key, $uri
-            );
-            $item_keys_with_links[$key] = $rendered_url->toString()->getGeneratedLink();
+      // These keys might not BE the EXACT term passed by the user so we will
+      // check if we are allowed to do this or not
+      // then we will dedup removing from the highlighted keys parts/terms
+      // already present in a phrase.
+      if ($this->configuration['highlight_processing'] == 'backend' && $this->configuration['highlight_backend_use_keys']) {
+        $highlighted_keys = $results[$item_id]->getExtraData(
+          'highlighted_keys'
+        );
+        if ($highlighted_keys && is_array($highlighted_keys)) {
+          // first implode all existing keys, makes comparing easier.
+          $joined_keys = strtolower(implode(" ", $keys));
+          foreach($highlighted_keys as $index => $highlighted_key) {
+            if (strpos($joined_keys, strtolower($highlighted_key)) !== FALSE) {
+              unset($highlighted_keys[$index]);
+            }
           }
-        }
-        catch (\Exception $e) {
-          $this->getLogger()->warning('Error happened trying to load the entity for Linked and generate a link highlight', []);
+          $item_keys = array_unique(array_merge($keys, $highlighted_keys));
         }
       }
+
       $excerpt_return = [];
 
       if (is_array($text) && count($text)) {
@@ -340,9 +360,27 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
         );
         $excerpt_return[] = $this->highlightField($excerpt, $item_keys, FALSE);
       }
-      // Bit of an overkill to check for the config again
-      // but i do overcheck.
-      if ($this->configuration['highlight_link'] && is_array($linkable_text) && count($linkable_text)) {
+
+      if (($this->configuration['highlight_link']  ?? FALSE ) && is_array($linkable_text) && count($linkable_text)) {
+        try {
+          $uri = $results[$item_id]->getDatasource()->getItemUrl($results[$item_id]->getOriginalObject());
+          foreach ($item_keys as $key) {
+            if (count(explode(" ", $key)) > 1) {
+              $uri->setOptions(['fragment' => 'search/"'.$key.'"']);
+            }
+            else {
+              $uri->setOptions(['fragment' => 'search/'.$key]);
+            }
+            $rendered_url = \Drupal\Core\Link::fromTextAndUrl(
+              $key, $uri
+            );
+            $item_keys_with_links[$key] = $rendered_url->toString()->getGeneratedLink();
+          }
+        }
+        catch (\Exception $e) {
+          $this->getLogger('strawberryfield')->warning('Error happened trying to load an entity to generate a link highlight', []);
+        }
+
         $linked_excerpt = $this->createExcerptFromBackend(
           implode($this->getEllipses()[1], $linkable_text), $item_keys
         );
@@ -394,6 +432,9 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
       $direct_keys = $query->getOriginalKeys();
       $match = [];
       $keys = [];
+      // This assumes we are indeed using phrase escaping (see \Drupal\search_api_solr\Utility\Utility::flattenKeys)
+      // And not term escaping (which would be desired for single keys
+      // but then i will not re-write code from \Drupal\search_api_solr!
       preg_match_all('/"([^"]+)"/', $direct_keys,$match);
       if (isset($match[1]) && is_array($match[1])) {
         $keys = array_unique($match[1]);
@@ -409,20 +450,26 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
       return $this->flattenKeysArray($keys);
     }
 
-    $keywords_in = preg_split(static::$split, $keys);
-    if (!$keywords_in) {
+    $keywords_and_phrases = [];
+    if (preg_match_all('/"(?:\\\\.|[^\\\\"])*"|\S+/', $keys, $keywords_and_phrases)) {
+      $keywords_in = $keywords_and_phrases[0] ?? NULL;
+      if (!$keywords_in) {
+        return [];
+      }
+      // Ensure there are no duplicates. (This is actually faster than
+      // array_unique() by a factor of 3 to 4.)
+      // Remove quotes from keywords.
+      $keywords = [];
+      foreach (array_filter($keywords_in) as $keyword) {
+        if ($keyword = trim($keyword, "'\"")) {
+          $keywords[$keyword] = $keyword;
+        }
+      }
+      return $keywords;
+    }
+    else {
       return [];
     }
-    // Ensure there are no duplicates. (This is actually faster than
-    // array_unique() by a factor of 3 to 4.)
-    // Remove quotes from keywords.
-    $keywords = [];
-    foreach (array_filter($keywords_in) as $keyword) {
-      if ($keyword = trim($keyword, "'\"")) {
-        $keywords[$keyword] = $keyword;
-      }
-    }
-    return $keywords;
   }
 
   /**
@@ -837,12 +884,12 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
         $args = [
           '%error_num' => preg_last_error(),
         ];
-        $this->getLogger()->warning('A PCRE error (#%error_num) occurred during Advanced results highlighting with Links.', $args);
+        $this->getLogger('strawberryfield')->warning('A PCRE error (#%error_num) occurred during Advanced results highlighting with Links.', $args);
         return $text;
       }
       $textsCount = count($texts);
       for ($i = 0; $i < $textsCount; $i += 2) {
-        $texts[$i] = $this->highlightFieldWithLink($texts[$i], $keys, FALSE);
+        $texts[$i] = $this->highlightFieldWithLinks($texts[$i], $keys, FALSE);
       }
       return implode('', $texts);
     }
@@ -939,47 +986,150 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
     if ($parse_mode_manager && count($entities)) {
       /** @var \Drupal\search_api\ParseMode\ParseModeInterface $parse_mode_direct */
       $parse_mode_direct = $parse_mode_manager->createInstance('direct');
-      $flavor_query = new Query($this->index,  [
-        'limit'  => 200, //count($entities)?,
-        'offset' => 0,
-      ]);
+      $flavor_query = new Query(
+        $this->index, [
+          'limit' => 200, //count($entities)?,
+          'offset' => 0,
+        ]
+      );
 
       $flavor_query->setParseMode($parse_mode_direct);
-      $combined_keys = $query->getOption('sbf_join_flavor')['v'];
-      $group_options = [
-        'use_grouping' => TRUE,
-        'fields' => ['parent_id'],
-        'truncate' => TRUE,
-        'group_limit' => 1,
-        'group_sort' => [],
-      ];
-      $flavor_query->setOption('search_api_grouping', $group_options);
-      $flavor_query->keys("{$combined_keys}");
-      $flavor_query->addCondition('parent_id', $entities, 'IN');
+      // Important NOTE: e.g if you are using a global AND, means for a search
+      // ALL WORDS need to match, this in NO CASE means all the words need to match
+      // THE OCR flavor or any flavor. The combined result (JOIN time + main query) need to match
+      // SO here we can not use the 'v' from $query->getOption('sbf_join_flavor')['v']; that was used
+      // to generate the JOIN because only on rare cases (e.g ONLY OCR matched all) will give us
+      // any highlights. This is a complexity of our process
+      // and OK if we handle this differently.
+      // Just in case someone tried to copy the code without understanding, let's be safe
+      $combined_keys = $query->getOption('sbf_join_flavor')['hl'] ??
+        ($query->getOption('sbf_join_flavor')['v'] ?? NULL);
+      // No join. Try with the Advanced Search Flavor Filter
+      // Sweet and made for a hit summer of advanced Searching!
+      // @See \Drupal\format_strawberryfield_views\Plugin\views\filter\AdvancedSearchApiFulltext::query
+      if (!$combined_keys) {
+        $combined_keys = $query->getOption('sbf_advanced_search_filter_flavor_hl') ?? NULL;
+      }
+      if ($combined_keys && is_string($combined_keys) && strlen(trim($combined_keys)) > 0
+      ) {
+        $group_options = [
+          'use_grouping' => TRUE,
+          'fields'       => ['parent_id'],
+          'truncate'     => TRUE,
+          'group_limit'  => 3,
+          'group_sort'   => [],
+        ];
+        $flavor_query->setOption('search_api_grouping', $group_options);
+        $flavor_query->keys("{$combined_keys}");
+        $flavor_query->addCondition('parent_id', $entities, 'IN');
 
-      // This is just to avoid Search API rewriting the query
-      $flavor_query->setOption('solr_param_defType', 'edismax');
-      // This will allow us to remove the edismax processor on a hook/event subscriber.
-      $flavor_query->setOption('sbf_advanced_highlight_flavor', TRUE);
-      $flavor_query->addCondition('search_api_datasource', 'strawberryfield_flavor_datasource');
-      // Flavors inherit permissions of a NODE. If not accesible this will never be called
-      $flavor_query->setOption('search_api_bypass_access', TRUE);
-      $flavor_query->setFulltextFields([]);
-      $flavor_query->setProcessingLevel(QueryInterface::PROCESSING_BASIC);
-      $flavor_query->setOption('search_api_retrieved_field_values', ['parent_id' => 'parent_id','processor_id'=> 'processor_id']);
-      $results = $flavor_query->execute();
-      foreach ($results as $item_id => $item) {
-        [$unused, $item_id] = Utility::splitCombinedId($item->getId());
-        $item_id = explode(':', $item_id);
-        if ($item_id && count($item_id) == 5) {
-          // For now this is fixed SBF can not be generated by other Entity Types
-          $node_id = 'entity:node/' . $item_id[0].':'.$item_id[2];
-          // ocr is 4, File id is 1,
-          $highlighted_fields[$node_id]['highlighted_fields'] = $item->getExtraData('highlighted_fields', []);
-          $highlighted_fields[$node_id]['highlighted_keys'] = $item->getExtraData('highlighted_keys', []);
+        // This is just to avoid Search API rewriting the query
+        $flavor_query->setOption('solr_param_defType', 'edismax');
+        // This will allow us to remove the edismax processor on a hook/event subscriber.
+        $flavor_query->setOption('sbf_advanced_highlight_flavor', TRUE);
+        $flavor_query->addCondition(
+          'search_api_datasource', 'strawberryfield_flavor_datasource'
+        );
+        // Flavors inherit permissions of a NODE. If not accesible this will never be called
+        $flavor_query->setOption('search_api_bypass_access', TRUE);
+        $flavor_query->setFulltextFields([]);
+        $flavor_query->setProcessingLevel(QueryInterface::PROCESSING_BASIC);
+        $flavor_query->setOption(
+          'search_api_retrieved_field_values',
+          ['parent_id' => 'parent_id', 'processor_id' => 'processor_id']
+        );
+        $results = $flavor_query->execute();
+        foreach ($results as $item_id => $item) {
+          [$unused, $item_id] = Utility::splitCombinedId($item->getId());
+          $item_id = explode(':', $item_id);
+          if ($item_id && count($item_id) == 5) {
+            // For now this is fixed SBF can not be generated by other Entity Types
+            $node_id = 'entity:node/' . $item_id[0] . ':' . $item_id[2];
+            // ocr is 4, File id is 1,
+            // Gosh we need to merge this... if not we end with the last one only.
+            // @TODO. we could check here if the keys for a certain highlight
+            // were already highlighted but then we are already generating a snippet
+            // that is limited in the caller. So not sure it is worth
+            $highlighted_fields[$node_id]['highlighted_fields']
+              = array_merge_recursive( $highlighted_fields[$node_id]['highlighted_fields'] ?? [], $item->getExtraData('highlighted_fields', []));
+            $highlighted_fields[$node_id]['highlighted_keys']
+              = array_unique(array_merge($highlighted_fields[$node_id]['highlighted_keys'] ?? [], $item->getExtraData('highlighted_keys', [])));
+          }
         }
       }
     }
     return $highlighted_fields;
   }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function preprocessSearchQuery(QueryInterface $query) {
+    // OK we know this only works for Solr. C'mon
+    $tags = $query->getTags();
+    // Don't run this on autocompletes!
+    if (isset($tags['search_api_autocomplete'])) {
+      return;
+    }
+    $backend = $query->getIndex()->getServerInstance()->getBackend();
+    $index_fields = $query->getIndex()->getFields();
+    $backend_highlights = [];
+    if ($backend instanceof \Drupal\search_api_solr\SolrBackendInterface && $this->configuration['highlight_processing'] == 'backend') {
+        $excerpt_fulltext_fields = $this->index->getFulltextFields();
+        if (!empty($this->configuration['exclude_fields'])) {
+          $excerpt_fulltext_fields = array_diff(
+            $excerpt_fulltext_fields, $this->configuration['exclude_fields']
+          );
+        }
+
+      $field_names = $backend->getSolrFieldNamesKeyedByLanguage(
+        $this->getLanguages($query), $query->getIndex()
+      );
+
+      // If Search API provides information about the fields to retrieve, limit
+      // the fields accordingly. ...
+      foreach ($excerpt_fulltext_fields as $field_name) {
+        if (isset($field_names[$field_name])) {
+          $backend_highlights[] = array_values($field_names[$field_name]);
+        }
+      }
+      $backend_highlights = array_unique(array_merge(...$backend_highlights));
+      $backend_highlights = !empty($backend_highlights) ? $backend_highlights : ['*'];
+      $backend_highlights = array_filter($backend_highlights, function($v) {
+        return preg_match('/^t.?[sm]_/', $v) || preg_match('/^s[sm]_/', $v);
+      });
+      $query->setOption(
+        'sbf_highlight_fields', $backend_highlights
+      );
+    }
+  }
+
+  public function getLanguages(QueryInterface $query) {
+    $language_ids = [];
+    $settings = \Drupal\search_api_solr\Utility\Utility::getIndexSolrSettings($query->getIndex());
+    $language_ids = $query->getLanguages();
+    // If there are no languages set, we need to set them. As an example, a
+    // language might be set by a filter in a search view.
+    if (empty($language_ids)) {
+      if (!$query->hasTag('views') && $settings['multilingual']['limit_to_content_language']) {
+        // Limit the language to the current language being used.
+        $language_ids[] = \Drupal::languageManager()
+          ->getCurrentLanguage(LanguageInterface::TYPE_CONTENT)
+          ->getId();
+      }
+      else {
+        // If the query is generated by views and/or the query isn't limited
+        // by any languages we have to search for all languages using their
+        // specific fields.
+        $language_ids = array_keys(\Drupal::languageManager()->getLanguages());
+      }
+    }
+
+    if ($settings['multilingual']['include_language_independent']) {
+      $language_ids[] = LanguageInterface::LANGCODE_NOT_SPECIFIED;
+    }
+    return $language_ids;
+
+  }
+
 }

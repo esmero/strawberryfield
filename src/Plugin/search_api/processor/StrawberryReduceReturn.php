@@ -75,11 +75,9 @@ class StrawberryReduceReturn extends ProcessorPluginBase {
    */
   public function preprocessSearchQuery(QueryInterface $query) {
     // We really don't want to return the aggregated fields this processor
-    // Provides
-    // Unnecessary HUGE payload.
+    // Provides. Unnecessary HUGE payload.
     if (isset($query->getOptions()['search_api_view']) && $query->getOptions()['search_api_view']->getDisplay()->usesFields()) {
       //don't override any other options set by someone else.
-
       if (empty($query->getOptions()['search_api_retrieved_field_values'] ?? [])) {
         $fields = [];
         // Get me all the fields of this index (gosh)
@@ -90,14 +88,24 @@ class StrawberryReduceReturn extends ProcessorPluginBase {
           unset($fields[$key]);
         }
         $fields = array_values(array_keys($fields));
-        $fields += ['search_api_relevance','search_api_datasource','search_api_language','search_api_id'];
+        // See \Drupal\search_api_solr\Plugin\search_api\backend\SearchApiSolrBackend::getRequiredFields for a better list
+        // Sadly that method is protected so we will need to re-write it here?
+        $fields += ['search_api_relevance','search_api_datasource','search_api_language','search_api_id','site_hash'];
         $query->setOption('search_api_retrieved_field_values', $fields);
-        $query->setOption('highlight_reduce_return', ['*']);
+        // don't override highlight fields if any other SBF module/processor has already done this
+        if ($query->getOption('sbf_highlight_fields', NULL)) {
+          $query->setOption('sbf_highlight_fields', ['*']);
+        }
       }
     }
     elseif (isset($query->getOptions()['search_api_view']) && !$query->getOptions()['search_api_view']->getDisplay()->usesFields()) {
-      $query->setOption('search_api_retrieved_field_values', ['search_api_relevance','search_api_datasource','search_api_language','search_api_id']);
-      $query->setOption('highlight_reduce_return', ['*']);
+      // See \Drupal\search_api_solr\Plugin\search_api\backend\SearchApiSolrBackend::getRequiredFields for a better list
+      // Sadly that method is protected so we will need to re-write it here?
+      $query->setOption('search_api_retrieved_field_values', ['search_api_relevance','search_api_datasource','search_api_language','search_api_id','site_hash']);
+      // don't override highlight fields if any other SBF module/processor has already done this
+      if ($query->getOption('sbf_highlight_fields', NULL)) {
+        $query->setOption('sbf_highlight_fields', ['*']);
+      }
     }
   }
 }

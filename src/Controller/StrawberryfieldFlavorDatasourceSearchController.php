@@ -199,7 +199,6 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
 
       $parse_mode = $this->parseModeManager->createInstance('terms');
       $query->setParseMode($parse_mode);
-      $query->sort('search_api_relevance', 'DESC');
       $query->keys($term);
 
       $query->setFulltextFields(['ocr_text']);
@@ -252,6 +251,7 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
       }
       if (isset($allfields_translated_to_solr['sequence_id'])) {
         $fields_to_retrieve['sequence_id'] = $allfields_translated_to_solr['sequence_id'];
+        $query->sort('sequence_id', QueryInterface::SORT_ASC);
       }
       if (isset($allfields_translated_to_solr['file_uuid'])) {
         $fields_to_retrieve['file_uuid'] = $allfields_translated_to_solr['file_uuid'];
@@ -275,7 +275,7 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
         4 => 'ss_search_api_language:("en" "und" "zxx")',
       ),
        */
-
+      $query->sort('search_api_relevance', 'DESC');
       $query->setProcessingLevel(QueryInterface::PROCESSING_BASIC);
       $results = $query->execute();
       $extradata = $results->getAllExtraData() ?? [];
