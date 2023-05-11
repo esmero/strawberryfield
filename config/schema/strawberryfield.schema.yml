@@ -97,6 +97,10 @@ strawberryfield.storage_settings:
       type: integer
       label: 'Max time to live of Archipelago generated Temporary Files'
       default: 21600
+    compost_dot_files:
+      type: boolean
+      label: 'If dot files are safe to be composted/deleted if found inside a safe Path'
+      default: false
 
 strawberryfield.archipelago_solr_settings:
   type: config_object
@@ -261,3 +265,61 @@ strawberryfield.breadcrumb_settings:
       type: boolean
       label: 'If Breadcrumb processing is enabled or not'
       default: TRUE
+
+search_api.property_configuration.sbf_flavor_aggregated_item:
+  type: mapping
+  label: 'Aggregated SBF Flavor field configuration'
+  mapping:
+    role:
+      type: sequence
+      label: 'The selected roles'
+      orderby: key
+      sequence:
+        type: string
+        label: 'The user roles which will be active when the entity is harvested for children'
+    processor_ids:
+      type:
+        type: string
+        label: 'Comma separated list of Drupal machine names (IDs) of Strawberry Runner Post processor Configuration entities.e.g "ocr,text"'
+
+plugin.plugin_configuration.search_api_processor.sbf_highlight:
+  type: search_api.default_processor_configuration
+  label: 'Advanced Highlight processor configuration'
+  mapping:
+    prefix:
+      type: string
+      label: 'Text/HTML that will be prepended to all occurrences of search keywords in highlighted text'
+    suffix:
+      type: string
+      label: 'Text/HTML that will be appended to all occurrences of search keywords in highlighted text'
+    excerpt:
+      type: boolean
+      label: 'When enabled, an excerpt will be created for searches with keywords, containing all occurrences of keywords in a fulltext field.'
+    excerpt_length:
+      type: integer
+      label: 'The requested length of the excerpt, in characters.'
+    excerpt_clean:
+      type: boolean
+      label: 'When enabled, the returned fields (or backend highlight if highlight_processing is set to "backend" will be sorted by longest text first and deduplicated giving a more representative snippet but not taking the order of the results in account'
+    highlight_link:
+      type: boolean
+      label: 'When enabled,  Strawberry Flavor Data Source type and Strawberry Flavor Aggregator types will have their own excerpt. The first occurrences of a keywords in a fulltext field of these types will get a link with the keyword as a URL fragment to the Original Content Entity.'
+    exclude_fields:
+      type: sequence
+      label: 'Fields excluded from excerpt'
+      orderby: value
+      sequence:
+        type: string
+        label: 'An excluded field''s ID'
+    highlight_processing:
+      type: string
+      label: 'Defines whether highlight and excerpt should be processed from backend highlighter or via post processing.'
+    highlight_backend_use_keys:
+      type: boolean
+      label: 'Whether highlighted keys returned by Solr should be used.'
+    highlight_partial:
+      type: boolean
+      label: 'Whether matches in parts of words should be highlighted'
+    lazy_excerpt:
+      type: boolean
+      label: 'Whether the lazy loading workaround is enabled to deliver fresh(er) Excerpts on GET requests'

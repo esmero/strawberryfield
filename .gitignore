@@ -18,3 +18,4 @@
 .idea/symfony2.xml
 src/.DS_Store
 src/Plugin/.DS_Store
+.DS_Store

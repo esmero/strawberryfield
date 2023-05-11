@@ -598,29 +598,27 @@ class StrawberryfieldJsonHelper {
    *
    * @return bool|array
    * @throws \Exception
-   */
+   */  
   public static function isValidJsonSchema(string $jsonstring, string $acceptedjsonschema) {
     $jsonarray = json_decode(trim($jsonstring));
     $json_error = json_last_error();
 
     if ($json_error == JSON_ERROR_NONE) {
-    try {
-      $schema = JsonSchema::import(
-        json_decode($acceptedjsonschema)
-      );
+      try {
+        $schema = JsonSchema::import(
+          json_decode($acceptedjsonschema)
+        );
 
-      $schema->in($jsonarray);
-      return $jsonarray;
-    }
-    catch (JsonSchemaException $exception) {
-      static::messenger()->addWarning($exception->getMessage());
-      return FALSE;
-    }
+        $schema->in($jsonarray);
+        return $jsonarray;
+      }
+      catch (JsonSchemaException $exception) {
+        \Drupal::messenger()->addWarning($exception->getMessage());
+        return FALSE;
+      }
     }
     else {
       return FALSE;
     }
   }
-
-
 }

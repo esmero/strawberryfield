@@ -103,7 +103,7 @@ class keyNameProviderOverviewForm extends FormBase {
         'callback' => [$this, 'ajaxSimulate'],
       ],
       '#states' => [
-        'visible' => ['input[name="ado_context_preview"' => ['filled' => true]],
+        'visible' => [':input[name="ado_context_preview"]' => ['filled' => true]],
       ],
     ];
 

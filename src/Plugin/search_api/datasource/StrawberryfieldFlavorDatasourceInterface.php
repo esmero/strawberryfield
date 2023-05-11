@@ -26,4 +26,13 @@ interface StrawberryfieldFlavorDatasourceInterface extends DatasourceInterface, 
    */
   public static function getValidIndexes();
 
+  /**
+   * Retrieves on StrawberryFlavor Entry from the backend.
+   *
+   * @param $item_id
+   *
+   * @return mixed
+   */
+   public function getFlavorFromBackend($item_id);
+
 }

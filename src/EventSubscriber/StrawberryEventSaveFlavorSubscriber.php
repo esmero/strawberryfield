@@ -3,6 +3,7 @@
 namespace Drupal\strawberryfield\EventSubscriber;
 
 use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Field\EntityReferenceFieldItemListInterface;
 use Drupal\Core\KeyValueStore\KeyValueFactoryInterface;
 use Drupal\file\FileInterface;
 use Drupal\search_api\Query\QueryInterface;
@@ -105,7 +106,7 @@ class StrawberryEventSaveFlavorSubscriber extends StrawberryfieldEventSaveSubscr
       $query->addCondition('file_uuid', $file->uuid())
         ->addCondition('search_api_datasource', $datasource_id)
         ->addCondition('uuid', $entity->uuid());
-      $query->setOption('search_api_retrieved_field_values', ['id']);
+      $query->setOption('search_api_retrieved_field_values', ['id' => 'id']);
       // Query breaks if not because standard hl is enabled for all fields.
       // and normal hl offsets on OCR HL specific ones.
       $query->setOption('ocr_highlight', 'on');
@@ -130,6 +131,7 @@ class StrawberryEventSaveFlavorSubscriber extends StrawberryfieldEventSaveSubscr
           }
           // If there are still more left, change the range and query again.
           if (count($tracked_ids) < $max) {
+            $query = $query->getOriginalQuery();
             $query->range($limit * $i, $limit);
             $results = $query->execute();
             $newcount = $results->getResultCount();
@@ -163,6 +165,7 @@ class StrawberryEventSaveFlavorSubscriber extends StrawberryfieldEventSaveSubscr
   protected function trackFlavorsNeedUpdate(EntityInterface $entity, array $deleted_ids) {
     $datasource_id = 'strawberryfield_flavor_datasource';
     $limit = 200;
+    $parent_entity_index_needs_update = FALSE;
     foreach (StrawberryfieldFlavorDatasource::getValidIndexes() as $index) {
       $query = $index->query(['offset' => 0, 'limit' => $limit]);
       $query->addCondition('search_api_datasource', $datasource_id)
@@ -198,14 +201,41 @@ class StrawberryEventSaveFlavorSubscriber extends StrawberryfieldEventSaveSubscr
             $newcount = $results->getResultCount();
           }
         }
+
         // Update after all possible query calls with offsets.
         $tracked_ids = array_diff($tracked_ids, $deleted_ids);
         if (count($tracked_ids) > 0) {
+          $parent_entity_index_needs_update = TRUE;
           $index->trackItemsUpdated($datasource_id, $tracked_ids);
         }
       }
       catch (SearchApiException $searchApiException) {
         watchdog_exception('strawberryfield', $searchApiException, 'We could not update tracking Strawberry Flavor Documents to Index because the Solr Query returned an exception at server level.');
+      }
+    }
+
+    if ($parent_entity_index_needs_update && $entity->field_sbf_nodetonode instanceof EntityReferenceFieldItemListInterface) {
+      $indexes = [];
+      /** @var \Drupal\search_api\Plugin\search_api\datasource\ContentEntityTrackingManager $tracking_manager */
+      $tracking_manager = \Drupal::getContainer()
+        ->get('search_api.entity_datasource.tracking_manager');
+      foreach ($entity->field_sbf_nodetonode->referencedEntities() as $key => $referencedEntity) {
+        if (!isset($indexes[$referencedEntity->getType()])) {
+          $indexes[$referencedEntity->getType()]
+            = $tracking_manager->getIndexesForEntity($referencedEntity);
+        }
+        $updated_item_ids = [];
+        $entity_id = $referencedEntity->id();
+        $langcode = [$referencedEntity->language()->getId()];
+        $combine_id = function ($langcode) use ($entity_id) {
+          return $entity_id . ':' . $langcode;
+        };
+        $updated_item_ids = array_map($combine_id, array_values($langcode));
+        if (isset($indexes[$referencedEntity->getType()])) {
+          foreach ($indexes[$referencedEntity->getType()] as $index) {
+            $index->trackItemsUpdated('entity:node', $updated_item_ids);
+          }
+        }
       }
     }
   }
