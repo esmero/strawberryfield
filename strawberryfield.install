@@ -9,6 +9,10 @@ use Drupal\taxonomy\Entity\Vocabulary;
 use Drupal\taxonomy\Entity\Term;
 use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\field\Entity\FieldConfig;
+use Drupal\views\Views;
+use Drupal\Core\Config\FileStorage;
+use Drupal\Core\Config\InstallStorage;
+use Drupal\Core\Config\StorageInterface;
 
 /**
  * Implements hook_install().
@@ -91,4 +95,47 @@ function strawberryfield_update_9102() {
       $block->save(TRUE);
     }
   }
+}
+
+/**
+ * Import views for ADO Tools children.
+ *
+ */
+function strawberryfield_update_9103() {
+  $view_names = ['ado_tools_children', 'ado_tools_children_creative_work_series'];
+  $views_set = true;
+  foreach ($view_names as $view_name) {
+    $view = Views::getView($view_name);
+    if(!isset($view)) {
+      $views_set = false;
+    }
+  }
+  if(!$views_set) {
+    strawberryfield_update_helper_install_configs();
+  }
+}
+
+/**
+ * Helper function to install all new configs.
+ *
+ * @param string $directory
+ *   The configs directory.
+ */
+function strawberryfield_update_helper_install_configs($directory = InstallStorage::CONFIG_OPTIONAL_DIRECTORY) {
+  /** @var \Drupal\Core\Config\ConfigInstallerInterface $config_installer */
+  $config_installer = \Drupal::service('config.installer');
+  $config_installer->installDefaultConfig('module', 'strawberryfield');
+
+  $optional_install_path = \Drupal::moduleHandler()
+                                  ->getModule('strawberryfield')
+                                  ->getPath() . '/' . $directory;
+  if (is_dir($optional_install_path)) {
+    // Install any optional config the module provides.
+    $storage = new FileStorage($optional_install_path, StorageInterface::DEFAULT_COLLECTION);
+    $config_installer->installOptionalConfig($storage);
+  }
+  $restrict_by_dependency = [
+    'module' => 'strawberryfield',
+  ];
+  $config_installer->installOptionalConfig(NULL, $restrict_by_dependency);
 }
