@@ -43,6 +43,7 @@ function strawberryfield_install() {
     $field = FieldConfig::create(['field_storage' => $fieldstorage, 'bundle' => $vid]);
     $field->save();
   }
+  strawberryfield_update_helper_install_configs();
 }
 
 /**
