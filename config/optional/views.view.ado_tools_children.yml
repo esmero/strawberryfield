@@ -1,4 +1,3 @@
-uuid: b7bde83a-c500-4c47-9cad-c96457cbf0d2
 langcode: en
 status: true
 dependencies:
@@ -6,8 +5,7 @@ dependencies:
     - search_api.index.default_solr_index
   module:
     - search_api
-_core:
-  default_config_hash: OBOETW0EZtZCux-LyxboihwxjTDcvuMnqQADfVhWWpE
+    - strawberryfield
 id: ado_tools_children
 label: ADO_Tools_Children
 module: views
