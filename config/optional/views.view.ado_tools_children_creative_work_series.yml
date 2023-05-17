@@ -6,6 +6,8 @@ dependencies:
     - search_api.index.default_solr_index
   module:
     - search_api
+_core:
+  default_config_hash: hAINKR52BFTMLYob5X1PA-5w5h5I1w5S0iWxGbdpmo0
 id: ado_tools_children_creative_work_series
 label: ADO_Tools_Children_Creative_Work_Series
 module: views
@@ -446,7 +448,7 @@ display:
         type: full
         options:
           offset: 0
-          items_per_page: 50
+          items_per_page: 10
           total_pages: null
           id: 0
           tags:
@@ -490,6 +492,19 @@ display:
           plugin_id: messages
           empty: true
       sorts:
+        sequence_id_1:
+          id: sequence_id_1
+          table: search_api_index_default_solr_index
+          field: sequence_id_1
+          relationship: none
+          group_type: group
+          admin_label: ''
+          plugin_id: search_api
+          order: ASC
+          expose:
+            label: ''
+            field_identifier: ''
+          exposed: false
         changed:
           id: changed
           table: search_api_index_default_solr_index
@@ -679,4 +694,3 @@ display:
         - 'user.node_grants:view'
       tags:
         - 'config:search_api.index.default_solr_index'
-
