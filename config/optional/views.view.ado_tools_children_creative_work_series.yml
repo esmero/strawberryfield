@@ -1,3 +1,4 @@
+uuid: db041c3a-c29a-4900-80f8-c5383b60584c
 langcode: en
 status: true
 dependencies:
@@ -5,7 +6,10 @@ dependencies:
     - search_api.index.default_solr_index
   module:
     - search_api
-    - strawberryfield
+  enforced:
+    module:
+      - search_api_solr
+      - strawberryfield
 id: ado_tools_children_creative_work_series
 label: ADO_Tools_Children_Creative_Work_Series
 module: views
@@ -16,7 +20,7 @@ base_field: search_api_id
 display:
   default:
     id: default
-    display_title: Master
+    display_title: Default
     display_plugin: default
     position: 0
     display_options:
@@ -93,16 +97,15 @@ display:
             use_highlighting: false
             multi_type: separator
             multi_separator: ', '
-        type:
-          id: type
-          table: search_api_datasource_default_solr_index_entity_node
-          field: type
+        digital_object_type:
+          id: digital_object_type
+          table: search_api_index_default_solr_index
+          field: digital_object_type
           relationship: none
           group_type: group
           admin_label: ''
-          entity_type: node
-          plugin_id: search_api_field
-          label: 'Content type'
+          plugin_id: search_api
+          label: 'Digital Object Type'
           exclude: false
           alter:
             alter_text: false
@@ -143,30 +146,10 @@ display:
           hide_empty: false
           empty_zero: false
           hide_alter_empty: true
-          click_sort_column: target_id
-          type: entity_reference_label
-          settings:
-            link: false
-          group_column: target_id
-          group_columns: {  }
-          group_rows: true
-          delta_limit: 0
-          delta_offset: 0
-          delta_reversed: false
-          delta_first_last: false
+          link_to_item: false
+          use_highlighting: false
           multi_type: separator
-          separator: ', '
-          field_api_classes: false
-          field_rendering: true
-          fallback_handler: search_api_entity
-          fallback_options:
-            link_to_item: false
-            use_highlighting: false
-            multi_type: separator
-            multi_separator: ', '
-            display_methods:
-              node_type:
-                display_method: label
+          multi_separator: ', '
         author:
           id: author
           table: search_api_index_default_solr_index
@@ -392,6 +375,59 @@ display:
             use_highlighting: false
             multi_type: separator
             multi_separator: ', '
+        sequence_id_1:
+          id: sequence_id_1
+          table: search_api_index_default_solr_index
+          field: sequence_id_1
+          relationship: none
+          group_type: group
+          admin_label: ''
+          plugin_id: search_api
+          label: 'Sequence ID'
+          exclude: false
+          alter:
+            alter_text: false
+            text: ''
+            make_link: false
+            path: ''
+            absolute: false
+            external: false
+            replace_spaces: false
+            path_case: none
+            trim_whitespace: false
+            alt: ''
+            rel: ''
+            link_class: ''
+            prefix: ''
+            suffix: ''
+            target: ''
+            nl2br: false
+            max_length: 0
+            word_boundary: true
+            ellipsis: true
+            more_link: false
+            more_link_text: ''
+            more_link_path: ''
+            strip_tags: false
+            trim: false
+            preserve_tags: ''
+            html: false
+          element_type: ''
+          element_class: ''
+          element_label_type: ''
+          element_label_class: ''
+          element_label_colon: true
+          element_wrapper_type: ''
+          element_wrapper_class: ''
+          element_default_classes: true
+          empty: ''
+          hide_empty: false
+          empty_zero: false
+          hide_alter_empty: true
+          link_to_item: false
+          use_highlighting: false
+          multi_type: separator
+          multi_separator: ', '
         search_api_operations:
           id: search_api_operations
           table: search_api_index_default_solr_index
