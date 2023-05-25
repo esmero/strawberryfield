@@ -105,6 +105,9 @@ class StrawberryFieldBreadcrumbBuilder implements BreadcrumbBuilderInterface {
     if ($this->configFactory->get('strawberryfield.breadcrumbs')->get('type') === 'longest') {
       $longest_trail = !empty($trail_flat) ? max($trail_flat) : [];
     }
+    elseif ($this->configFactory->get('strawberryfield.breadcrumbs')->get('type') === 'shortest') {
+      $longest_trail = !empty($trail_flat) ? min($trail_flat) : [];
+    }
     else {
       $longest_trail = $this->smartTrail($trail_flat);
     }
