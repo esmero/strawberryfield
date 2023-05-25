@@ -70,6 +70,7 @@ class BreadcrumbSettingsForm extends ConfigFormBase {
       '#options' => [
         'longest' => 'Use first Longest parentship trail',
         'smart' => 'Use the the most representative longest parentship trail based also on the shorter ones.',
+        'shortest' => 'Use the shorter one. Useful when all paths end in the same parent.',
       ],
       '#default_value' => $breadcrumb_type->get('type'),
       "#empty_value" => NULL,
