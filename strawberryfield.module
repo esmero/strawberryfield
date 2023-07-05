@@ -303,11 +303,6 @@ function strawberryfield_file_mimetype_mapping_alter(&$mapping) {
   // @ WACZ WIP.
   $mapping['mimetypes']['wacz_mimetype'] = 'application/vnd.datapackage+zip';
   $mapping['extensions']['wacz'] = 'wacz_mimetype';
-  // @Wrong JPEG and TIFF from remote sources
-  $mapping['mimetypes']['jpg_mimetype'] = 'image/jpg';
-  $mapping['mimetypes']['tif_mimetype'] = 'image/tif';
-  $mapping['extensions']['tiff'] = 'tif_mimetype';
-  $mapping['extensions']['jpg'] = 'jpg_mimetype';
 
 }
 
