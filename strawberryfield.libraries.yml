@@ -21,3 +21,10 @@ strawberryfield.d3viz:
     - strawberryfield/d3js
     - strawberryfield/d3jsplus
     - core/drupal.form
+jmespath_codemirror_strawberryfield:
+  version: 1.0
+  js:
+    js/jmespath-codemirror_strawberryfield.js: {minified: false}
+  dependencies:
+    - core/jquery
+    - core/drupal
