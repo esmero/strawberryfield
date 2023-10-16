@@ -345,25 +345,37 @@ class StrawberryFlavorContentAccess extends ProcessorPluginBase {
     // Collect all the required fields that need to be part of the index.
     $unpublished_own = $account->hasPermission('view own unpublished content');
 
-    $enabled_conditions = $query->createConditionGroup('OR', ['content_access_enabled']);
-    foreach ($affected_datasources as $entity_type => $datasources) {
-      foreach ($datasources as $datasource_id) {
-        // If this is a comment datasource, or users cannot view their own
-        // unpublished nodes, a simple filter on "status" is enough. Otherwise,
-        // it's a bit more complicated.
-        $status_field = $this->findField($datasource_id, 'status', 'boolean');
-        if ($status_field) {
-          $enabled_conditions->addCondition($status_field->getFieldIdentifier(), TRUE);
-        }
-        if ($entity_type == 'node' && $unpublished_own) {
-          $author_field = $this->findField($datasource_id, 'uid', 'integer');
-          if ($author_field) {
-            $enabled_conditions->addCondition($author_field->getFieldIdentifier(), $account->id());
+    // Add awareness to Moderation Module's "View any unpublished content"
+    $unpublished_any = $account->hasPermission('view any unpublished content');
+
+    // No need to check on status or ownership if the user can already see any unpublished content
+    if (!$unpublished_any) {
+      $enabled_conditions = $query->createConditionGroup(
+        'OR', ['content_access_enabled']
+      );
+      foreach ($affected_datasources as $entity_type => $datasources) {
+        foreach ($datasources as $datasource_id) {
+          // If this is a comment datasource, or users cannot view their own
+          // unpublished nodes, a simple filter on "status" is enough. Otherwise,
+          // it's a bit more complicated.
+          $status_field = $this->findField($datasource_id, 'status', 'boolean');
+          if ($status_field) {
+            $enabled_conditions->addCondition(
+              $status_field->getFieldIdentifier(), TRUE
+            );
+          }
+          if ($entity_type == 'node' && $unpublished_own) {
+            $author_field = $this->findField($datasource_id, 'uid', 'integer');
+            if ($author_field) {
+              $enabled_conditions->addCondition(
+                $author_field->getFieldIdentifier(), $account->id()
+              );
+            }
           }
         }
       }
+      $access_conditions->addConditionGroup($enabled_conditions);
     }
-    $access_conditions->addConditionGroup($enabled_conditions);
 
     // Filter by the user's node access grants.
     $node_grants_field = $this->findField(NULL, 'search_api_node_grants', 'string');
