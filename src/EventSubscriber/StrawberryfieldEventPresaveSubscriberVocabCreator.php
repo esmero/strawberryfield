@@ -105,7 +105,7 @@ class StrawberryfieldEventPresaveSubscriberVocabCreator extends StrawberryfieldE
               $query->condition('vid', "strawberryfield_voc_id");
               $query->condition('name', $path);
               $query->condition('parent', $parent_id, 'IN');
-              $tids = $query->execute();
+              $tids = $query->accessCheck(FALSE)->execute();
               if (count($tids) == 0) {
                 $new_term = \Drupal\taxonomy\Entity\Term::create(
                   [
