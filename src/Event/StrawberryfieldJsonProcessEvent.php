@@ -2,7 +2,7 @@
 
 namespace Drupal\strawberryfield\Event;
 
-use Symfony\Component\EventDispatcher\Event;
+use Symfony\Contracts\EventDispatcher\Event;
 
 /**
  * Class to contain a SBF JSON processing event.
