@@ -5,7 +5,7 @@ namespace Drupal\strawberryfield\Event;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\strawberryfield\StrawberryfieldEventType;
-use Symfony\Component\EventDispatcher\Event;
+use Symfony\Contracts\EventDispatcher\Event;
 
 /**
  * Class to contain a SBF Service event.
