@@ -172,6 +172,7 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
       ->condition('entity_type', 'node')
       ->condition('bundle', $bundle)
       ->condition('field_type', 'strawberryfield_field')
+      ->accessCheck(FALSE)
       ->execute();
     $fields = $this->entityTypeManager->getStorage('field_config')
       ->loadMultiple($field_ids);
@@ -189,6 +190,7 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
       ->condition('entity_type', 'node')
       ->condition('bundle', $bundle)
       ->condition('field_type', 'strawberryfield_field')
+      ->accessCheck(FALSE)
       ->execute();
     $fields = $field_config->loadMultiple($field_ids);
 
@@ -289,7 +291,7 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
    * {@inheritdoc}
    */
   public function verifyDrush(string $execpath, string $home): bool {
-    $site_path = \Drupal::service('site.path'); // e.g.: 'sites/default'
+    $site_path = \Drupal::getContainer()->getParameter('site.path'); // e.g.: 'sites/default'
     $site_path = explode('/', $site_path);
     $site_name = $site_path[1];
     $execpath = $execpath . ' --uri=' . $site_name;
