@@ -40,7 +40,7 @@ class StrawberryfieldMimeService extends ExtensionMimeTypeGuesser {
   /**
    * {@inheritdoc}
    */
-  public function guess($path) {
+  public function guessMimeType($path): ?string  {
     if ($this->mapping === NULL) {
       $mapping = $this->defaultMapping;
       // Allow modules to alter the default mapping.
@@ -69,7 +69,14 @@ class StrawberryfieldMimeService extends ExtensionMimeTypeGuesser {
 
     // We return only the last one giving any more precise one to have a chance.
     return end($qualified);
+  }
 
+
+  /**
+   * {@inheritdoc}
+   */
+  public function guess($path) {
+    return $this->guessMimeType($path);
   }
 
 

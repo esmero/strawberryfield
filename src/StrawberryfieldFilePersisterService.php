@@ -534,7 +534,7 @@ class StrawberryfieldFilePersisterService {
       // Real use case since the file DB gets never reprocessed once saved.
       // And we could have update/upgraded our mappings.
       $uri = $file->getFileUri();
-      $mimetype = \Drupal::service('strawberryfield.mime_type.guesser.mime')->guess(
+      $mimetype = \Drupal::service('strawberryfield.mime_type.guesser.mime')->guessMimeType(
         $uri
       );
       if (($file->getMimeType(
