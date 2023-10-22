@@ -3,7 +3,7 @@ description: Creates a field type that stores JSON and makes it available to oth
 package: Archipelago
 type: module
 core_version_requirement: ^9.5 || ^10
-php: 8.1
+php: 8
 dependencies:
   - 'drupal:user'
   - 'drupal:field'
