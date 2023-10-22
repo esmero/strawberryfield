@@ -7,13 +7,14 @@
 
 namespace Drupal\strawberryfield\ProxyClass {
 
-    /**
+  use Drupal\Core\File\MimeType\ExtensionMimeTypeGuesser;
+
+  /**
      * Provides a proxy class for \Drupal\strawberryfield\StrawberryfieldMimeService.
      *
      * @see \Drupal\Component\ProxyBuilder
      */
-    class StrawberryfieldMimeService implements \Symfony\Component\HttpFoundation\File\MimeType\MimeTypeGuesserInterface
-    {
+    class StrawberryfieldMimeService extends ExtensionMimeTypeGuesser {
 
         use \Drupal\Core\DependencyInjection\DependencySerializationTrait;
 

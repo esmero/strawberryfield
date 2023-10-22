@@ -8,14 +8,12 @@
 
 namespace Drupal\strawberryfield;
 
-use Symfony\Component\HttpFoundation\File\MimeType\MimeTypeGuesserInterface;
 use Drupal\Core\File\MimeType\ExtensionMimeTypeGuesser;
 
 /**
  * Makes possible to guess the extension of a file using the MIME type.
  */
-class StrawberryfieldMimeService extends ExtensionMimeTypeGuesser implements MimeTypeGuesserInterface {
-
+class StrawberryfieldMimeService extends ExtensionMimeTypeGuesser {
 
   /**
    * {@inheritdoc}
