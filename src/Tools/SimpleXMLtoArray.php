@@ -111,7 +111,7 @@ class SimpleXMLtoArray {
 
     //get text content of node
     $textContentArray = [];
-    $plainText = trim((string)$element);
+    $plainText = trim((string)($element ?? ''));
     if ($plainText !== '') $textContentArray[$this->options['textContent']] = $plainText;
 
     //stick it all together
