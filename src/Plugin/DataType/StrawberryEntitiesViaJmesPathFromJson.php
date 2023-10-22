@@ -67,7 +67,7 @@ class StrawberryEntitiesViaJmesPathFromJson extends StrawberryValuesViaJmesPathF
       $jmespath_array = array_map('trim', explode(',', $jmespaths));
       $jmespath_result = [];
       foreach ($jmespath_array as $jmespath) {
-        $jmespath_result[] = $item->searchPath(trim($jmespath),FALSE);
+        $jmespath_result[] = $item->searchPath(trim($jmespath ?? ''),FALSE);
       }
         foreach ($jmespath_result as $nodeid) {
           $item_values = (array) $nodeid;
