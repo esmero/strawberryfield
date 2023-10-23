@@ -114,3 +114,11 @@ services:
     class: Drupal\strawberryfield\EventSubscriber\SearchApiSolrEventSubscriber
     tags:
       - { name: event_subscriber }
+  strawberryfield.early_rendering_controller_wrapper_subscriber:
+    class: Drupal\strawberryfield\EventSubscriber\EarlyRenderingControllerWrapperSubscriber
+    decorates: early_rendering_controller_wrapper_subscriber
+    decoration_priority: 9
+    public: false
+    arguments: [ '@strawberryfield.early_rendering_controller_wrapper_subscriber.inner' ]
+    tags:
+      - { name: event_subscriber }
