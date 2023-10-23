@@ -8,8 +8,6 @@
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\EntityPublishedInterface;
 use Drupal\Core\Render\Markup;
-use Drupal\file\FileInterface;
-use Drupal\search_api\Query\QueryInterface;
 use Drupal\strawberryfield\Event\StrawberryfieldCrudEvent;
 use Drupal\strawberryfield\StrawberryfieldEventType;
 use Drupal\Core\Field\BaseFieldDefinition;
@@ -22,8 +20,6 @@ use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Field\FieldItemListInterface;
-use Solarium\Core\Query\QueryInterface as SolariumQueryInterface;
-use Solarium\Component\ComponentAwareQueryInterface;
 use Drupal\Core\Entity\Display\EntityViewDisplayInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\node\NodeInterface;
@@ -322,107 +318,6 @@ function strawberryfield_s3fs_url_settings_alter(array &$url_settings, $s3_file_
   // records the name of the currently logged in user.
   // $account = Drupal::currentUser();
   // $url_settings['custom_GET_args']['x-user'] = $account->getAccountName();
-}
-
-/**
- * Implements hook_search_api_solr_query_alter().
- *
- * Let modules alter the Solarium select query before executing it.
- *
- * After this hook, the select query will be finally converted into an
- * expression that will be processed by the lucene query parser. Therefore you
- * can't modify the 'q' parameter here, because it gets overwritten by that
- * conversion. If you need to modify the 'q' parameter you should implement an
- * event listener instead of this hook that handles the solarium events (our
- * connector injects the drupal event handler into solarium) or implement
- * hook_search_api_solr_converted_query() instead. If you want to force a
- * different parser like edismax you must set the 'defType' parameter
- * accordingly.
- */
-function strawberryfield_search_api_solr_query_alter(SolariumQueryInterface $solarium_query, QueryInterface $query) {
-  // To get a list of solarium events:
-  // @see http://solarium.readthedocs.io/en/stable/customizing-solarium/#plugin-system
-  if ($query->getOption('no_highlight')) {
-    $solarium_query->addParam('hl', 'false');
-    /* @var \Solarium\Component\Highlighting\Highlighting $hl */
-    $hl = $solarium_query->getHighlighting();
-    $hl->clearFields();
-  }
-
-  if ($query->getOption('ocr_highlight')) {
-    // $solr_field_names maps search_api field names to real field names in
-    // the Solr index.
-    $solr_field_names = $query->getIndex()->getServerInstance()->getBackend()->getSolrFieldNames($query->getIndex());
-    if (isset($solr_field_names['ocr_text'])) {
-      /* @var \Solarium\Component\Highlighting\Highlighting $hl */
-      $hl = $solarium_query->getHighlighting();
-      // hl.fl has issues if ocr_text is in that list (Token Offset big error,
-      // bad, bad)
-      // By removing any highlight returns in this case we can focus on what we
-      // need.
-      $hl->clearFields();
-
-      $solarium_query->addParam('hl.ocr.fl', $solr_field_names['ocr_text']);
-      $solarium_query->addParam('hl.ocr.absoluteHighlights', 'on');
-      // Only place where unified is justified
-      $hl->setMethod('unified');
-    }
-  }
-  elseif ($query->getOption('sbf_highlight_fields', FALSE)) {
-    //advanced_highlight_return
-    // ELSEIF bc OCR and these ones are incompatible
-    /* @var \Solarium\Component\Highlighting\Highlighting $hl */
-    $hl = $solarium_query->getHighlighting();
-    $highlight_fields = $query->getOption('sbf_highlight_fields',[]);
-    foreach ($highlight_fields as $highlighted_field) {
-      // We must not set the fields at once using setFields() to not break
-      // the altered queries.
-        $hl->addField($highlighted_field);
-    }
-
-    // Force HL to original for now. We can make this an option
-    // but given the Drupal nature of treating all Full Text fields as the same
-    // If a given Full text does not contain the vector index data required this will
-    // fail. Unified does not play with JOINs on Solr 9.1 throwing
-    // a class mismatch even if we are not asking for Highlights from the flavor.
-    // @TODO revisit for Solr 9.2.x
-    $hl->setUsePhraseHighlighter(TRUE);
-    $hl->setMethod('original');
-    $hl->setFragSize(128);
-    $hl->setRequireFieldMatch(TRUE);
-  }
-}
-
-function strawberryfield_search_api_solr_converted_query_alter(SolariumQueryInterface $solarium_query, QueryInterface $query) {
-  if ($query->getOption('sbf_advanced_highlight_flavor',FALSE)) {
-    $components = $solarium_query->getComponents();
-    if (isset($components['edismax'])) {
-      $solarium_query->removeComponent(
-        ComponentAwareQueryInterface::COMPONENT_EDISMAX
-      );
-      $solarium_query->addParam('defType', 'lucene');
-      /* @var \Solarium\Component\Highlighting\Highlighting $hl */
-      $hl = $solarium_query->getHighlighting();
-
-      $hl->setUsePhraseHighlighter(TRUE);
-      $hl->setDefaultSummary(TRUE);
-      $hl->setMethod('original');
-      $hl->setRequireFieldMatch(TRUE);
-      $hl->setFragsizeIsMinimum(FALSE);
-      $hl->setMergeContiguous(TRUE);
-      $hl->setFragSize(128);
-      if ($combined_keys = $query->getOption('sbf_join_flavor')['hl'] ?? NULL) {
-        $hl->setQuery($combined_keys);
-      }
-
-      // Because the Query Sets a few Fields to retrieve (to make it faster)
-      // But Search API is silly and decides that when that happens
-      // I want only those fields highlighted
-      // By setting the to all but limiting it to setRequireFieldMatch we only the matched ones.
-      // This fails with JOINS and unified so we set method original.
-      $hl->setFields(['*']);
-    }
-  }
 }
 
 /**

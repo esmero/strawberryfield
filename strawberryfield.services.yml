@@ -110,3 +110,7 @@ services:
   strawberryfield.lazy_builders:
     class: Drupal\strawberryfield\StrawberryfieldLazyBuilders
     arguments: [ '@entity_type.manager', '@renderer' ]
+  strawberryfield.search_api_solr_subscriber:
+    class: Drupal\strawberryfield\EventSubscriber\SearchApiSolrEventSubscriber
+    tags:
+      - { name: event_subscriber }
