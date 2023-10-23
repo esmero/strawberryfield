@@ -22,7 +22,7 @@
         "swaggest/json-diff":"~3.8",
         "frictionlessdata/datapackage": "dev-main",
         "drupal/search_api": "~1.29",
-        "drupal/search_api_solr": "^4.2.10",
+        "drupal/search_api_solr": "^4.2",
         "professional-wiki/edtf": "~3.0",
         "mhor/php-mediainfo": "~5.4"
     },
