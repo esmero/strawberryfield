@@ -45,7 +45,7 @@ function strawberryfield_node_presave(ContentEntityInterface $entity) {
     // event by calling it and for new ones. Etc.
     $event_type = StrawberryfieldEventType::PRESAVE;
     $event = new StrawberryfieldCrudEvent($event_type, $entity, $sbf_fields);
-    \Drupal::service('event_dispatcher')->dispatch($event_type, $event);
+    \Drupal::service('event_dispatcher')->dispatch($event, $event_type);
 
     if ($bench) {
       $end_time = microtime(TRUE);
@@ -77,7 +77,7 @@ function strawberryfield_node_update(ContentEntityInterface $entity) {
   if ($sbf_fields = \Drupal::service('strawberryfield.utility')->bearsStrawberryfield($entity)) {
     $event_type = StrawberryfieldEventType::SAVE;
     $event = new StrawberryfieldCrudEvent($event_type, $entity, $sbf_fields);
-    \Drupal::service('event_dispatcher')->dispatch($event_type, $event);
+    \Drupal::service('event_dispatcher')->dispatch($event, $event_type);
   }
 }
 
@@ -91,7 +91,7 @@ function strawberryfield_node_insert(ContentEntityInterface $entity) {
   if ($sbf_fields = \Drupal::service('strawberryfield.utility')->bearsStrawberryfield($entity)) {
     $event_type = StrawberryfieldEventType::INSERT;
     $event = new StrawberryfieldCrudEvent($event_type, $entity, $sbf_fields);
-    \Drupal::service('event_dispatcher')->dispatch($event_type, $event);
+    \Drupal::service('event_dispatcher')->dispatch($event, $event_type);
     // @TODO use updated $event object to debug things if an event failed.
     // via $event->getProcessedBy();
   }
@@ -104,7 +104,7 @@ function strawberryfield_node_revision_create(ContentEntityInterface $new_revisi
   if ($sbf_fields = \Drupal::service('strawberryfield.utility')->bearsStrawberryfield($entity)) {
     $event_type = StrawberryfieldEventType::NEW_REVISION;
     $event = new StrawberryfieldCrudEvent($event_type, $new_revision, $sbf_fields);
-    \Drupal::service('event_dispatcher')->dispatch($event_type, $event);
+    \Drupal::service('event_dispatcher')->dispatch($event, $event_type);
   }
 }
 
@@ -115,7 +115,7 @@ function strawberryfield_node_delete(ContentEntityInterface $entity) {
   if ($sbf_fields = \Drupal::service('strawberryfield.utility')->bearsStrawberryfield($entity)) {
     $event_type = StrawberryfieldEventType::DELETE;
     $event = new StrawberryfieldCrudEvent($event_type, $entity, $sbf_fields);
-    \Drupal::service('event_dispatcher')->dispatch($event_type, $event);
+    \Drupal::service('event_dispatcher')->dispatch($event, $event_type);
   }
 }
 
@@ -127,7 +127,7 @@ function strawberryfield_node_revision_delete(ContentEntityInterface $entity) {
   if ($sbf_fields = \Drupal::service('strawberryfield.utility')->bearsStrawberryfield($entity)) {
     $event_type = StrawberryfieldEventType::DELETE;
     $event = new StrawberryfieldCrudEvent($event_type, $entity, $sbf_fields);
-    \Drupal::service('event_dispatcher')->dispatch($event_type, $event);
+    \Drupal::service('event_dispatcher')->dispatch($event, $event_type);
   }
   // @TODO move this to an event subscriber.
   strawberryfield_invalidate_fieldefinition_caches($entity);
