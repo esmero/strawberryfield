@@ -8,6 +8,5 @@ dependencies:
   - 'drupal:user'
   - 'drupal:field'
   - 'drupal:serialization'
-  - 'drupal:hal'
   - 'drupal:file'
   - 'search_api:search_api'
