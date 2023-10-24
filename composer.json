@@ -1,6 +1,6 @@
 {
     "name": "strawberryfield/strawberryfield",
-    "description": "A strawberry field for Drupal 8",
+    "description": "A strawberry field for Drupal 9",
     "type": "drupal-module",
     "license": "GPL-2.0+",
     "homepage": "https://github.com/esmero/strawberryfield",
@@ -13,17 +13,17 @@
         }
     ],
     "require": {
-        "php": ">=7.3",
+        "php": ">=7.4",
         "ext-json": "*",
-        "drupal/core": "^8.9 || ^9",
+        "drupal/core": ">=9.5 <10.0",
         "ml/json-ld": "~1.1",
-        "mtdowling/jmespath.php":"~2.5",
+        "mtdowling/jmespath.php":"~2.6",
         "swaggest/json-schema":"~0.12",
-        "swaggest/json-diff":"~3.7",
+        "swaggest/json-diff":"~3.8",
         "frictionlessdata/datapackage": "dev-main",
-        "drupal/search_api": "~1.19",
-        "drupal/search_api_solr": "~4.1",
-        "professional-wiki/edtf": "~2.0",
+        "drupal/search_api": "~1.29",
+        "drupal/search_api_solr": "^4.2.10",
+        "professional-wiki/edtf": "~3.0",
         "mhor/php-mediainfo": "~5.4"
     },
     "minimum-stability": "dev",

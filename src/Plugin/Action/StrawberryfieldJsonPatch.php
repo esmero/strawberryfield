@@ -215,7 +215,6 @@ JSON;
       if ($sbf_fields = $this->strawberryfieldUtility->bearsStrawberryfield(
         $entity
       )) {
-        $this->messenger()->addMessage($this->configuration['simulate']);
         $this->patchArray = json_decode($this->configuration['jsonpatch']);
         foreach ($sbf_fields as $field_name) {
           /* @var $field \Drupal\Core\Field\FieldItemInterface */

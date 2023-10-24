@@ -5,6 +5,7 @@ namespace Drupal\strawberryfield\Controller;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Controller\ControllerBase;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\search_api\Item\Field;
 use Drupal\search_api\Query\QueryInterface;
 use Drupal\strawberryfield\Plugin\search_api\datasource\StrawberryfieldFlavorDatasource;
 use Ramsey\Uuid\Uuid;
@@ -66,7 +67,6 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
     $this->strawberryfieldUtility = $strawberryfield_utility_service;
     $this->entityTypeManager = $entitytype_manager;
     $this->parseModeManager = $parse_mode_manager;
-
   }
 
   /**
@@ -112,7 +112,6 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
     //search for IAB highlight
     // if format=json, page=all and q not null
     if (($input = $request->query->get('q')) && ($format == 'json') && ($page == 'all')) {
-
 
       $snippets = $this->flavorfromSolrIndex(
         $input,
@@ -187,7 +186,7 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
    * @throws \Drupal\Component\Plugin\Exception\PluginException
    * @throws \Drupal\search_api\SearchApiException
    */
-  protected function flavorfromSolrIndex(string $term, int $nodeid, string $processor, string $file_uuid, array $indexes, $limit = 50) {
+  protected function flavorfromSolrIndex(string $term, int $nodeid, string $processor, string $file_uuid, array $indexes, $limit = 100) {
     /* @var \Drupal\search_api\IndexInterface[] $indexes */
     $result_snippets = [];
     foreach ($indexes as $search_api_index) {
@@ -200,13 +199,29 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
 
       $parse_mode = $this->parseModeManager->createInstance('terms');
       $query->setParseMode($parse_mode);
-      $query->sort('search_api_relevance', 'DESC');
       $query->keys($term);
 
       $query->setFulltextFields(['ocr_text']);
 
-      $query->addCondition('parent_id', $nodeid)
-        ->addCondition('search_api_datasource', 'strawberryfield_flavor_datasource')
+      $allfields_translated_to_solr = $search_api_index->getServerInstance()
+        ->getBackend()
+        ->getSolrFieldNames($query->getIndex());
+      /* Forcing here two fixed options */
+      $parent_conditions = $query->createConditionGroup('OR');
+      if (isset($allfields_translated_to_solr['parent_id'])) {
+        $parent_conditions->addCondition('parent_id', $nodeid);
+      }
+      // The property path for this is: target_id:field_descriptive_metadata:sbf_entity_reference_ispartof:nid
+      // TODO: This needs a config form. For now let's document. Even if not present
+      // It will not fail.
+      if (isset($allfields_translated_to_solr['top_parent_id'])) {
+        $parent_conditions->addCondition('top_parent_id', $nodeid);
+      }
+      if (count($parent_conditions->getConditions())) {
+        $query->addConditionGroup($parent_conditions);
+      }
+
+      $query->addCondition('search_api_datasource', 'strawberryfield_flavor_datasource')
         ->addCondition('processor_id', $processor);
       // IN the case of multiple files being used in the same IIIF manifest we do not limit
       // Which file we are loading.
@@ -215,6 +230,8 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
       // And preprocess everything here.
       // Its like having the same Twig template on front and back?
       // @giancarlobi. Maybe an idea for the future once this "works".
+      // $solarium_query->createFilterQuery('language_filter')->setQuery(
+      // $this->createFilterQuery($unspecific_field_names['search_api_language'], $language_ids, 'IN', new Field($index, 'search_api_language'), $options)
 
       if ($file_uuid != 'all') {
         if (Uuid::isValid($file_uuid)) {
@@ -222,16 +239,30 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
         }
       }
 
-      $allfields_translated_to_solr = $search_api_index->getServerInstance()
-        ->getBackend()
-        ->getSolrFieldNames($query->getIndex());
       if (isset($allfields_translated_to_solr['ocr_text'])) {
         // Will be used by \strawberryfield_search_api_solr_query_alter
         $query->setOption('ocr_highlight', 'on');
         // We are already checking if the Node can be viewed. Custom Datasources can not depend on Solr node access policies.
         $query->setOption('search_api_bypass_access', TRUE);
       }
-      $query->setOption('search_api_retrieved_field_values', ['id']);
+      $fields_to_retrieve['id'] = 'id';
+      if (isset($allfields_translated_to_solr['parent_sequence_id'])) {
+        $fields_to_retrieve['parent_sequence_id'] = $allfields_translated_to_solr['parent_sequence_id'];
+      }
+      if (isset($allfields_translated_to_solr['sequence_id'])) {
+        $fields_to_retrieve['sequence_id'] = $allfields_translated_to_solr['sequence_id'];
+        $query->sort('sequence_id', QueryInterface::SORT_ASC);
+      }
+      if (isset($allfields_translated_to_solr['file_uuid'])) {
+        $fields_to_retrieve['file_uuid'] = $allfields_translated_to_solr['file_uuid'];
+      }
+      if (isset($allfields_translated_to_solr['sbf_file_uri'])) {
+        $fields_to_retrieve['sbf_file_uri'] = $allfields_translated_to_solr['sbf_file_uri'];
+      }
+      // This is documented at the API level but maybe our processing level
+      // Does not trigger it?
+      // Still keeping it because maybe/someday it will work out!
+      $query->setOption('search_api_retrieved_field_values', $fields_to_retrieve);
       // If we allow Extra processing here Drupal adds Content Access Check
       // That does not match our Data Source \Drupal\search_api\Plugin\search_api\processor\ContentAccess
       // we get this filter (see 2nd)
@@ -244,26 +275,58 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
         4 => 'ss_search_api_language:("en" "und" "zxx")',
       ),
        */
-
+      $query->sort('search_api_relevance', 'DESC');
       $query->setProcessingLevel(QueryInterface::PROCESSING_BASIC);
       $results = $query->execute();
-      $extradata = $results->getAllExtraData();
+      $extradata = $results->getAllExtraData() ?? [];
+      // remove the ID and the parent, not needed for file matching
+      unset($fields_to_retrieve['id']);
+      unset($fields_to_retrieve['parent_sequence_id']);
       // Just in case something goes wrong with the returning region text
       $region_text = $term;
+      $page_number_by_id = [];
       if ($results->getResultCount() >= 1) {
         if (isset($extradata['search_api_solr_response']['ocrHighlighting']) && count(
             $extradata['search_api_solr_response']['ocrHighlighting']
           ) > 0) {
+          foreach ($results as $result) {
+            $extradata_from_item = $result->getAllExtraData() ?? [];
+            if (isset($allfields_translated_to_solr['parent_sequence_id']) &&
+              isset($extradata_from_item['search_api_solr_document'][$allfields_translated_to_solr['parent_sequence_id']])) {
+              $sequence_number = (array) $extradata_from_item['search_api_solr_document'][$allfields_translated_to_solr['parent_sequence_id']];
+              if (isset($sequence_number[0]) && !empty($sequence_number[0]) && ($sequence_number[0] != 0)) {
+                // We do all this checks to avoid adding a strange offset e.g a collection instead of a CWS
+                $page_number_by_id[$extradata_from_item['search_api_solr_document']['id']] = $sequence_number[0];
+              }
+            }
+            foreach($fields_to_retrieve as $machine_name => $field) {
+              $filedata_by_id[$extradata_from_item['search_api_solr_document']['id']][$machine_name] = $extradata_from_item['search_api_solr_document'][$field] ?? NULL;
+            }
+            // If we use getField we can access the RAW/original source without touching Solr
+            // Not right now needed but will keep this around.
+            //e.g $sequence_id = $result->getField('sequence_id')->getValues();
+          }
+
           foreach ($extradata['search_api_solr_response']['ocrHighlighting'] as $sol_doc_id => $field) {
             $result_snippets_base = [];
-            if (isset($field[$allfields_translated_to_solr['ocr_text']]['snippets'])) {
+            $previous_text = '';
+            $accumulated_text = [];
+            if (isset($field[$allfields_translated_to_solr['ocr_text']]['snippets']) &&
+              is_array($field[$allfields_translated_to_solr['ocr_text']]['snippets'])) {
               foreach ($field[$allfields_translated_to_solr['ocr_text']]['snippets'] as $snippet) {
                 // IABR uses 0 to N-1. We may want to reprocess this for other endpoints.
                 //$page_number = strpos($snippet['pages'][0]['id'], $page_prefix) === 0 ? (int) substr(
                 //  $snippet['pages'][0]['id'],
                 //  $page_prefix_len
                 //) : (int) $snippet['pages'][0]['id'];
-                $page_number = preg_replace('/\D/', '', $snippet['pages'][0]['id']);
+                if (isset($page_number_by_id[$sol_doc_id])) {
+                  // If we have a Solr doc (means children) and their own page number use them here.
+                  $page_number = $page_number_by_id[$sol_doc_id];
+                }
+                else {
+                  // If not the case (e.g a PDF) go for it.
+                  $page_number = preg_replace('/\D/', '', $snippet['pages'][0]['id']);
+                }
                 // Just some check in case something goes wrong and page number is 0 or negative?
                 // and rebase page number starting with 0
                 $page_number = ($page_number > 0) ? (int) ($page_number - 1) : 0;
@@ -278,12 +341,13 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
                   'par' => [
                     [
                       'page' => $page_number,
-                      'boxes' => [],
+                      'boxes' => $result_snippets_base['par'][0]['boxes'] ?? [],
                     ],
                   ],
                 ];
 
                 foreach ($snippet['highlights'] as $highlight) {
+
                   $region_text = str_replace(
                     ['<em>', '</em>'],
                     ['{{{', '}}}'],
@@ -316,11 +380,17 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
                       'page' => $page_number,
                     ];
                   }
+                  $accumulated_text[] = $region_text;
                 }
               }
-              $result_snippets_base['text'] = $region_text;
+              $result_snippets_base['text'] = !empty($accumulated_text) ? implode(" ... ", array_unique($accumulated_text)) : $term;
+              // Add extra data that IAB does not need/nor understand but we do need
+              // To match Image IDs against sequences/canvases on an arbitrary
+              // IIIF manifest driven by a twig template.
+              foreach($fields_to_retrieve as $machine_name => $field) {
+                $result_snippets_base['sbf_metadata'][$machine_name] = $filedata_by_id[$sol_doc_id][$machine_name];
+              }
             }
-
             $result_snippets[] = $result_snippets_base;
           }
         }
@@ -328,7 +398,6 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
     }
     return ['matches' => $result_snippets];
   }
-
 
   /**
    * Gets the Original, un processed Content from a SBF Flavor

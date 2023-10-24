@@ -132,7 +132,7 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
       ],
     ];
 
-    $intervals = [21600, 43200, 86400, 604800, 2419200, 7776000];
+    $intervals = [3600, 10800, 21600, 43200, 86400, 604800, 2419200, 7776000];
     $period = array_combine($intervals, array_map([$this->dateFormatter, 'formatInterval'], $intervals));
 
     $form['compost_maximum_age'] = [
@@ -142,7 +142,12 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
       '#options' => $period,
       '#description' => $this->t('Temporary Files are left overs of Archipelago processing and associated modules. They are safe to be removed. <strong>NOTE:</strong> Cleanup frequency (check/delete) is different to this setting. Temporary Files might fill up your filesystem. Make sure the "Archipelago Temporary File Composter Queue Worker" queue is programmed to run frequently.'),
     ];
-
+    $form['compost_dot_files'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('During Compost, treat dot files as safe to be deleted, if inside a safe Path.'),
+      '#default_value' => $config_storage->get('compost_dot_files') ?? FALSE,
+      '#description' => $this->t('When enabled, we will ease the security concern for hidden files, if and only if the file to be composted is in a safe path. e.g /tmp. Safe paths by default are private://webform, temporary:// and /tmp'),
+    ];
     $form['extractmetadata'] = [
       '#type' => 'checkbox',
       '#title' => $this->t('Should File level metadata extraction be processed?'),
@@ -592,6 +597,7 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
       ->set('object_file_strategy', $form_state->getValue('object_file_strategy'))
       ->set('object_file_path', trim($form_state->getValue('object_file_path')," \n\r\t\v\0/"))
       ->set('compost_maximum_age', (int) $form_state->getValue('compost_maximum_age'))
+      ->set('compost_dot_files', (bool) $form_state->getValue('compost_dot_files'))
       ->save();
     parent::submitForm($form, $form_state);
   }

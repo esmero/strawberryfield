@@ -162,6 +162,8 @@ class CompostQueueWorker extends QueueWorkerBase implements ContainerFactoryPlug
         'module' => 'strawberryfield',
         'timestamp' => 1652919451,
     )
+    SBR might pass the 'uri' as absolute starting with /tmp so we also add that into the
+    Safe paths.
 */
     if (!function_exists('str_starts_with')) {
       function str_starts_with($haystack, $needle) {
@@ -186,6 +188,7 @@ class CompostQueueWorker extends QueueWorkerBase implements ContainerFactoryPlug
 
     $safe_paths
       = $safe_paths_default = [
+      $this->fileSystem->getTempDirectory(),
       'temporary://',
       'private://webform/',
       's3://webform/'
@@ -213,11 +216,15 @@ class CompostQueueWorker extends QueueWorkerBase implements ContainerFactoryPlug
     }
 
     $base_name = $this->fileSystem->basename($data->uri);
+    // Bypass prefix check if enabled and in a safe place already
+    $bypass_dot = ($this->config->get('compost_dot_files') && $safe);
 
-    foreach ($unsafe_prefix as $prefix) {
-      if (str_starts_with($base_name, $prefix)) {
-        $safe = FALSE;
-        break;
+    if (!$bypass_dot) {
+      foreach ($unsafe_prefix as $prefix) {
+        if (str_starts_with($base_name, $prefix)) {
+          $safe = FALSE;
+          break;
+        }
       }
     }
 
@@ -228,9 +235,29 @@ class CompostQueueWorker extends QueueWorkerBase implements ContainerFactoryPlug
       }
     }
 
+    // still never ever allow .htaccess or .env to be deleted.
+    // paranoid android-Diego.
+    if (in_array($base_name, ['.htaccess', '.env'])) {
+      $safe = FALSE;
+    }
+
+
     if (!$safe) {
-      // return silently. Safer...
-      return;
+      $this->loggerFactory->get('archipelago')->warning('Attempt to compost an unsafe File with path <em>@path</em> was made. Please manually delete it or lower/configure your security settings and code overrides defining what a Safe Path is.',[
+        '@path' => $data->uri
+      ]);
+      if (class_exists('\Drupal\Core\Queue\DelayedRequeueException')) {
+        throw new \Drupal\Core\Queue\DelayedRequeueException(
+          0, 'Unsafe File found. Check your logs and deal with it. We will still try again later.'
+        );
+      }
+      else {
+        // Drupal 8 Compat. This might make the queue run over this until
+        // Lease time expires. Not optimal.
+        throw new RequeueException(
+          'Unsafe File found. Check your logs and deal with it. We will still try again later.'
+        );
+      }
     }
     // Now check if the file is attached to an entity or not
     /** @var \Drupal\file\FileInterface[] $files */

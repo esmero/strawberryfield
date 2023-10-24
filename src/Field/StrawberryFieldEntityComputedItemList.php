@@ -42,7 +42,6 @@ class StrawberryFieldEntityComputedItemList extends EntityReferenceFieldItemList
           }
         }
         // Now see if we got entities
-        // I will not deduplicate here since frequency could be a desired factor
         $node_entities = array_unique($node_entities);
         foreach ($node_entities as $index => $id) {
           $this->list[$index] = $this->createItem($index, (int) $id);

@@ -107,3 +107,6 @@ services:
     arguments: ['@entity_type.manager', '@current_user', '@strawberryfield.utility', '@config.factory']
     tags:
       - { name: breadcrumb_builder, priority: 1500 }
+  strawberryfield.lazy_builders:
+    class: Drupal\strawberryfield\StrawberryfieldLazyBuilders
+    arguments: [ '@entity_type.manager', '@renderer' ]

@@ -23,6 +23,11 @@ use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Field\FieldItemListInterface;
 use Solarium\Core\Query\QueryInterface as SolariumQueryInterface;
+use Solarium\Component\ComponentAwareQueryInterface;
+use Drupal\Core\Entity\Display\EntityViewDisplayInterface;
+use Drupal\Core\Entity\EntityInterface;
+use Drupal\node\NodeInterface;
+
 
 /**
  * Implements hook_ENTITY_TYPE_presave().
@@ -298,6 +303,7 @@ function strawberryfield_file_mimetype_mapping_alter(&$mapping) {
   // @ WACZ WIP.
   $mapping['mimetypes']['wacz_mimetype'] = 'application/vnd.datapackage+zip';
   $mapping['extensions']['wacz'] = 'wacz_mimetype';
+
 }
 
 /**
@@ -358,7 +364,63 @@ function strawberryfield_search_api_solr_query_alter(SolariumQueryInterface $sol
 
       $solarium_query->addParam('hl.ocr.fl', $solr_field_names['ocr_text']);
       $solarium_query->addParam('hl.ocr.absoluteHighlights', 'on');
-      $solarium_query->addParam('hl.method', 'UnifiedHighlighter');
+      // Only place where unified is justified
+      $hl->setMethod('unified');
+    }
+  }
+  elseif ($query->getOption('sbf_highlight_fields', FALSE)) {
+    //advanced_highlight_return
+    // ELSEIF bc OCR and these ones are incompatible
+    /* @var \Solarium\Component\Highlighting\Highlighting $hl */
+    $hl = $solarium_query->getHighlighting();
+    $highlight_fields = $query->getOption('sbf_highlight_fields',[]);
+    foreach ($highlight_fields as $highlighted_field) {
+      // We must not set the fields at once using setFields() to not break
+      // the altered queries.
+        $hl->addField($highlighted_field);
+    }
+
+    // Force HL to original for now. We can make this an option
+    // but given the Drupal nature of treating all Full Text fields as the same
+    // If a given Full text does not contain the vector index data required this will
+    // fail. Unified does not play with JOINs on Solr 9.1 throwing
+    // a class mismatch even if we are not asking for Highlights from the flavor.
+    // @TODO revisit for Solr 9.2.x
+    $hl->setUsePhraseHighlighter(TRUE);
+    $hl->setMethod('original');
+    $hl->setFragSize(128);
+    $hl->setRequireFieldMatch(TRUE);
+  }
+}
+
+function strawberryfield_search_api_solr_converted_query_alter(SolariumQueryInterface $solarium_query, QueryInterface $query) {
+  if ($query->getOption('sbf_advanced_highlight_flavor',FALSE)) {
+    $components = $solarium_query->getComponents();
+    if (isset($components['edismax'])) {
+      $solarium_query->removeComponent(
+        ComponentAwareQueryInterface::COMPONENT_EDISMAX
+      );
+      $solarium_query->addParam('defType', 'lucene');
+      /* @var \Solarium\Component\Highlighting\Highlighting $hl */
+      $hl = $solarium_query->getHighlighting();
+
+      $hl->setUsePhraseHighlighter(TRUE);
+      $hl->setDefaultSummary(TRUE);
+      $hl->setMethod('original');
+      $hl->setRequireFieldMatch(TRUE);
+      $hl->setFragsizeIsMinimum(FALSE);
+      $hl->setMergeContiguous(TRUE);
+      $hl->setFragSize(128);
+      if ($combined_keys = $query->getOption('sbf_join_flavor')['hl'] ?? NULL) {
+        $hl->setQuery($combined_keys);
+      }
+
+      // Because the Query Sets a few Fields to retrieve (to make it faster)
+      // But Search API is silly and decides that when that happens
+      // I want only those fields highlighted
+      // By setting the to all but limiting it to setRequireFieldMatch we only the matched ones.
+      // This fails with JOINS and unified so we set method original.
+      $hl->setFields(['*']);
     }
   }
 }
@@ -373,5 +435,33 @@ function strawberryfield_cron() {
   // Is invoked but never with `drush cron`
   if (PHP_SAPI != 'cli') {
     \Drupal::getContainer()->get('strawberryfield.hydroponics')->run();
+  }
+}
+
+/**
+ * Implements hook_entity_view_alter().
+ */
+function strawberryfield_entity_view_alter(array &$build, EntityInterface $entity, EntityViewDisplayInterface $display) {
+  $excerpt_component = $display->getComponent('search_api_excerpt');
+  if ($excerpt_component !== NULL && $entity instanceof NodeInterface && $entity->view ?? NULL) {
+    if (\Drupal::request()->getMethod() == 'GET' ) {
+      // Check if the current index has lazy_excerpt enabled...
+      if ($processor = ($entity->view->getQuery()->getIndex()->getProcessors(
+        )['sbf_highlight'] ?? NULL)
+      ) {
+        if ($processor->getConfiguration()['lazy_excerpt']) {
+          $cid = 'entity:' . $entity->getEntityTypeId() . '/' . $entity->id()
+            . ':'
+            . $entity->language()->getId();
+          $build['search_api_excerpt'] = [
+            '#lazy_builder'       => [
+              'strawberryfield.lazy_builders:renderExcerpt',
+              [$cid, 'node:'.$entity->id()]
+            ],
+            '#create_placeholder' => TRUE,
+          ];
+        }
+      }
+    }
   }
 }
