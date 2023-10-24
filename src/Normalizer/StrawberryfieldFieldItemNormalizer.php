@@ -45,7 +45,7 @@ class StrawberryfieldFieldItemNormalizer extends FieldItemNormalizer {
   /**
    * {@inheritdoc}
    */
-  public function normalize($field_item, $format = NULL, array $context = []) {
+  public function normalize($field_item, $format = NULL, array $context = []):mixed {
     //@TODO check what options we can get from $context
     //@TODO allow per Field instance to limit which prop is internal or external
     // Only do this because parent implementation can change.
@@ -56,11 +56,11 @@ class StrawberryfieldFieldItemNormalizer extends FieldItemNormalizer {
     if ((isset($values[$mainproperty])) && (!empty($values[$mainproperty])) || $values[$mainproperty]!='') {
       $values[$mainproperty] = $this->serializer->decode($values[$mainproperty], 'json');
     }
-    
+
     return $values;
   }
 
-  public function denormalize($data, $class, $format = NULL, array $context = []) {
+  public function denormalize($data, $class, $format = NULL, array $context = []):mixed {
     if (!isset($context['target_instance'])) {
       throw new InvalidArgumentException('$context[\'target_instance\'] must be set to denormalize with the FieldItemNormalizer');
     }
@@ -79,22 +79,22 @@ class StrawberryfieldFieldItemNormalizer extends FieldItemNormalizer {
     foreach ($constructedValue as $key => $value) {
       $field_item->set($key, $value);
     }
-    
+
     return $field_item;
   }
 
   /**
    * Encodes the $data items that aren't already strings or computed/readOnly properties
-   * 
+   *
    * @param mixed $data
    * @param array $context
-   * 
+   *
    * @return array|mixed
-   */  
+   */
   protected function constructValue($data, $context) {
     // Encode individually, otherwise 'value' gets nested and breaks the SBF
     $individualEncodedValues = [];
-    
+
     $data_definition = $context['target_instance']->getDataDefinition();
 
     foreach ($data as $key => $value ) {
@@ -103,7 +103,7 @@ class StrawberryfieldFieldItemNormalizer extends FieldItemNormalizer {
       if ($data_definition->getPropertyDefinition($key)->isComputed() || $data_definition->getPropertyDefinition($key)->isReadOnly()) {
         continue;
       }
-      
+
       $isJsonString = StrawberryfieldJsonHelper::isJsonString($value);
       if ($isJsonString) {
         $encoded = $value;
@@ -112,7 +112,7 @@ class StrawberryfieldFieldItemNormalizer extends FieldItemNormalizer {
       }
       $individualEncodedValues[$key] = $encoded;
     }
-    
+
     return $individualEncodedValues;
   }
 
