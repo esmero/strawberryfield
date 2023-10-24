@@ -45,20 +45,21 @@ class StrawberryfieldFieldItemNormalizer extends FieldItemNormalizer {
   /**
    * {@inheritdoc}
    */
-  public function normalize($field_item, $format = NULL, array $context = []):mixed {
+  public function normalize($object, $format = NULL, array $context = []) {
     //@TODO check what options we can get from $context
     //@TODO allow per Field instance to limit which prop is internal or external
     // Only do this because parent implementation can change.
-    $values = parent::normalize($field_item, $format , $context);
+    $values = parent::normalize($object, $format , $context);
 
     //  Get the main property and decode
-    $mainproperty = $field_item->mainPropertyName();
+    $mainproperty = $object->mainPropertyName();
     if ((isset($values[$mainproperty])) && (!empty($values[$mainproperty])) || $values[$mainproperty]!='') {
       $values[$mainproperty] = $this->serializer->decode($values[$mainproperty], 'json');
     }
 
     return $values;
   }
+
 
   public function denormalize($data, $class, $format = NULL, array $context = []):mixed {
     if (!isset($context['target_instance'])) {
