@@ -9,6 +9,7 @@ use Drupal\strawberryfield\Plugin\Field\FieldType\StrawberryFieldItem;
 use Drupal\serialization\Normalizer\EntityReferenceFieldItemNormalizerTrait;
 use Drupal\Core\TypedData\TypedDataInternalPropertiesHelper;
 use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
+use ArrayObject;
 
 
 /**
