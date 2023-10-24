@@ -45,7 +45,7 @@ class StrawberryfieldFieldItemNormalizer extends FieldItemNormalizer {
   /**
    * {@inheritdoc}
    */
-  public function normalize($object, $format = NULL, array $context = []) {
+  public function normalize($object, $format = NULL, array $context = []): ArrayObject|array|string|int|float|bool|null {
     //@TODO check what options we can get from $context
     //@TODO allow per Field instance to limit which prop is internal or external
     // Only do this because parent implementation can change.
@@ -61,7 +61,7 @@ class StrawberryfieldFieldItemNormalizer extends FieldItemNormalizer {
   }
 
 
-  public function denormalize($data, $class, $format = NULL, array $context = []):mixed {
+  public function denormalize($data, $class, $format = NULL, array $context = []): ArrayObject|array|string|int|float|bool|null {
     if (!isset($context['target_instance'])) {
       throw new InvalidArgumentException('$context[\'target_instance\'] must be set to denormalize with the FieldItemNormalizer');
     }
