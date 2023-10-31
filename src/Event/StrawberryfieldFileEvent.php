@@ -5,7 +5,7 @@ namespace Drupal\strawberryfield\Event;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\strawberryfield\StrawberryfieldEventType;
-use Drupal\Component\EventDispatcher\Event;
+use Symfony\Contracts\EventDispatcher\Event;
 
 /**
  * File Event. Works on File paths/urls, not File Entities.

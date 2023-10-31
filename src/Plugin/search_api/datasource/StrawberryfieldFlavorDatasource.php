@@ -492,8 +492,7 @@ XML;
         '#multiple' => TRUE,
       ];
     }
-    if ($this->moduleHandler()->moduleExists('format_strawberryfield')) {
-
+    if (\Drupal::moduleHandler()->moduleExists('format_strawberryfield')) {
       $entity = NULL;
       if ($this->configuration['metadatadisplayentity_source']) {
         $entity = $this->entityTypeManager->getStorage(

@@ -169,9 +169,6 @@ class StrawberryfieldHydroponicsService {
     $config = $this->configFactory->get('strawberryfield.hydroponics_settings');
     if ($config->get('active')) {
       global $base_url;
-      $site_path = \Drupal::service('site.path'); // e.g.: 'sites/default'
-      $site_path = explode('/', $site_path);
-      $site_name = $site_path[1];
       $queuerunner_pid = (int) \Drupal::state()->get('hydroponics.queurunner_last_pid', 0);
       $lastRunTime = intval(\Drupal::state()->get('hydroponics.heartbeat'));
       $currentTime = intval(\Drupal::time()->getRequestTime());
