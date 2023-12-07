@@ -474,7 +474,7 @@ class StrawberryfieldFilePersisterService {
    */
   public function generateAsFileStructure(
     array $file_id_list,
-    $file_source_key,
+          $file_source_key,
     array $cleanjson = [],
     bool $force = FALSE,
     bool $force_reduced_techmd = FALSE
@@ -736,7 +736,7 @@ class StrawberryfieldFilePersisterService {
    */
   protected function retrieve_filestructure_from_metadata(
     array $cleanjsonbytype,
-    $file_id_list,
+          $file_id_list,
     string $file_source_key
   ) {
     $found = [];
@@ -809,65 +809,75 @@ class StrawberryfieldFilePersisterService {
                       $destination_folder,
                       FileSystemInterface::CREATE_DIRECTORY | FileSystemInterface::MODIFY_PERMISSIONS
                     );
-                    // Copy to new destination
-                    $destination_uri = $this->fileSystem->copy(
-                      $current_uri,
-                      $destination_uri
-                    );
+                    // Let's deal with the 5Gbyte Limit of the S3:// Wrapper here
+                    if ($file->getSize() >= $this->storageConfig->get('multipart_upload_threshold')) {
+                      $destination_uri = $this->copyOrPutS3Aware($current_uri, $destination_uri);
+                    }
+                    else {
+                      // Nomral Copy to new destination
+                      $destination_uri = $this->fileSystem->copy(
+                        $current_uri,
+                        $destination_uri
+                      );
+                    }
                     // Means moving was successful
                     if ($destination_uri) {
                       $file->setFileUri($destination_uri);
-                      $file->setPermanent();
-                      if (isset($info['name']) && !empty($info['name'])) {
-                        $file->setFilename($info['name']);
-                      }
-                      try {
-                        $file->save();
-                        $persisted++;
-                        $event_type = StrawberryfieldEventType::TEMP_FILE_CREATION;
-                        $current_timestamp = (new DrupalDateTime())->getTimestamp();
-                        $event = new StrawberryfieldFileEvent($event_type, 'strawberryfield', $current_uri, $current_timestamp);
-
-                        // This will allow any temp file on ADO save to be managed
-                        // IN a queue by \Drupal\strawberryfield\EventSubscriber\StrawberryfieldEventCompostBinSubscriber
-                        $this->eventDispatcher->dispatch($event, $event_type);
-                      }
-                      catch (\Drupal\Core\Entity\EntityStorageException $e) {
-                        $this->messenger()->addError(
-                          t(
-                            'Something went wrong when saving file @filename:, please check your logs.',
-                            ['@filename' => $file->getFilename()]
-                          )
-                        );
-                      }
-                    }
-                    // Count usage even if we had issues moving.
-                    // This gives us at least the chance to try again.
-                    if (!$entity->isNew()) {
-                      // We can not update its usage if the entity is new here
-                      // Because we have no entity id yet
-                      $this->add_file_usage(
-                        $file,
-                        $entity->id(),
-                        $entity_type_id
-                      );
                     }
                   }
+                  try {
+                    if (isset($info['name']) && !empty($info['name'])) {
+                      $file->setFilename($info['name']);
+                    }
+                    $file->setPermanent();
+                    $file->save();
+                    $persisted++;
+                    // Only attempt to compost if $destination_uri != $current_uri
+                    // basically if the File was already in the perfect spot why attempt it again?
+                    if ($destination_uri != $current_uri) {
+                      $event_type = StrawberryfieldEventType::TEMP_FILE_CREATION;
+                      $current_timestamp = (new DrupalDateTime())->getTimestamp();
+                      $event = new StrawberryfieldFileEvent($event_type, 'strawberryfield', $current_uri, $current_timestamp);
+                      // This will allow any temp file on ADO save to be managed
+                      // IN a queue by \Drupal\strawberryfield\EventSubscriber\StrawberryfieldEventCompostBinSubscriber
+                      $this->eventDispatcher->dispatch($event, $event_type);
+                    }
+                  }
+                  catch (\Drupal\Core\Entity\EntityStorageException $e) {
+                    $this->messenger()->addError(
+                      t(
+                        'Something went wrong when saving file @filename:, please check your logs.',
+                        ['@filename' => $file->getFilename()]
+                      )
+                    );
+                  }
                 }
-                else {
-                  $this->messenger()->addError(
-                    t(
-                      'Your content references a file at @fileurl with Internal ID @file_id that we could not find a full metadata definition for, maybe we forgot to process it?',
-                      ['@fileurl' => $current_uri, '@file_id' => $fid]
-                    )
+                // Count usage even if we had issues moving.
+                // This gives us at least the chance to try again.
+                if (!$entity->isNew()) {
+                  // We can not update its usage if the entity is new here
+                  // Because we have no entity id yet
+                  $this->add_file_usage(
+                    $file,
+                    $entity->id(),
+                    $entity_type_id
                   );
                 }
+              }
+              else {
+                $this->messenger()->addError(
+                  t(
+                    'Your content references a file at @fileurl with Internal ID @file_id that we could not find a full metadata definition for, maybe we forgot to process it?',
+                    ['@fileurl' => $current_uri, '@file_id' => $fid]
+                  )
+                );
               }
             }
           }
         }
       }
     }
+
     // Number of files we could store.
     return $persisted;
   }
@@ -1128,7 +1138,7 @@ class StrawberryfieldFilePersisterService {
     FileInterface $file,
     int $nodeid,
     string $entity_type_id = 'node',
-    $count = 1
+                  $count = 1
   ) {
     if (!$file || !$this->moduleHandler->moduleExists('file')) {
       return;
@@ -1166,8 +1176,8 @@ class StrawberryfieldFilePersisterService {
     string $data,
     string $path,
     string $filename,
-    $compress = FALSE,
-    $onlycompressed = TRUE
+           $compress = FALSE,
+           $onlycompressed = TRUE
   ) {
     $success = FALSE;
     $compress = (extension_loaded('zlib') && $compress);
@@ -1279,13 +1289,13 @@ class StrawberryfieldFilePersisterService {
       try {
         $client = $s3fs->getAmazonS3Client($config);
         $args = ['Bucket' => $config['bucket']];
-        if ($protocol == 'private') {
+        if ($protocol == 'private' && !empty($config['private_folder']) && strlen($config['private_folder'] ?? '' > 0)) {
           $key = $config['private_folder'] . '/' . $key;
         }
-        elseif ($protocol == 'public') {
+        elseif ($protocol == 'public' && !empty($config['public_folder']) && strlen($config['public_folder'] ?? '' > 0)) {
           $key = $config['public_folder'] . '/' . $key;
         }
-        if (!empty($config['root_folder'])) {
+        if (!empty($config['root_folder'])  && strlen($config['root_folder']  ?? '' > 0)) {
           $key = $config['root_folder'] . '/' . $key;
         }
         // Longer than the max Key for an S3 Object Path
@@ -1317,5 +1327,171 @@ class StrawberryfieldFilePersisterService {
       $wrapper->writeUriToCache($uri);
     }
     return $exists;
+  }
+
+  /**
+   *
+   * Copies a file, but also checks if source/destination require S3 Multipart workaround.
+   *
+   * @param string $source_uri
+   *    A source URI with stream wrapper protocol
+   * @param string $destination_uri
+   *   A destination URI with stream wrapper protocol
+   *
+   * @return string|bool
+   *    FALSE if copy/upload was unsucessfull. $destination_uri if all went well.
+   */
+  public function copyOrPutS3Aware(string $source_uri, string $destination_uri) {
+
+    $source_wrapper = $this->streamWrapperManager->getViaUri($source_uri);
+    $destination_wrapper = $this->streamWrapperManager->getViaUri($destination_uri);
+    $source_local = TRUE;
+    $destination_local = TRUE;
+    if (!$source_wrapper || !$destination_wrapper) {
+      return FALSE;
+    }
+
+    $parts = explode('://', $source_uri);
+    if (count($parts) == 2) {
+      $source_protocol = $parts[0];
+      $source_key = $parts[1];
+      if (get_class($source_wrapper) === 'Drupal\s3fs\StreamWrapper\S3fsStream') {
+        $source_local = FALSE;
+      }
+    } else {
+      // The URI is not even valid, do not bother on informing here
+      return FALSE;
+    }
+
+    $parts = explode('://', $destination_uri);
+    if (count($parts) == 2) {
+      $destination_protocol = $parts[0];
+      $destination_key = $parts[1];
+      if (get_class($destination_wrapper) === 'Drupal\s3fs\StreamWrapper\S3fsStream') {
+        $destination_local = FALSE;
+      }
+    } else {
+      // The URI is not even valid, do not bother on informing here
+      return FALSE;
+    }
+
+    if (!$destination_local) {
+      $s3fs = \Drupal::Service('s3fs');
+      $s3fsConfig = $this->configFactory->get('s3fs.settings');
+      foreach ($s3fsConfig->get() as $prop => $value) {
+        $config[$prop] = $value;
+      }
+      if ($destination_protocol == 'private' && !empty($config['private_folder']) && strlen($config['private_folder'] ?? '' > 0)) {
+        $destination_key = $config['private_folder'] . '/' . $destination_key;
+      }
+      elseif ($destination_protocol == 'public' && !empty($config['public_folder']) && strlen($config['public_folder'] ?? '' > 0)) {
+        $destination_key = $config['public_folder'] . '/' . $destination_key;
+      }
+      if (!empty($config['root_folder']) && strlen($config['root_folder']  ?? '' > 0)) {
+        $destination_key = $config['root_folder'] . '/' . $destination_key;
+      }
+      // Longer than the max Key for an S3 Object Path
+      if (mb_strlen(rtrim($destination_key, '/')) > 255) {
+        $this->loggerFactory->get('strawberryfield')->info('File !destination_uri will not be processed as S3 because the path is longer than 255 characters', ['!destination_uri' => $destination_uri]);
+        return FALSE;
+      }
+
+      try {
+        $client = $s3fs->getAmazonS3Client($config);
+        $options = [
+          'mup_threshold' => $this->storageConfig->get('multipart_upload_threshold')
+        ];
+        $bucket =  $config['bucket'];
+        if (!$source_local) {
+          if ($source_protocol == 'private' && !empty($config['private_folder']) && strlen($config['private_folder'] ?? '' > 0)) {
+            $source_key  = $config['private_folder'] . '/' . $source_key;
+          }
+          elseif ($source_protocol == 'public' && !empty($config['public_folder']) && strlen($config['public_folder'] ?? '' > 0)) {
+            $source_key = $config['public_folder'] . '/' . $source_key;
+          }
+          if (!empty($config['root_folder']) && strlen($config['root_folder']  ?? '' > 0)) {
+            $source_key = $config['root_folder'] . '/' . $source_key;
+          }
+
+          try {
+            $objectCopierPromise = new \Aws\S3\ObjectCopier($client, ['Bucket' => $bucket, 'Key' => $source_key], ['Bucket' => $bucket, 'Key' => $destination_key], 'private', $options);
+            $result = $objectCopierPromise->copy();
+            $destination_wrapper->writeUriToCache($destination_uri);
+            $this->loggerFactory->get('strawberryfield')->info('File was successfully Copied to S3 at !destination_uri via Multipart', ['!destination_uri' => $destination_uri]);
+            return $destination_uri;
+          }
+          catch (\Aws\Exception\MultipartUploadException $e) {
+            $this->loggerFactory->get('sbf')->error($e->getMessage());
+          }
+          catch (\Exception $e) {
+            $this->loggerFactory->get('sbf')->error($e->getMessage());
+          }
+        }
+        else {
+          // Use a stream instead of a file path.
+          $source = fopen($source_uri, 'rb');
+          if ($source) {
+            $objectUploaderPromise = new \Aws\S3\ObjectUploader($client, $bucket, $destination_key, $source, 'private', $options);
+            do {
+              try {
+                $result = $objectUploaderPromise->upload();
+                if ($result["@metadata"]["statusCode"] == '200') {
+                  $this->loggerFactory->get('strawberryfield')->info('File was successfully uploaded to S3 at %destination_uri via Multipart', ['%destination_uri' => $destination_uri]);
+                }
+                // If the SDK chooses a multipart upload, try again if there is an exception.
+                // Unlike PutObject calls, multipart upload calls are not automatically retried.
+              }
+              catch (\Aws\Exception\MultipartUploadException $e) {
+                rewind($source);
+                $this->loggerFactory->get('strawberryfield')->warning('File failed uploading to S3 at %destination_uri via Multipart but we will try again', ['%destination_uri' => $destination_uri]);
+                try {
+                  $uploader = new \Aws\S3\MultipartUploader($client, $source, [
+                    'state' => $e->getState(),
+                  ]);
+                }
+                catch (\Exception $e) {
+                  $this->loggerFactory->get('strawberryfield')->error('File failed uploading to S3 at %destination_uri from %source_uri via Multipart even if we retried', [
+                    '%destination_uri' => $destination_uri,
+                    '%source_uri' => $source_uri
+                  ]);
+                  return FALSE;
+                }
+              }
+            } while (!isset($result));
+            $destination_wrapper->writeUriToCache($destination_uri);
+            fclose($source);
+            return $destination_uri;
+          }
+          else {
+            $this->loggerFactory->get('strawberryfield')->error('File upload %source_uri failed because we could not open the Source.', [
+              '%source_uri' => $source_uri
+            ]);
+            return FALSE;
+          }
+        }
+
+      }
+      catch (\Exception $exception) {
+        $this->loggerFactory->get('strawberryfield')->error('File upload %source_uri failed because we could not connect to S3.', [
+          '%source_uri' => $source_uri
+        ]);
+        return FALSE;
+      }
+    }
+    else {
+      $destination_uri = $this->fileSystem->copy(
+        $source_uri,
+        $destination_uri
+      );
+      if ($destination_uri) {
+        return $destination_uri;
+      }
+      else {
+        $this->loggerFactory->get('strawberryfield')->error('File %source_uri direct copy operation failed.', [
+          '%source_uri' => $source_uri
+        ]);
+        return FALSE;
+      }
+    }
   }
 }
