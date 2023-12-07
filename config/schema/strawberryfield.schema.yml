@@ -79,6 +79,10 @@ strawberryfield.storage_settings:
     file_scheme:
       type: string
       label: 'Storage Scheme for Persisting Files'
+    multipart_upload_threshold:
+      type: integer
+      label: 'At what file size (in bytes) Multipart copy/put should be used when the destination of a file is S3'
+      default: 5368709120
     file_path:
       type: string
       label: 'Storage Path under the Storage Scheme, for Persisting Files'
