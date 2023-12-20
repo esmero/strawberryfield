@@ -814,7 +814,7 @@ class StrawberryfieldFilePersisterService {
                       $destination_uri = $this->copyOrPutS3Aware($current_uri, $destination_uri);
                     }
                     else {
-                      // Nomral Copy to new destination
+                      // Normal Copy to new destination
                       $destination_uri = $this->fileSystem->copy(
                         $current_uri,
                         $destination_uri
@@ -1469,7 +1469,6 @@ class StrawberryfieldFilePersisterService {
             return FALSE;
           }
         }
-
       }
       catch (\Exception $exception) {
         $this->loggerFactory->get('strawberryfield')->error('File upload %source_uri failed because we could not connect to S3.', [
