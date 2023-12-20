@@ -243,21 +243,10 @@ class CompostQueueWorker extends QueueWorkerBase implements ContainerFactoryPlug
 
 
     if (!$safe) {
-      $this->loggerFactory->get('archipelago')->warning('Attempt to compost an unsafe File with path <em>@path</em> was made. Please manually delete it or lower/configure your security settings and code overrides defining what a Safe Path is.',[
+      $this->loggerFactory->get('archipelago')->warning('Attempt to compost an unsafe File with path <em>@path</em> was made. If you need to remove it, please do it so manually. If not, you can ignore this warning.',[
         '@path' => $data->uri
       ]);
-      if (class_exists('\Drupal\Core\Queue\DelayedRequeueException')) {
-        throw new \Drupal\Core\Queue\DelayedRequeueException(
-          0, 'Unsafe File found. Check your logs and deal with it. We will still try again later.'
-        );
-      }
-      else {
-        // Drupal 8 Compat. This might make the queue run over this until
-        // Lease time expires. Not optimal.
-        throw new RequeueException(
-          'Unsafe File found. Check your logs and deal with it. We will still try again later.'
-        );
-      }
+      return;
     }
     // Now check if the file is attached to an entity or not
     /** @var \Drupal\file\FileInterface[] $files */

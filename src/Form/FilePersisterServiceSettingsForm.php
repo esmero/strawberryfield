@@ -81,6 +81,16 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
       '#options' => $scheme_options,
       '#required' => TRUE
     ];
+    $form['multipart_upload_threshold'] = [
+      '#type' => 'number',
+      '#title' => $this->t('Specify file size (in bytes) when Multipart Upload/Copy should be attempted.'),
+      '#description' => $this->t('Only applies when the Storage Scheme used is S3 driven (e.g s3://). The default is 5Gbytes. The lowest threshold possible is 100 Mbytes'),
+      '#default_value' => $config_storage->get('multipart_upload_threshold') ?? 5368709120,
+      '#min' => 104857600,
+      '#step' => 1048576,
+      '#max' => 5368709120,
+      '#required' => TRUE
+    ];
     $form['file_path'] = [
       '#type' => 'textfield',
       '#title' => $this->t('Relative Path for Persisting Files'),
@@ -593,6 +603,7 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
       ->save();
     $this->config('strawberryfield.storage_settings')
       ->set('file_scheme', $form_state->getValue('file_scheme'))
+      ->set('multipart_upload_threshold', (int) $form_state->getValue('multipart_upload_threshold'))
       ->set('file_path', trim($form_state->getValue('file_path')," \n\r\t\v\0/"))
       ->set('object_file_scheme', $form_state->getValue('object_file_scheme'))
       ->set('object_file_strategy', $form_state->getValue('object_file_strategy'))
