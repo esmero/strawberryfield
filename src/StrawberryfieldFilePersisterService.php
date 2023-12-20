@@ -1392,7 +1392,7 @@ class StrawberryfieldFilePersisterService {
       }
       // Longer than the max Key for an S3 Object Path
       if (mb_strlen(rtrim($destination_key, '/')) > 255) {
-        $this->loggerFactory->get('strawberryfield')->info('File !destination_uri will not be processed as S3 because the path is longer than 255 characters', ['!destination_uri' => $destination_uri]);
+        $this->loggerFactory->get('strawberryfield')->info('File @destination_uri will not be processed as S3 because the path is longer than 255 characters', ['@destination_uri' => $destination_uri]);
         return FALSE;
       }
 
@@ -1417,7 +1417,7 @@ class StrawberryfieldFilePersisterService {
             $objectCopierPromise = new \Aws\S3\ObjectCopier($client, ['Bucket' => $bucket, 'Key' => $source_key], ['Bucket' => $bucket, 'Key' => $destination_key], 'private', $options);
             $result = $objectCopierPromise->copy();
             $destination_wrapper->writeUriToCache($destination_uri);
-            $this->loggerFactory->get('strawberryfield')->info('File was successfully Copied to S3 at !destination_uri via Multipart', ['!destination_uri' => $destination_uri]);
+            $this->loggerFactory->get('strawberryfield')->info('File was successfully Copied to S3 at @destination_uri via Multipart', ['@destination_uri' => $destination_uri]);
             return $destination_uri;
           }
           catch (\Aws\Exception\MultipartUploadException $e) {
@@ -1436,21 +1436,21 @@ class StrawberryfieldFilePersisterService {
               try {
                 $result = $objectUploaderPromise->upload();
                 if ($result["@metadata"]["statusCode"] == '200') {
-                  $this->loggerFactory->get('strawberryfield')->info('File was successfully uploaded to S3 at %destination_uri via Multipart', ['%destination_uri' => $destination_uri]);
+                  $this->loggerFactory->get('strawberryfield')->info('File was successfully uploaded to S3 at @destination_uri via Multipart', ['@destination_uri' => $destination_uri]);
                 }
                 // If the SDK chooses a multipart upload, try again if there is an exception.
                 // Unlike PutObject calls, multipart upload calls are not automatically retried.
               }
               catch (\Aws\Exception\MultipartUploadException $e) {
                 rewind($source);
-                $this->loggerFactory->get('strawberryfield')->warning('File failed uploading to S3 at %destination_uri via Multipart but we will try again', ['%destination_uri' => $destination_uri]);
+                $this->loggerFactory->get('strawberryfield')->warning('File failed uploading to S3 at @destination_uri via Multipart but we will try again', ['@destination_uri' => $destination_uri]);
                 try {
                   $uploader = new \Aws\S3\MultipartUploader($client, $source, [
                     'state' => $e->getState(),
                   ]);
                 }
                 catch (\Exception $e) {
-                  $this->loggerFactory->get('strawberryfield')->error('File failed uploading to S3 at %destination_uri from %source_uri via Multipart even if we retried', [
+                  $this->loggerFactory->get('strawberryfield')->error('File failed uploading to S3 at @destination_uri from @source_uri via Multipart even if we retried', [
                     '%destination_uri' => $destination_uri,
                     '%source_uri' => $source_uri
                   ]);
