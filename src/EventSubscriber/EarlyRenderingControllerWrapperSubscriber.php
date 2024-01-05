@@ -22,7 +22,15 @@ class EarlyRenderingControllerWrapperSubscriber extends OriginalEarlyRenderingCo
   }
 
   protected function wrapControllerExecutionInRenderContext($controller, array $arguments) {
-    if(get_class($controller[0]) === "Drupal\jsonapi\Controller\EntityResource"){
+    $class = NULL;
+    if (is_array($controller) && !empty($controller[0]) && is_object($controller[0])) {
+      $class = get_class($controller[0]);
+    }
+    elseif (is_object($controller)) {
+      $class = get_class($controller);
+    }
+
+    if ($class === "Drupal\jsonapi\Controller\EntityResource"){
       $context = new RenderContext();
       $response = $this->renderer->executeInRenderContext($context, function () use ($controller, $arguments) {
         return call_user_func_array($controller, $arguments);
