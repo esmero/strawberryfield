@@ -864,11 +864,11 @@ class StrawberryfieldFilePersisterService {
                   );
                 }
               }
-              else {
+              elseif (!$file) {
                 $this->messenger()->addError(
                   t(
-                    'Your content references a file at @fileurl with Internal ID @file_id that we could not find a full metadata definition for, maybe we forgot to process it?',
-                    ['@fileurl' => $file->getFileUri(), '@file_id' => $fid]
+                    'Your content references a file with Internal ID @file_id that we could not find a File Entity for or a full metadata definition for.',
+                    ['@file_id' => $fid]
                   )
                 );
               }
