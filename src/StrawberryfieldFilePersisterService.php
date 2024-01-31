@@ -1080,7 +1080,7 @@ class StrawberryfieldFilePersisterService {
             $values = \Drupal::entityQuery($entity_type_id)->condition(
               'nid',
               $id
-            )->execute();
+            )->accessCheck(FALSE)->execute();
             if (empty($values)) {
               $this->remove_file_usage($file, $id, $entity_type_id, 0);
               $orphaned++;
