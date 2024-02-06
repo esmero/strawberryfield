@@ -1,11 +1,11 @@
-(function ($, Drupal, drupalSettings, d3, d3plus) {
+(function ($, Drupal, drupalSettings, d3, d3plus, once) {
     {
         'use strict';
 
         Drupal.strawberryfield_collapsible_tree = function(data, selector) {
 
             const root = d3.hierarchy(data);
-            const margin = {top: 40, right: 100, bottom: 40, left: 100};
+            const margin = {top: 40, right: 100, bottom: 40, left: 120};
             const width = 940 - margin.right - margin.left;
             const height = 1024 - margin.top - margin.bottom;
             const dx = 10;
@@ -36,7 +36,7 @@
 
             const svg = d3.select(selector).append("svg")
                 .attr("viewBox", [0, 0, width, height])
-                .style("font", "0.45em sans-serif")
+                .style("font", "0.37em sans-serif")
                 .style("user-select", "none");
 
             var columns = svg.append("g").attr("transform", "translate(40,40)");
@@ -188,7 +188,7 @@
                         lines = lines.length > 0 ? lines : [text.text()];
                         var line = [],
                         lineNumber = 0,
-                        lineHeight = 1.1, // ems
+                        lineHeight = 1.2, // ems
                         x = text.attr("x"),
                         y = text.attr("y"),
                         dy = parseFloat(text.attr("dy"));
@@ -217,20 +217,25 @@
         }
 
         Drupal.behaviors.d3viz = {
-            attach: function (context, settings) {
-                $('#visualized').once('d3viz')
-                    .each(function (index, value) {
-                        var element_id = $(this).attr("id");
-                        console.log(drupalSettings.strawberry_keyname_provider);
-                        const data = JSON.parse(drupalSettings.strawberry_keyname_provider);
-                        return new Promise(function() {
-                            $('#visualized').empty();
-                            d3.collapsible_tree(data, '#visualized');
-                        });
-                    })
+          attach: function (context, settings) {
+            const visualizedtoAttach = once('sbf_d3viz', '#visualized');
+            $(visualizedtoAttach).each(function (index, value) {
+              var element_id = $(this).attr("id");
+              const data = JSON.parse(drupalSettings.strawberry_keyname_provider);
+              return new Promise(function () {
+                $('#visualized').empty();
+                d3.collapsible_tree(data, '#visualized');
+              });
+            })
+          },
+          detach: function detach(context, settings, trigger) {
+            // Thanks debugger, if not i would have ended using "unload"
+            if (trigger === 'serialize') {
+              const visualizedtoDeattach = once.remove('sbf_d3viz', '#visualized');
             }
+          }
         }
     }
-})(jQuery, Drupal, drupalSettings, d3, d3plus);
+})(jQuery, Drupal, drupalSettings, d3, d3plus, once);
 
 
