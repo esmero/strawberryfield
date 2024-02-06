@@ -152,10 +152,6 @@ class keyNameProviderOverviewForm extends FormBase {
 
       $response = new AjaxResponse();
 
-      // Remove the .once() added flag so we can reload our Tree via 3DJS.
-      // @See js/d3viz_strawberryfield.js -> Drupal.behaviors.d3viz
-      $response->addCommand(new InvokeCommand('#visualized', 'removeOnce', ['d3viz']));
-
       $settings['strawberry_keyname_provider'] = json_encode($this->generatePopulatedTree($preview_node));
       $response->addCommand(new SettingsCommand(['strawberry_keyname_provider' => []], TRUE));
       $response->addCommand(new SettingsCommand($settings, TRUE));
