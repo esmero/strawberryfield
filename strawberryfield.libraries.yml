@@ -17,6 +17,7 @@ strawberryfield.d3viz:
   dependencies:
     - core/jquery
     - core/drupal
+    - core/once
     - core/drupalSettings
     - strawberryfield/d3js
     - strawberryfield/d3jsplus
