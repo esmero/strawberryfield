@@ -74,7 +74,8 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
             // We could also just get the first order values?
             // @TODO, ask the team.
             $jmespath_result_to_expose[] = json_encode($item, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
-          } else {
+          }
+          else {
             $jmespath_result_to_expose = array_merge($jmespath_result_to_expose, $item);
           }
         }
@@ -84,13 +85,18 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
         }
       }
       // This is an array, don't double nest to make the normalizer happy.
-      $jmespath_result_to_expose = array_filter($jmespath_result_to_expose);
-      foreach($jmespath_result_to_expose as $i => $v) {
+      foreach($jmespath_result_to_expose as $i => &$v) {
         if(is_array($v) or is_object($v)) {
-          $jmespath_result_to_expose[$i] = json_encode($v);
+          $v = json_encode($v);
+        }
+        elseif (is_string($v)) {
+          $v = trim($v);
         }
       }
-      $values = array_map('trim', $jmespath_result_to_expose);
+      $values = array_filter($jmespath_result_to_expose, function($value) {
+        // Only filter out nulls and empties. Keep FALSE/and 0
+        return ($value !== NULL && $value !== '');
+      });
       $values = array_map('stripslashes', $values);
       if ($is_date) {
         $values_parsed = [];
@@ -132,8 +138,9 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
           }
         }
         $values = array_unique($values_parsed);
+        $values = array_filter(array_values($values));
       }
-      $this->processed = array_filter(array_values($values));
+      $this->processed = array_values($values);
       $this->list = [];
       foreach ($this->processed as $delta => $item) {
         $this->list[$delta] = $this->createItem($delta, $item);

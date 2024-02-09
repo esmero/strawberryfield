@@ -71,12 +71,21 @@ class StrawberryValuesFromJson extends ItemList {
             // @TODO should we allow unicode directly?
             $item = json_encode($item,JSON_UNESCAPED_UNICODE);
           }
+          elseif (is_string($item)) {
+            $item = trim($item);
+          }
         }
         // This is an array, don't double nest to make the normalizer happy.
-        $values = array_map('trim', $flattened[$needle]);
+        $values = array_filter($flattened[$needle], function($value) {
+          // Only filter out nulls and empties. Keep FALSE/and 0
+          return ($value !== NULL && $value !== '');
+        });
       }
       elseif (isset($flattened[$needle])) {
-        $values[] = trim($flattened[$needle]);
+        $flattened[$needle] = is_string($flattened[$needle]) ? trim($flattened[$needle]) : $flattened[$needle];
+        if ($flattened[$needle] !== '') {
+          $values[] = $flattened[$needle];
+        }
       }
       $this->processed = array_values($values);
       $this->list = [];
