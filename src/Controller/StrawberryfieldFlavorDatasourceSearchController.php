@@ -291,8 +291,13 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
           ) > 0) {
           foreach ($results as $result) {
             $extradata_from_item = $result->getAllExtraData() ?? [];
+            // check if the hit was generated at the same node level of the caller, if so
+            // it is not of a CWS child (in terms of from where we are searching from)
+            // and no fictious offset should be happening at all.
+            $result_is_top_media = isset($allfields_translated_to_solr['parent_id']) ? $extradata_from_item['search_api_solr_document'][$allfields_translated_to_solr['parent_id']] == $nodeid : FALSE;
+
             if (isset($allfields_translated_to_solr['parent_sequence_id']) &&
-              isset($extradata_from_item['search_api_solr_document'][$allfields_translated_to_solr['parent_sequence_id']])) {
+              isset($extradata_from_item['search_api_solr_document'][$allfields_translated_to_solr['parent_sequence_id']]) && !$result_is_top_media) {
               $sequence_number = (array) $extradata_from_item['search_api_solr_document'][$allfields_translated_to_solr['parent_sequence_id']];
               if (isset($sequence_number[0]) && !empty($sequence_number[0]) && ($sequence_number[0] != 0)) {
                 // We do all this checks to avoid adding a strange offset e.g a collection instead of a CWS
@@ -322,6 +327,10 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
                 if (isset($page_number_by_id[$sol_doc_id])) {
                   // If we have a Solr doc (means children) and their own page number use them here.
                   $page_number = $page_number_by_id[$sol_doc_id];
+                  // If the child is a pdf it might already have a relative offset?
+                  // issue with this approach is that we don't know
+                  // how many extra offsets are the previous children adding so this requires
+                  // each child to be simply a single Image ...
                 }
                 else {
                   // If not the case (e.g a PDF) go for it.
