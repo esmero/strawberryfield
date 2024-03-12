@@ -106,28 +106,55 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
           if ($result->isValid()) {
             $edtf_value = $result->getEdtfValue();
             // @todo remove once EDTF fixes their invalid Constructor for EDTF\Model\Interval that should per interface never allow NULL for start nor end date
-            switch(get_class($edtf_value)) {
-              case "EDTF\Model\Interval":
-                if($edtf_value->hasStartDate()) {
-                  $values_parsed[] = date('c', $edtf_value->getMin());
+            if (get_class($edtf_value) == "EDTF\Model\Set") {
+              //means we have something like [1977, 1984/2023] or {1977, 1984/2023}
+              // and each entry needs to be processed like individual elements
+              foreach ($edtf_value->getElements() as $element) {
+                switch(get_class($element)) {
+                  case "EDTF\Model\SetElement\RangeSetElement":
+                    $values_parsed[] = date('c', $element->getMinAsUnixTimestamp());
+                    $values_parsed[] = date('c', $element->getMaxAsUnixTimestamp());
+                    break;
+                  default:
+                    // Make sure we do not index same day twice
+                    $start_day = date('Y-m-d', $element->getMinAsUnixTimestamp());
+                    $end_day = date('Y-m-d', $element->getMaxAsUnixTimestamp());
+                    if ($start_day === $end_day) {
+                      // if this is the same day just index one.
+                      $values_parsed[] = date('c',  $element->getMinAsUnixTimestamp());
+                    }
+                    else {
+                      $values_parsed[] = date('c', $element->getMinAsUnixTimestamp());
+                      $values_parsed[] = date('c', $element->getMaxAsUnixTimestamp());
+                    }
+                    break;
                 }
-                if($edtf_value->hasEndDate()) {
-                  $values_parsed[] = date('c', $edtf_value->getMax());
-                }
-                break;
-              default:
-                // Make sure we do not index same day twice
-                $start_day = date('Y-m-d', $edtf_value->getMin());
-                $end_day = date('Y-m-d', $edtf_value->getMax());
-                if ($start_day === $end_day) {
-                  // if this is the same day just index one.
-                  $values_parsed[] = date('c', $edtf_value->getMin());
-                }
-                else {
-                  $values_parsed[] = date('c', $edtf_value->getMin());
-                  $values_parsed[] = date('c', $edtf_value->getMax());
-                }
-                break;
+              }
+            }
+            else {
+              //single entries.
+              switch (get_class($edtf_value)) {
+                case "EDTF\Model\Interval":
+                  if ($edtf_value->hasStartDate()) {
+                    $values_parsed[] = date('c', $edtf_value->getMin());
+                  }
+                  if ($edtf_value->hasEndDate()) {
+                    $values_parsed[] = date('c', $edtf_value->getMax());
+                  }
+                  break;
+                default:
+                  // Make sure we do not index same day twice
+                  $start_day = date('Y-m-d', $edtf_value->getMin());
+                  $end_day = date('Y-m-d', $edtf_value->getMax());
+                  if ($start_day === $end_day) {
+                    // if this is the same day just index one.
+                    $values_parsed[] = date('c', $edtf_value->getMin());
+                  } else {
+                    $values_parsed[] = date('c', $edtf_value->getMin());
+                    $values_parsed[] = date('c', $edtf_value->getMax());
+                  }
+                  break;
+              }
             }
           }
           else {
