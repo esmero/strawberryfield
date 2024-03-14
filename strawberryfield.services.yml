@@ -114,6 +114,7 @@ services:
     class: Drupal\strawberryfield\EventSubscriber\SearchApiSolrEventSubscriber
     tags:
       - { name: event_subscriber }
+    arguments: [ '@strawberryfield.search_api_state_helper' ]
   strawberryfield.early_rendering_controller_wrapper_subscriber:
     class: Drupal\strawberryfield\EventSubscriber\EarlyRenderingControllerWrapperSubscriber
     decorates: early_rendering_controller_wrapper_subscriber
@@ -122,3 +123,7 @@ services:
     arguments: [ '@strawberryfield.early_rendering_controller_wrapper_subscriber.inner' ]
     tags:
       - { name: event_subscriber }
+  strawberryfield.search_api_state_helper:
+    class: \Drupal\strawberryfield\StrawberryfieldSearchAPIUtilityService
+    tags:
+      - { name: backend_overridable }

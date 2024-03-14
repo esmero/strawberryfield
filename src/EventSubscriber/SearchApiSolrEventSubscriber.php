@@ -3,13 +3,17 @@
 
 namespace Drupal\strawberryfield\EventSubscriber;
 
+use Drupal\search_api\Event\IndexingItemsEvent;
+use Drupal\search_api\Event\SearchApiEvents;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Drupal\search_api_solr\Event\SearchApiSolrEvents;
 use Drupal\search_api_solr\Event\PreQueryEvent;
 use Drupal\search_api_solr\Event\PostConvertedQueryEvent;
 use Solarium\Component\ComponentAwareQueryInterface;
+use Drupal\strawberryfield\StrawberryfieldSearchAPIUtilityServiceInterface;
 
 class SearchApiSolrEventSubscriber implements EventSubscriberInterface {
+  private StrawberryfieldSearchAPIUtilityServiceInterface $search_api_state;
 
   /**
    * @inheritDoc
@@ -17,10 +21,19 @@ class SearchApiSolrEventSubscriber implements EventSubscriberInterface {
   public static function getSubscribedEvents() {
     return [
       SearchApiSolrEvents::PRE_QUERY => 'preQuery',
-      SearchApiSolrEvents::POST_CONVERT_QUERY => 'convertedQuery'
+      SearchApiSolrEvents::POST_CONVERT_QUERY => 'convertedQuery',
+      SearchApiEvents::INDEXING_ITEMS => 'indexingItems',
     ];
   }
 
+  /**
+   * StrawberryEventDeleteFlavorSubscriber constructor.
+   *
+   * @param StrawberryfieldSearchAPIUtilityServiceInterface $search_api_state
+   */
+  public function __construct(StrawberryfieldSearchAPIUtilityServiceInterface $search_api_state) {
+    $this->search_api_state = $search_api_state;
+  }
 
   /**
    * @param \Drupal\search_api_solr\Event\PreQueryEvent $event
@@ -117,5 +130,28 @@ class SearchApiSolrEventSubscriber implements EventSubscriberInterface {
         $hl->setFields(['*']);
       }
     }
+  }
+  /**
+   * Reacts to the indexing items event.
+   *
+   * @param \Drupal\search_api\Event\IndexingItemsEvent $event
+   *   The indexing items event.
+   */
+  public function indexingItems(IndexingItemsEvent $event) {
+    $items = $event->getItems();
+    if (count($items)) {
+      $this->search_api_state->setIsIndexing(TRUE);
+    }
+  }
+
+
+  /**
+   * Reacts to the finished indexing items event.
+   *
+   * @param \Drupal\search_api\Event\IndexingItemsEvent $event
+   *   The indexing items event.
+   */
+  public function finishedIndexingItems(IndexingItemsEvent $event) {
+    $this->search_api_state->setIsIndexing(FALSE);
   }
 }
