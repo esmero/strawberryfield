@@ -36,7 +36,7 @@ final class StrawberryfieldRenderCallbacks implements TrustedCallbackInterface
         $view->initDisplay();
         $view->setExposedInput(['' => '']);
         // Disable render caching.
-        $build['#cache']['max-age'] = 0;
+        // $build['#cache']['max-age'] = 0;
       }
     }
     return $build;
