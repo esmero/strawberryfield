@@ -16,6 +16,7 @@ use Drupal\Core\StreamWrapper\StreamWrapperInterface;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\strawberryfield\Field\StrawberryFieldFileComputedItemList;
 use Drupal\strawberryfield\Field\StrawberryFieldEntityComputedItemList;
+use Drupal\strawberryfield\StrawberryfieldRenderCallbacks;
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Session\AccountInterface;
@@ -359,4 +360,11 @@ function strawberryfield_entity_view_alter(array &$build, EntityInterface $entit
       }
     }
   }
+}
+
+/**
+* Implements hook_element_info_alter().
+ */
+function strawberryfield_element_info_alter(array &$info): void {
+  array_unshift($info['view']['#pre_render'], 'Drupal\strawberryfield\StrawberryfieldRenderCallbacks::preRender');
 }

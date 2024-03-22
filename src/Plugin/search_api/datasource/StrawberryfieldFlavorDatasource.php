@@ -739,9 +739,8 @@ XML;
       if (!$index->isValidDatasource($datasource_id)) {
         unset($indexes[$index_id]);
       }
-
-      return $indexes;
     }
+    return $indexes;
   }
 
 
