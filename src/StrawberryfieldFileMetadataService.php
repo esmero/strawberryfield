@@ -404,13 +404,15 @@ class StrawberryfieldFileMetadataService {
       );
     }
     else {
-      $output_fido = explode(',', str_replace('"', '', $result_fido));
+      $output_fido = preg_split('/("[^"]*")|[,]+/', $result_fido, -1,
+        PREG_SPLIT_NO_EMPTY|PREG_SPLIT_DELIM_CAPTURE);
+      $output_fido = is_array($output_fido) ? $output_fido : [];
       if (count($output_fido) && $output_fido[0] == 'OK') {
         // Means FIDO could do its JOB
         $pronom['pronom_id'] = isset($output_fido[2]) ? 'info:pronom/' . $output_fido[2] : NULL;
-        $pronom['label'] = $output_fido[3] ?: NULL;
-        $pronom['mimetype'] = $output_fido[7] ?: NULL;
-        $pronom['detection_type'] = $output_fido[8] ?: NULL;
+        $pronom['label'] = isset($output_fido[3]) ? (is_string($output_fido[3]) ? trim($output_fido[3],'"'): NULL) : NULL;
+        $pronom['mimetype'] = isset($output_fido[7]) ? (is_string($output_fido[7]) ? trim($output_fido[7],'"'): NULL) : NULL;
+        $pronom['detection_type'] =  isset($output_fido[8]) ? (is_string($output_fido[8]) ? trim($output_fido[8],'"'): NULL) : NULL;
         $metadata['flv:pronom'] = $pronom;
       }
     }
