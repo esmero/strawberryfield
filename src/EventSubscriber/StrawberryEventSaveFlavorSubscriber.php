@@ -177,12 +177,17 @@ class StrawberryEventSaveFlavorSubscriber extends StrawberryfieldEventSaveSubscr
       $query->setOption('ocr_highlight', 'on');
       // We want all documents removed. No server access needed here.
       $query->setOption('search_api_bypass_access', TRUE);
+      // Offset and limit could also be also via setOption
       $query->setProcessingLevel(QueryInterface::PROCESSING_NONE);
       try {
         $results = $query->execute();
         $max = $newcount = $results->getResultCount();
         $tracked_ids = [];
         $i = 0;
+
+        //@see \Drupal\search_api\Utility\QueryHelper::addResults to see how statically
+        //caching of results is happening/
+
         // Only reason we use $newcount and $max is in the rare case
         // that while untracking deletion is happening in real time
         // and the actual $newcount decreases "live"
@@ -196,6 +201,7 @@ class StrawberryEventSaveFlavorSubscriber extends StrawberryfieldEventSaveSubscr
           }
           // If there are still more left, change the range and query again.
           if (count($tracked_ids) < $max) {
+            // Offset and limit could also be also via setOption
             $query->range($limit * $i, $limit);
             $results = $query->execute();
             $newcount = $results->getResultCount();
