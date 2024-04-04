@@ -341,21 +341,29 @@ function strawberryfield_entity_view_alter(array &$build, EntityInterface $entit
   $excerpt_component = $display->getComponent('search_api_excerpt');
   if ($excerpt_component !== NULL && $entity instanceof NodeInterface && $entity->view ?? NULL) {
     if (\Drupal::request()->getMethod() == 'GET' ) {
-      // Check if the current index has lazy_excerpt enabled...
-      if ($processor = ($entity->view->getQuery()->getIndex()->getProcessors(
-        )['sbf_highlight'] ?? NULL)
-      ) {
-        if ($processor->getConfiguration()['lazy_excerpt']) {
-          $cid = 'entity:' . $entity->getEntityTypeId() . '/' . $entity->id()
-            . ':'
-            . $entity->language()->getId();
-          $build['search_api_excerpt'] = [
-            '#lazy_builder'       => [
-              'strawberryfield.lazy_builders:renderExcerpt',
-              [$cid, 'node:'.$entity->id()]
-            ],
-            '#create_placeholder' => TRUE,
-          ];
+      // if mixing SQL/Search API (e.g the result row is rendered using a View that is not Search API
+      // But the listing is obviously an Search API view i can't trust that getQuery() will
+      // be driven by searchAPI, so might not have an index.
+      // @TODO. Review every call to ->getIndex() everywhere. Bc method is specific to that plugin (no interface)
+      if ($entity->view instanceof \Drupal\views\ViewExecutable) {
+        if ($entity->view->getQuery() instanceof \Drupal\search_api\Plugin\views\query\SearchApiQuery) {
+          // Check if the current index has lazy_excerpt enabled...
+          if ($processor = ($entity->view->getQuery()->getIndex()->getProcessors(
+          )['sbf_highlight'] ?? NULL)
+          ) {
+            if ($processor->getConfiguration()['lazy_excerpt'] ?? NULL) {
+              $cid = 'entity:' . $entity->getEntityTypeId() . '/' . $entity->id()
+                . ':'
+                . $entity->language()->getId();
+              $build['search_api_excerpt'] = [
+                '#lazy_builder'       => [
+                  'strawberryfield.lazy_builders:renderExcerpt',
+                  [$cid, 'node:'.$entity->id()]
+                ],
+                '#create_placeholder' => TRUE,
+              ];
+            }
+          }
         }
       }
     }
