@@ -39,6 +39,11 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements St
   public const SBFL_KEY_COLLECTION = 'Strawberryfield_flavor_datasource_temp';
 
   /**
+   * The key for accessing last tracked Page information in site state for flavor datasource.
+   */
+  protected const TRACKING_OFFSET_STATE_KEY = 'search_api.datasource.strawberryfield_flavor_datasource.last_offset';
+
+  /**
    * An MINI OCR XML defined for empty pages.
    */
   public const EMPTY_MINIOCR_XML = <<<'XML'
@@ -104,6 +109,13 @@ XML;
   protected $entityDisplayRepository;
 
   /**
+   * The state service.
+   *
+   * @var \Drupal\Core\State\StateInterface
+   */
+  protected $state;
+
+  /**
    * {@inheritdoc}
    */
   public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
@@ -120,8 +132,8 @@ XML;
     $datasource->entityTypeBundleInfo = $container->get('entity_type.bundle.info');
     $datasource->typedDataManager = $container->get('typed_data_manager');
     $datasource->languageManager = $container->get('language_manager');
-    $datasource->keyValue = $container->get('keyvalue');
-
+    $datasource->keyValue = $container->get('strawberryfield.keyvalue.database');
+    $datasource->state = $container->get('state');
     return $datasource;
   }
 
@@ -269,112 +281,96 @@ XML;
    * {@inheritdoc}
    */
   public function getPartialItemIds($page = NULL, array $bundles = NULL, array $languages = NULL) {
-    $select = $this->getEntityTypeManager()
-      ->getStorage($this->getEntityTypeId())
-      ->getQuery();
-
-    // When tracking items, we never want access checks.
-    $select->accessCheck(FALSE);
-
-    // We want to determine all entities of either one of the given bundles OR
-    // one of the given languages. That means we can't just filter for $bundles
-    // if $languages is given. Instead, we have to filter for all bundles we
-    // might want to include and later sort out those for which we want only the
-    // translations in $languages and those (matching $bundles) where we want
-    // all (enabled) translations.
-    if ($this->hasBundles()) {
-
-      $bundle_property = $this->getEntityType()->getKey('bundle');
-      if ($bundles && !$languages) {
-        $select->condition($bundle_property, $bundles, 'IN');
-      }
-      else {
-        $enabled_bundles = array_keys($this->getBundles());
-        // Since this is also called for removed bundles/languages,
-        // $enabled_bundles might not include $bundles.
-        if ($bundles) {
-          $enabled_bundles = array_unique(
-            array_merge($bundles, $enabled_bundles)
-          );
-        }
-        if (count($enabled_bundles) < count($this->getEntityBundles())) {
-          $select->condition($bundle_property, $enabled_bundles, 'IN');
-        }
-      }
-    }
 
     if (isset($page)) {
       $page_size = $this->getConfigValue('tracking_page_size');
       assert($page_size, 'Tracking page size is not set.');
-      $select->range($page * $page_size, $page_size);
-      // For paging to reliably work, a sort should be present.
-      $entity_id = $this->getEntityType()->getKey('id');
-      $select->sort($entity_id);
+      $offset = $page * 100; // Yeah hundred is cool.
+    }
+    else {
+      //Bananas! we can't get a Million? No, we can't
+      $page_size = $this->getConfigValue('tracking_page_size') ?? 100;
+      $page = 0;
+      $offset = $page * $page_size;
+    }
+    if ($page > 0) {
+      $offset = $this->state->get(self::TRACKING_OFFSET_STATE_KEY, $offset);
     }
 
-    $entity_ids = $select->execute();
 
-    if (!$entity_ids) {
-      return NULL;
+    $finished = FALSE;
+    $morethanone = FALSE;
+    while ((!$finished && !$morethanone)) {
+        $valid_item_ids = $this->getFlavorKeysFromBackend($offset, $page_size);
+        if ($valid_item_ids == NULL) {
+          $finished = TRUE;
+        }
+        elseif (count($valid_item_ids)) {
+          $morethanone = TRUE;
+        }
+        else {
+          $page = $page + 1;
+          $offset = $page * $page_size;
+        }
     }
 
-    // For all loaded entities, compute all their item IDs (one for each
-    // translation we want to include). For those matching the given bundles (if
-    // any), we want to include translations for all enabled languages. For all
-    // other entities, we just want to include the translations for the
-    // languages passed to the method (if any).
-    $item_ids = [];
-    $enabled_languages = array_keys($this->getLanguages());
-    // As above for bundles, $enabled_languages might not include $languages.
-    if ($languages) {
-      $enabled_languages = array_unique(
-        array_merge($languages, $enabled_languages)
-      );
+    if ($finished) {
+      $this->state->delete(self::TRACKING_OFFSET_STATE_KEY);
+      return $valid_item_ids;
     }
-    // Also, we want to always include entities with unknown language.
-    $enabled_languages[] = LanguageInterface::LANGCODE_NOT_SPECIFIED;
-    $enabled_languages[] = LanguageInterface::LANGCODE_NOT_APPLICABLE;
 
-    /** @var \Drupal\Core\Entity\ContentEntityInterface $entity */
-    foreach ($this->getEntityStorage()->loadMultiple(
-      $entity_ids
-    ) as $entity_id => $entity) {
-      $translations = array_keys($entity->getTranslationLanguages());
-      $translations = array_intersect($translations, $enabled_languages);
-      // If only languages were specified, keep only those translations matching
-      // them. If bundles were also specified, keep all (enabled) translations
-      // for those entities that match those bundles.
-      if ($languages !== NULL
-        && (!$bundles || !in_array($entity->bundle(), $bundles))) {
-        $translations = array_intersect($translations, $languages);
-      }
-      // Well, well well. Happens that we may have gotten this wrong?
-      // Flavours can be also file based. One ADO manny files?
-      // Many times files flavors...
-      // Also should we track here who provides the data
-      // SB_runners config ID?
+    // If so, i want to keep a state of the last page tracked ... bc any next page will if not repeat again the call.
+    $this->state->set(self::TRACKING_OFFSET_STATE_KEY, ($offset + $page_size));
+    return $valid_item_ids;
+  }
 
-      // We will throw the service invoke event here
-      // And fetch back which ones to be indexed?
-
-      foreach ($translations as $langcode) {
-        $sequence_id = 1;
-        $item_ids[] = "$entity_id:$sequence_id:$langcode";
-        // WE probably don't want anything here at all
-        // since this is pushed really by a queue
-        // and should never run if there is no real data source!
+  private function getFlavorKeysFromBackend($offset, $page_size) {
+    $item_ids =  $this->keyValue->get(self::SBFL_KEY_COLLECTION)->listKeys($offset, $page_size);
+    $valid_item_ids = [];
+    // Now with this in place we will actually check if Nodes/files for these exist.
+    // Should be the case always. But extra security might be good?
+    $entity_ids = [];
+    $entity_ids_splitted = [];
+    foreach ($item_ids as $id => $value) {
+      $splitted_id = explode(':', $id);
+      if (isset($splitted_id[0])) {
+        $entity_ids[$splitted_id[0]] = $splitted_id[0];
+        $entity_ids_splitted[$splitted_id[0]][$id] = $splitted_id;
       }
     }
-
+    $entity_ids = array_values($entity_ids);
+    foreach (
+      $this->getEntityStorage()->loadMultiple($entity_ids) as $entity_id =>
+      $entity
+    ) {
+      $status = $entity->isPublished();
+      $uid = $entity->getOwnerId();
+      foreach (
+        $entity_ids_splitted[$entity_id] as $item_id => $splitted_id_for_node
+      ) {
+        $fid_uuid = isset($splitted_id_for_node[3]) ? $splitted_id_for_node[3] : NULL;
+        $files = $this->entityTypeManager->getStorage('file')->loadByProperties(
+          [
+            'uuid' => $fid_uuid,
+          ]
+        );
+        $file = $files ? reset($files) : NULL;
+        if ($file) {
+          $valid_item_ids[] = $item_id;
+        }
+        unset($file);
+      }
+    }
     if (Utility::isRunningInCli()) {
       // When running in the CLI, this might be executed for all entities from
       // within a single process. To avoid running out of memory, reset the
       // static cache after each batch.
       $this->getEntityStorage()->resetCache($entity_ids);
     }
-
-    return [];
+    // NULL here means the query returned 0, means we are done.
+    return count($item_ids) ? $valid_item_ids : NULL;
   }
+
 
   /**
    * {@inheritdoc}

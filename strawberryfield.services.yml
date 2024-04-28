@@ -127,3 +127,6 @@ services:
     class: \Drupal\strawberryfield\StrawberryfieldSearchAPIUtilityService
     tags:
       - { name: backend_overridable }
+  strawberryfield.keyvalue.database:
+    class: Drupal\strawberryfield\KeyValueStore\KeyValueDatabaseWithIndexFactory
+    arguments: [ '@serialization.phpserialize', '@database' ]
