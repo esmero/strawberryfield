@@ -52,6 +52,12 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements St
 XML;
 
   /**
+   * Time to space constant. Calculated by the idea of 15 minutes per A4,
+   * Being that 3508 pixels (height because time flows down) / 15 / 60.
+   */
+  public const PIXELS_PER_SECOND = 3.8977777778;
+
+  /**
    * The entity type manager.
    *
    * @var \Drupal\Core\Entity\EntityTypeManagerInterface|null
