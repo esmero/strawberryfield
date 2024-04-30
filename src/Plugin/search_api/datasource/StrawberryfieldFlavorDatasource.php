@@ -50,12 +50,12 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements St
 <?xml version="1.0" encoding="UTF-8"?>
 <ocr><p xml:id="empty_sequence" wh="100 100"><b><l><w x="0 0 0 0"> </w></l></b></p></ocr>
 XML;
+
   /**
    * Time to space constant. Calculated by the idea of 15 minutes per A4,
-   * Being that 3508pixels / 15 / 60.
+   * Being that 3508 pixels (height because time flows down) / 15 / 60.
    */
   public const PIXELS_PER_SECOND = 3.8977777778;
-
 
   /**
    * The entity type manager.
