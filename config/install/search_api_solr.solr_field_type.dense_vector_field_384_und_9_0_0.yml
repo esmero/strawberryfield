@@ -8,7 +8,6 @@ dependencies:
 id: dense_vector_field_384_und
 label: 'Dense Vector Field of 384 dimensions suitable for Bert text feature extraction (embeddings) using dot_product as comparison algorithm'
 minimum_solr_version: 9.0.0
-custom_code: knn_384
 field_type_language_code: und
 domains: {  }
 field_type:
