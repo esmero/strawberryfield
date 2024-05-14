@@ -569,9 +569,7 @@ XML;
     ) {
       $status = $entity->isPublished();
       $uid = $entity->getOwnerId();
-      foreach (
-        $entity_ids_splitted[$entity_id] as $item_id => $splitted_id_for_node
-      ) {
+      foreach ($entity_ids_splitted[$entity_id] as $item_id => $splitted_id_for_node) {
         $sequence_id = !empty($splitted_id_for_node[1]) ? $splitted_id_for_node[1] : 1;
         $fid_uuid = isset($splitted_id_for_node[3]) ? $splitted_id_for_node[3] : NULL;
         // for Metadata only Processors we won't have a file. We will use the stub "ado" instead
