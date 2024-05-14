@@ -60,7 +60,7 @@ class StrawberryfieldFlavorDataDefinition extends ComplexDataDefinitionBase {
       $info['vector_1024'] = ListDataDefinition::create('float')->setLabel('Vector of size 1024 coming from ML')->addConstraint('Length', ['max' => 1024]);
       $info['vector_384'] = ListDataDefinition::create('float')->setLabel('Vector of size 384 coming from ML')->addConstraint('Length', ['max' => 384]);
       $info['vector_512'] = ListDataDefinition::create('float')->setLabel('Vector of size 512 coming from ML')->addConstraint('Length', ['max' => 512]);
-      return $this->propertyDefinitions;
     }
+    return $this->propertyDefinitions;
   }
 }
