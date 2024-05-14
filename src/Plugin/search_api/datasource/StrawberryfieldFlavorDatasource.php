@@ -355,16 +355,22 @@ XML;
         $entity_ids_splitted[$entity_id] as $item_id => $splitted_id_for_node
       ) {
         $fid_uuid = isset($splitted_id_for_node[3]) ? $splitted_id_for_node[3] : NULL;
-        $files = $this->entityTypeManager->getStorage('file')->loadByProperties(
-          [
-            'uuid' => $fid_uuid,
-          ]
-        );
-        $file = $files ? reset($files) : NULL;
-        if ($file) {
+        if ($fid_uuid && $fid_uuid!= 'ado') {
+          $files = $this->entityTypeManager->getStorage('file')->loadByProperties(
+            [
+              'uuid' => $fid_uuid,
+            ]
+          );
+          $file = $files ? reset($files) : NULL;
+          if ($file) {
+            $valid_item_ids[] = $item_id;
+          }
+          unset($file);
+        }
+        else {
+          // These are valid if no UUID is given at all for a file.
           $valid_item_ids[] = $item_id;
         }
-        unset($file);
       }
     }
     if (Utility::isRunningInCli()) {
@@ -619,9 +625,9 @@ XML;
           // For ML generated data. We will pre-validate
           $service_md5 =  isset($processed_data->service_md5) ? $processed_data->service_md5 : '';
           $vector_576 = isset($processed_data->vector_576) && is_array($processed_data->vector_576) && count($processed_data->vector_576) == 576 ? $processed_data->vector_576 : NULL;
-          $vector_512 = isset($processed_data->vector_576) && is_array($processed_data->vector_512) && count($processed_data->vector_512) == 512 ? $processed_data->vector_512 : NULL;
-          $vector_1024 = isset($processed_data->vector_576) && is_array($processed_data->vector_1024) && count($processed_data->vector_1024) == 1024 ? $processed_data->vector_1024 : NULL;
-          $vector_384 = isset($processed_data->vector_576) && is_array($processed_data->vector_576) && count($processed_data->vector_384) == 384 ? $processed_data->vector_384 : NULL;
+          $vector_512 = isset($processed_data->vector_512) && is_array($processed_data->vector_512) && count($processed_data->vector_512) == 512 ? $processed_data->vector_512 : NULL;
+          $vector_1024 = isset($processed_data->vector_1024) && is_array($processed_data->vector_1024) && count($processed_data->vector_1024) == 1024 ? $processed_data->vector_1024 : NULL;
+          $vector_384 = isset($processed_data->vector_384) && is_array($processed_data->vector_384) && count($processed_data->vector_384) == 384 ? $processed_data->vector_384 : NULL;
           $file_uuid = $file ?  $file->uuid() : NULL;
           $target_fileid = $file ? $file->id() : NULL;
           if ($checksum) {
