@@ -9,6 +9,7 @@ use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Drupal\search_api_solr\Event\SearchApiSolrEvents;
 use Drupal\search_api_solr\Event\PreQueryEvent;
 use Drupal\search_api_solr\Event\PostConvertedQueryEvent;
+use Drupal\search_api_solr\Event\PostConfigFilesGenerationEvent;
 use Solarium\Component\ComponentAwareQueryInterface;
 use Drupal\strawberryfield\StrawberryfieldSearchAPIUtilityServiceInterface;
 
@@ -23,6 +24,7 @@ class SearchApiSolrEventSubscriber implements EventSubscriberInterface {
       SearchApiSolrEvents::PRE_QUERY => 'preQuery',
       SearchApiSolrEvents::POST_CONVERT_QUERY => 'convertedQuery',
       SearchApiEvents::INDEXING_ITEMS => 'indexingItems',
+      SearchApiSolrEvents::POST_CONFIG_FILES_GENERATION => 'overrideExtraFields',
     ];
   }
 
@@ -93,6 +95,10 @@ class SearchApiSolrEventSubscriber implements EventSubscriberInterface {
       $hl->setFragSize(128);
       $hl->setRequireFieldMatch(TRUE);
     }
+    // KNN here
+    if ($query->getOption('sbf_knn')) {
+      $solarium_query->getQuery();
+    }
   }
 
 
@@ -130,6 +136,22 @@ class SearchApiSolrEventSubscriber implements EventSubscriberInterface {
         $hl->setFields(['*']);
       }
     }
+    if ($query->getOption('sbf_knn')) {
+      error_log($solarium_query->getQuery());
+      $solarium_query->setQuery($query->getOption('sbf_knn')[0][0]);
+      $hl = $solarium_query->getHighlighting();
+      // We can't highlight when doing Vector Queries or we will get
+      //  [ x:drupal] o.a.s.h.RequestHandlerBase java.lang.UnsupportedOperationException => java.lang.UnsupportedOperationException
+      //	at org.apache.lucene.search.highlight.WeightedSpanTermExtractor$DelegatingLeafReader.getFieldInfos(WeightedSpanTermExtractor.java:460)
+      //java.lang.UnsupportedOperationException: null
+
+      $hl->clearFields();
+      $hl->setUsePhraseHighlighter(FALSE);
+      // Just in case?
+      $solarium_query->removeComponent(
+        ComponentAwareQueryInterface::COMPONENT_EDISMAX
+      );
+    }
   }
   /**
    * Reacts to the indexing items event.
@@ -153,5 +175,9 @@ class SearchApiSolrEventSubscriber implements EventSubscriberInterface {
    */
   public function finishedIndexingItems(IndexingItemsEvent $event) {
     $this->search_api_state->setIsIndexing(FALSE);
+  }
+
+  public function overrideExtraFields(PostConfigFilesGenerationEvent $event): void {
+    /// TODO override extra fields so we can get around silly search api defining all as multivalued
   }
 }
