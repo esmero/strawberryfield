@@ -21,7 +21,9 @@ class DenseVector512DataType extends DataTypePluginBase {
    * {@inheritdoc}
    */
   public function getValue($value) {
-    $value = (float) $value;
+    if ($value !== NULL) {
+      $value = (float)$value;
+    }
     return $value;
   }
 
