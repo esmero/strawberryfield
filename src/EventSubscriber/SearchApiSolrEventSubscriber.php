@@ -195,14 +195,16 @@ class SearchApiSolrEventSubscriber implements EventSubscriberInterface {
       $index = $item->getIndex();
       $solr_names = $index->getServerInstance()->getBackend()->getSolrFieldNames($index);
 
+
       foreach ($names as $name) {
         if (isset($solr_names[$name])) {
-          // Remove first. Solr Search API like 99% chances removed any 0.0 from a vector. Damn.
-          $document->setField($solr_names[$name], $item->getField($name)->getValues() ?? NULL);
+          // Why this check? I can't sent an empty. But i can send a NULL if not present
+          if (!empty($values = $item->getField($name)->getValues())) {
+            $document->setField($solr_names[$name], $item->getField($name)->getValues() ?? NULL);
+          }
         }
       }
     }
-    $document = $document;
   }
 
 
