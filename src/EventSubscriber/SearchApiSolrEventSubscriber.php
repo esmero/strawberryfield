@@ -5,6 +5,7 @@ namespace Drupal\strawberryfield\EventSubscriber;
 
 use Drupal\search_api\Event\IndexingItemsEvent;
 use Drupal\search_api\Event\SearchApiEvents;
+use Drupal\search_api_solr\Event\PostCreateIndexDocumentEvent;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Drupal\search_api_solr\Event\SearchApiSolrEvents;
 use Drupal\search_api_solr\Event\PreQueryEvent;
@@ -25,6 +26,7 @@ class SearchApiSolrEventSubscriber implements EventSubscriberInterface {
       SearchApiSolrEvents::POST_CONVERT_QUERY => 'convertedQuery',
       SearchApiEvents::INDEXING_ITEMS => 'indexingItems',
       SearchApiSolrEvents::POST_CONFIG_FILES_GENERATION => 'overrideExtraFields',
+      SearchApiSolrEvents::POST_CREATE_INDEX_DOCUMENT => 'RestoreLostZerosVector',
     ];
   }
 
@@ -177,6 +179,32 @@ class SearchApiSolrEventSubscriber implements EventSubscriberInterface {
   public function finishedIndexingItems(IndexingItemsEvent $event) {
     $this->search_api_state->setIsIndexing(FALSE);
   }
+
+  public function RestoreLostZerosVector(PostCreateIndexDocumentEvent $event) {
+    $item = $event->getSearchApiItem();
+    $names = [];
+    foreach($item->getFields(FALSE) as $field) {
+      if (str_starts_with($field->getType(), 'densevector_')) {
+          $names[] = $field->getFieldIdentifier();
+      }
+    }
+
+    if (count($names) > 0) {
+
+      $document = $event->getSolariumDocument();
+      $index = $item->getIndex();
+      $solr_names = $index->getServerInstance()->getBackend()->getSolrFieldNames($index);
+
+      foreach ($names as $name) {
+        if (isset($solr_names[$name])) {
+          // Remove first. Solr Search API like 99% chances removed any 0.0 from a vector. Damn.
+          $document->setField($solr_names[$name], $item->getField($name)->getValues() ?? NULL);
+        }
+      }
+    }
+    $document = $document;
+  }
+
 
   public function overrideExtraFields(PostConfigFilesGenerationEvent $event): void {
     /// TODO override extra fields so we can get around silly search api defining all as multivalued
