@@ -137,7 +137,8 @@ class SearchApiSolrEventSubscriber implements EventSubscriberInterface {
       }
     }
     if ($query->getOption('sbf_knn')) {
-      error_log($solarium_query->getQuery());
+        //@TODO this is overly nested. I should also allow multiple ones like this
+        // then move any non KNN queries to "before" or to "filters"
       $solarium_query->setQuery($query->getOption('sbf_knn')[0][0]);
       $hl = $solarium_query->getHighlighting();
       // We can't highlight when doing Vector Queries or we will get
