@@ -121,7 +121,7 @@ class StrawberryFieldBreadcrumbBuilder implements BreadcrumbBuilderInterface {
     }
     $breadcrumb->setLinks($links);
     $breadcrumb->addCacheTags(['config:strawberryfield.breadcrumbs']);
-    $breadcrumb->addCacheContexts(['route']);
+    $breadcrumb->addCacheContexts(['route', 'url.path', 'languages']);
     return $breadcrumb;
   }
 

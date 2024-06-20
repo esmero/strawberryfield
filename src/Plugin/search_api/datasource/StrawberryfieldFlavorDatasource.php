@@ -355,16 +355,22 @@ XML;
         $entity_ids_splitted[$entity_id] as $item_id => $splitted_id_for_node
       ) {
         $fid_uuid = isset($splitted_id_for_node[3]) ? $splitted_id_for_node[3] : NULL;
-        $files = $this->entityTypeManager->getStorage('file')->loadByProperties(
-          [
-            'uuid' => $fid_uuid,
-          ]
-        );
-        $file = $files ? reset($files) : NULL;
-        if ($file) {
+        if ($fid_uuid && $fid_uuid!= 'ado') {
+          $files = $this->entityTypeManager->getStorage('file')->loadByProperties(
+            [
+              'uuid' => $fid_uuid,
+            ]
+          );
+          $file = $files ? reset($files) : NULL;
+          if ($file) {
+            $valid_item_ids[] = $item_id;
+          }
+          unset($file);
+        }
+        else {
+          // These are valid if no UUID is given at all for a file.
           $valid_item_ids[] = $item_id;
         }
-        unset($file);
       }
     }
     if (Utility::isRunningInCli()) {
@@ -563,29 +569,34 @@ XML;
     ) {
       $status = $entity->isPublished();
       $uid = $entity->getOwnerId();
-      foreach (
-        $entity_ids_splitted[$entity_id] as $item_id => $splitted_id_for_node
-      ) {
+      foreach ($entity_ids_splitted[$entity_id] as $item_id => $splitted_id_for_node) {
         $sequence_id = !empty($splitted_id_for_node[1]) ? $splitted_id_for_node[1] : 1;
         $fid_uuid = isset($splitted_id_for_node[3]) ? $splitted_id_for_node[3] : NULL;
+        // for Metadata only Processors we won't have a file. We will use the stub "ado" instead
+
         $plugin_id = isset($splitted_id_for_node[4]) ? $splitted_id_for_node[4] : NULL;
         $translation_id = isset($splitted_id_for_node[2]) ? $splitted_id_for_node[2] : NULL;
         // probably we will want to add the module/class namespace for the plugin id?
-        $files = $this->entityTypeManager->getStorage('file')->loadByProperties(
-          [
-            'uuid' => $fid_uuid,
-          ]
-        );
-        $file = $files ? reset($files) : NULL;
+        if ($fid_uuid && $fid_uuid != 'ado') {
+          $files = $this->entityTypeManager->getStorage('file')->loadByProperties(
+            [
+              'uuid' => $fid_uuid,
+            ]
+          );
+          $file = $files ? reset($files) : NULL;
+        }
 
-        if ($file && $plugin_id !== NULL
+        if (($file || $fid_uuid == 'ado') && $plugin_id !== NULL
           && ($processed_data
             = $this->getFlavorFromBackend($item_id))
         ) {
-          // Put the package File ID / Package.
+          // From 1.4.0 we will also allow Flavors that are purely metadata in its origin to exist.
+          // So file is an optional.
           $fulltext = isset($processed_data->fulltext) ? (string) $processed_data->fulltext : '';
           $label = isset($processed_data->label) ? (string) $processed_data->label : "Sequence {$sequence_id}";
           $plaintext = isset($processed_data->plaintext) ? (string) $processed_data->plaintext : '';
+          // Checksum will still exist, even if just metadata. That way on simple "ado" save if a processor
+          // is using metadata, if nothing changed we won't need to re-index.
           $checksum = isset($processed_data->checksum) ? (string) $processed_data->checksum : NULL;
           $where = isset($processed_data->where) ? (array) $processed_data->where : [];
           $where= preg_grep(
@@ -608,35 +619,49 @@ XML;
           $config_processor_id = isset($processed_data->config_processor_id) ? $processed_data->config_processor_id : '';
           $nlplang = isset($processed_data->nlplang) ? $processed_data->nlplang : [];
           $processlang = isset($processed_data->processlang) ? $processed_data->processlang : [];
+
+          // For ML generated data. We will pre-validate
+          $service_md5 =  isset($processed_data->service_md5) ? $processed_data->service_md5 : '';
+          $vector_576 = isset($processed_data->vector_576) && is_array($processed_data->vector_576) && count($processed_data->vector_576) == 576 ? $processed_data->vector_576 : NULL;
+          $vector_512 = isset($processed_data->vector_512) && is_array($processed_data->vector_512) && count($processed_data->vector_512) == 512 ? $processed_data->vector_512 : NULL;
+          $vector_1024 = isset($processed_data->vector_1024) && is_array($processed_data->vector_1024) && count($processed_data->vector_1024) == 1024 ? $processed_data->vector_1024 : NULL;
+          $vector_384 = isset($processed_data->vector_384) && is_array($processed_data->vector_384) && count($processed_data->vector_384) == 384 ? $processed_data->vector_384 : NULL;
+          $file_uuid = $file ?  $file->uuid() : NULL;
+          $target_fileid = $file ? $file->id() : NULL;
           if ($checksum) {
             $data = [
-              'item_id'             => $item_id,
-              'label'               => $label,
-              'sequence_id'         => $sequence_id,
-              'sequence_total'      => $sequence_total,
-              'target_id'           => $entity_id,
-              'parent_id'           => $entity_id,
-              'file_uuid'           => $file->uuid(),
-              'target_fileid'       => $file->id(),
+              'item_id' => $item_id,
+              'label' => $label,
+              'sequence_id' => $sequence_id,
+              'sequence_total' => $sequence_total,
+              'target_id' => $entity_id,
+              'parent_id' => $entity_id,
+              'file_uuid' => $file_uuid,
+              'target_fileid' => $target_fileid,
               'config_processor_id' => $config_processor_id,
-              'processor_id'        => $plugin_id,
-              'fulltext'            => '',
-              'plaintext'           => '',
-              'metadata'            => $metadata,
-              'who'                 => $who,
-              'nlplang'             => $nlplang,
-              'processlang'         => $processlang,
-              'where'               => $where,
-              'when'                => $when,
-              'ts'                  => $ts,
-              'sentiment'           => $sentiment,
-              'uri'                 => $uri,
-              'checksum'            => $checksum,
-              'status'              => $status,
-              'uid'                 => $uid,
+              'processor_id' => $plugin_id,
+              'fulltext' => '',
+              'plaintext' => '',
+              'metadata' => $metadata,
+              'who' => $who,
+              'nlplang' => $nlplang,
+              'processlang' => $processlang,
+              'where' => $where,
+              'when' => $when,
+              'ts' => $ts,
+              'sentiment' => $sentiment,
+              'uri' => $uri,
+              'checksum' => $checksum,
+              'status' => $status,
+              'uid' => $uid,
+              'service_md5' => $service_md5,
+              'vector_384' => $vector_384,
+              'vector_512' => $vector_512,
+              'vector_576' => $vector_576,
+              'vector_1024' => $vector_1024
             ];
             // This will then always create a new Index document, even if empty.
-            // Needed if we e.g are gonna use this for Book search/IIIF search
+            // Needed if we e.g. want to use this for Book search/IIIF search
             // to make sure it at least exists!
             if (!empty(trim($fulltext))) {
               try {
@@ -671,7 +696,7 @@ XML;
                 str_replace("<l>", PHP_EOL . "<l> ", $data['plaintext'])
               );
             }
-
+            // TODO. What if we wrap this in a try/catch?
             $documents[$item_id] = $this->typedDataManager->create(
               $sbfflavordata_definition
             );
@@ -994,6 +1019,7 @@ XML;
    * @return mixed
    */
   public function getFlavorFromBackend($item_id) {
+    //@TODO work an alternative backends.
     return $this->keyValue->get(self::SBFL_KEY_COLLECTION)->get(
       $item_id
     );
