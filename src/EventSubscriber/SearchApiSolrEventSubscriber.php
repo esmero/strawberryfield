@@ -97,10 +97,6 @@ class SearchApiSolrEventSubscriber implements EventSubscriberInterface {
       $hl->setFragSize(128);
       $hl->setRequireFieldMatch(TRUE);
     }
-    // KNN here
-    if ($query->getOption('sbf_knn')) {
-      $solarium_query->getQuery();
-    }
   }
 
 
@@ -190,12 +186,9 @@ class SearchApiSolrEventSubscriber implements EventSubscriberInterface {
     }
 
     if (count($names) > 0) {
-
       $document = $event->getSolariumDocument();
       $index = $item->getIndex();
       $solr_names = $index->getServerInstance()->getBackend()->getSolrFieldNames($index);
-
-
       foreach ($names as $name) {
         if (isset($solr_names[$name])) {
           // Why this check? I can't sent an empty. But i can send a NULL if not present
