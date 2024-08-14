@@ -18,6 +18,7 @@ use Drupal\search_api\Plugin\PluginFormTrait;
 use Drupal\Core\Form\FormStateInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Drupal\Core\Plugin\PluginDependencyTrait;
+use Drupal\strawberryfield\StrawberryfieldSearchAPIUtilityServiceInterface;
 
 /**
  * Represents a datasource which exposes flavors.
@@ -78,6 +79,12 @@ XML;
    */
   protected $configFactory;
 
+  /**
+   * The SBF Search API State (indexing) helper.
+   *
+   * @var \Drupal\strawberryfield\StrawberryfieldSearchAPIUtilityServiceInterface;
+   */
+  protected $searchApiStateHelper;
 
   /**
    * The entity field manager.
@@ -140,6 +147,7 @@ XML;
     $datasource->languageManager = $container->get('language_manager');
     $datasource->keyValue = $container->get('strawberryfield.keyvalue.database');
     $datasource->state = $container->get('state');
+    $datasource->searchApiStateHelper = $container->get('strawberryfield.search_api_state_helper');
     return $datasource;
   }
 
@@ -705,7 +713,7 @@ XML;
           // As good as we can here
           // Try avoiding tracking for update if we are still processing partial sequences
           // This will of course make no difference for Single Files/Single Sequence.
-          if ($sequence_id == $sequence_total) {
+          if (($sequence_id == $sequence_total) && $this->searchApiStateHelper->isIndexing()) {
             // We store the entity. That way we can get the parents
             // out of it.
             // We don't know much at this stage
@@ -734,16 +742,18 @@ XML;
       }
     }
 
-    /** @var \Drupal\search_api\Plugin\search_api\datasource\ContentEntityTrackingManager $tracking_manager */
-    $tracking_manager = \Drupal::getContainer()
-      ->get('search_api.entity_datasource.tracking_manager');
-    // We don't want to do this many times. We only need to call fetching the index once
-    // Per bundle.
-    foreach ($content_item_ids_to_update as $bundle => $items_by_bundle) {
-      $one_entity = reset($items_by_bundle);
-      $indexes = $tracking_manager->getIndexesForEntity($one_entity);
-      foreach ($indexes as $index) {
-        $index->trackItemsUpdated('entity:node', array_keys($items_by_bundle));
+    if ($this->searchApiStateHelper->isIndexing()) {
+      /** @var \Drupal\search_api\Plugin\search_api\datasource\ContentEntityTrackingManager $tracking_manager */
+      $tracking_manager = \Drupal::getContainer()
+        ->get('search_api.entity_datasource.tracking_manager');
+      // We don't want to do this many times. We only need to call fetching the index once
+      // Per bundle.
+      foreach ($content_item_ids_to_update as $bundle => $items_by_bundle) {
+        $one_entity = reset($items_by_bundle);
+        $indexes = $tracking_manager->getIndexesForEntity($one_entity);
+        foreach ($indexes as $index) {
+          $index->trackItemsUpdated('entity:node', array_keys($items_by_bundle));
+        }
       }
     }
 
