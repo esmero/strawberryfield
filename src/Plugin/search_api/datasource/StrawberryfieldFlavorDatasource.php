@@ -743,7 +743,6 @@ XML;
     }
 
     if ($this->searchApiStateHelper->isIndexing()) {
-      error_log('we are indexing now');
       /** @var \Drupal\search_api\Plugin\search_api\datasource\ContentEntityTrackingManager $tracking_manager */
       $tracking_manager = \Drupal::getContainer()
         ->get('search_api.entity_datasource.tracking_manager');
@@ -756,9 +755,6 @@ XML;
           $index->trackItemsUpdated('entity:node', array_keys($items_by_bundle));
         }
       }
-    }
-    else {
-      error_log('fetched flavor but not indexing');
     }
 
     return $documents;
