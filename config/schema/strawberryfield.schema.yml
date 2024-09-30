@@ -269,7 +269,6 @@ strawberryfield.breadcrumb_settings:
       type: boolean
       label: 'If Breadcrumb processing is enabled or not'
       default: TRUE
-
 search_api.property_configuration.sbf_flavor_aggregated_item:
   type: mapping
   label: 'Aggregated SBF Flavor field configuration'

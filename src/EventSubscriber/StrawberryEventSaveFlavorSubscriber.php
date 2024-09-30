@@ -80,7 +80,6 @@ class StrawberryEventSaveFlavorSubscriber extends StrawberryfieldEventSaveSubscr
     // Require an extra SOLR query/means also a config form to set the field that
     // Connects... so not yet ok?
     $this->trackFlavorsNeedUpdate($entity, $tracked_deleted);
-
     $current_class = get_called_class();
     $event->setProcessedBy($current_class, TRUE);
   }

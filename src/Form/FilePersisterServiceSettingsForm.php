@@ -158,7 +158,6 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
       '#default_value' => $config_storage->get('compost_dot_files') ?? FALSE,
       '#description' => $this->t('When enabled, we will ease the security concern for hidden files, if and only if the file to be composted is in a safe path. e.g /tmp. Safe paths by default are private://webform, temporary:// and /tmp'),
     ];
-
     $form['extractmetadata'] = [
       '#type' => 'checkbox',
       '#title' => $this->t('Should File level metadata extraction be processed?'),
