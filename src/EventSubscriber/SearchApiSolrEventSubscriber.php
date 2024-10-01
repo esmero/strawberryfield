@@ -3,13 +3,19 @@
 
 namespace Drupal\strawberryfield\EventSubscriber;
 
+use Drupal\search_api\Event\IndexingItemsEvent;
+use Drupal\search_api\Event\SearchApiEvents;
+use Drupal\search_api_solr\Event\PostCreateIndexDocumentEvent;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Drupal\search_api_solr\Event\SearchApiSolrEvents;
 use Drupal\search_api_solr\Event\PreQueryEvent;
 use Drupal\search_api_solr\Event\PostConvertedQueryEvent;
+use Drupal\search_api_solr\Event\PostConfigFilesGenerationEvent;
 use Solarium\Component\ComponentAwareQueryInterface;
+use Drupal\strawberryfield\StrawberryfieldSearchAPIUtilityServiceInterface;
 
 class SearchApiSolrEventSubscriber implements EventSubscriberInterface {
+  private StrawberryfieldSearchAPIUtilityServiceInterface $search_api_state;
 
   /**
    * @inheritDoc
@@ -17,10 +23,21 @@ class SearchApiSolrEventSubscriber implements EventSubscriberInterface {
   public static function getSubscribedEvents() {
     return [
       SearchApiSolrEvents::PRE_QUERY => 'preQuery',
-      SearchApiSolrEvents::POST_CONVERT_QUERY => 'convertedQuery'
+      SearchApiSolrEvents::POST_CONVERT_QUERY => 'convertedQuery',
+      SearchApiEvents::INDEXING_ITEMS => 'indexingItems',
+      SearchApiSolrEvents::POST_CONFIG_FILES_GENERATION => 'overrideExtraFields',
+      SearchApiSolrEvents::POST_CREATE_INDEX_DOCUMENT => 'RestoreLostZerosVector',
     ];
   }
 
+  /**
+   * StrawberryEventDeleteFlavorSubscriber constructor.
+   *
+   * @param StrawberryfieldSearchAPIUtilityServiceInterface $search_api_state
+   */
+  public function __construct(StrawberryfieldSearchAPIUtilityServiceInterface $search_api_state) {
+    $this->search_api_state = $search_api_state;
+  }
 
   /**
    * @param \Drupal\search_api_solr\Event\PreQueryEvent $event
@@ -117,5 +134,74 @@ class SearchApiSolrEventSubscriber implements EventSubscriberInterface {
         $hl->setFields(['*']);
       }
     }
+    if ($query->getOption('sbf_knn')) {
+        //@TODO this is overly nested. I should also allow multiple ones like this
+        // then move any non KNN queries to "before" or to "filters"
+      $solarium_query->setQuery($query->getOption('sbf_knn')[0][0]);
+      $hl = $solarium_query->getHighlighting();
+      // We can't highlight when doing Vector Queries or we will get
+      //  [ x:drupal] o.a.s.h.RequestHandlerBase java.lang.UnsupportedOperationException => java.lang.UnsupportedOperationException
+      //	at org.apache.lucene.search.highlight.WeightedSpanTermExtractor$DelegatingLeafReader.getFieldInfos(WeightedSpanTermExtractor.java:460)
+      //java.lang.UnsupportedOperationException: null
+
+      $hl->clearFields();
+      $hl->setUsePhraseHighlighter(FALSE);
+      // Just in case?
+      $solarium_query->removeComponent(
+        ComponentAwareQueryInterface::COMPONENT_EDISMAX
+      );
+    }
+  }
+  /**
+   * Reacts to the indexing items event.
+   *
+   * @param \Drupal\search_api\Event\IndexingItemsEvent $event
+   *   The indexing items event.
+   */
+  public function indexingItems(IndexingItemsEvent $event) {
+    $items = $event->getItems();
+    if (count($items)) {
+      $this->search_api_state->setIsIndexing(TRUE);
+    }
+  }
+
+
+  /**
+   * Reacts to the finished indexing items event.
+   *
+   * @param \Drupal\search_api\Event\IndexingItemsEvent $event
+   *   The indexing items event.
+   */
+  public function finishedIndexingItems(IndexingItemsEvent $event) {
+    $this->search_api_state->setIsIndexing(FALSE);
+  }
+
+  public function RestoreLostZerosVector(PostCreateIndexDocumentEvent $event) {
+    $item = $event->getSearchApiItem();
+    $names = [];
+    foreach($item->getFields(FALSE) as $field) {
+      if (str_starts_with($field->getType(), 'densevector_')) {
+          $names[] = $field->getFieldIdentifier();
+      }
+    }
+
+    if (count($names) > 0) {
+      $document = $event->getSolariumDocument();
+      $index = $item->getIndex();
+      $solr_names = $index->getServerInstance()->getBackend()->getSolrFieldNames($index);
+      foreach ($names as $name) {
+        if (isset($solr_names[$name])) {
+          // Why this check? I can't sent an empty. But i can send a NULL if not present
+          if (!empty($values = $item->getField($name)->getValues())) {
+            $document->setField($solr_names[$name], $item->getField($name)->getValues() ?? NULL);
+          }
+        }
+      }
+    }
+  }
+
+
+  public function overrideExtraFields(PostConfigFilesGenerationEvent $event): void {
+    /// TODO override extra fields so we can get around silly search api defining all as multivalued
   }
 }

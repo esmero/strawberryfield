@@ -92,3 +92,16 @@ function strawberryfield_update_9102() {
     }
   }
 }
+
+/**
+ * Update multipart_upload_threshold
+ *
+ */
+function strawberryfield_update_9103() {
+  $storage_settings = \Drupal::configFactory()->getEditable('strawberryfield.storage_settings');
+  $multipart_upload_threshold = $storage_settings->get('multipart_upload_threshold');
+  if (!$multipart_upload_threshold) {
+    $storage_settings->set('multipart_upload_threshold', 5368709120);
+    $storage_settings->save(TRUE);
+  }
+}

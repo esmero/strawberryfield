@@ -1,0 +1,4 @@
+GLAM Metadata:
+  label: 'GLAM Metadata'
+  description: 'Field to store complex JSON for Libraries, Museums, Archives.'
+  weight: -50

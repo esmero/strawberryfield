@@ -83,7 +83,7 @@ class StrawberryEntitiesViaJmesPathFromJson extends StrawberryValuesViaJmesPathF
       $delta = 0;
       foreach ($this->processed as $reference) {
        // No way we can use  $this->createItem($delta, $reference); here
-       // Because our public facing datatype is not what it seems
+       // Because our public facing data_type is not what it seems
        // We can not use DataReferenceDefinitions here, we need actually EntityAdapter!
        // Because \Drupal\search_api\Utility\FieldsHelper::extractFields can only act
        // on Complexdatainterface elements

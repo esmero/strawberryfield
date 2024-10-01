@@ -17,8 +17,7 @@ class StrawberryfieldFlavorDataDefinition extends ComplexDataDefinitionBase {
    * {@inheritdoc}
    */
   public function getPropertyDefinitions() {
-
-    if(!isset($this->propertyDefinitions)){
+    if (!isset($this->propertyDefinitions)) {
       $info = &$this->propertyDefinitions;
       $info['item_id'] = DataDefinition::create('string')->setLabel('Item ID');
       $info['label'] = DataDefinition::create('string')->setLabel('A Label');
@@ -50,13 +49,18 @@ class StrawberryfieldFlavorDataDefinition extends ComplexDataDefinitionBase {
       $info['when'] = ListDataDefinition::create('string')->setLabel('Ordered list of dates in string format');
       $info['sentiment'] = DataDefinition::create('string')->setLabel('Sentiment in integer range');
       $info['nlplang'] = ListDataDefinition::create('string')->setLabel('Ordered list of nlp detected languages');
-      $info['processlang'] = ListDataDefinition::create('string')->setLabel('Ordered list of languages provided to process nnmodified data body');
+      $info['processlang'] = ListDataDefinition::create('string')->setLabel('Ordered list of languages provided to process unmodified data body');
       $info['ts'] = DataDefinition::create('string')->setLabel('A Time stamp');
       //§/ required by Content Access processor , maybe we can disable it in some manner
       $info['status'] = DataDefinition::create('boolean')->setLabel('Status');
       $info['uid'] = DataDefinition::create('integer')->setLabel('UID');
+      // New For ML
+      $info['service_md5'] = DataDefinition::create('string')->setLabel('An MD5 checksum characterizing the Service that generated the values');
+      $info['vector_576'] = ListDataDefinition::create('float')->setLabel('Vector of size 576 coming from ML')->addConstraint('Length', ['max' => 576]);
+      $info['vector_1024'] = ListDataDefinition::create('float')->setLabel('Vector of size 1024 coming from ML')->addConstraint('Length', ['max' => 1024]);
+      $info['vector_384'] = ListDataDefinition::create('float')->setLabel('Vector of size 384 coming from ML')->addConstraint('Length', ['max' => 384]);
+      $info['vector_512'] = ListDataDefinition::create('float')->setLabel('Vector of size 512 coming from ML')->addConstraint('Length', ['max' => 512]);
     }
     return $this->propertyDefinitions;
   }
-
 }

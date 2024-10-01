@@ -18,6 +18,7 @@ use Drupal\search_api\Plugin\PluginFormTrait;
 use Drupal\Core\Form\FormStateInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Drupal\Core\Plugin\PluginDependencyTrait;
+use Drupal\strawberryfield\StrawberryfieldSearchAPIUtilityServiceInterface;
 
 /**
  * Represents a datasource which exposes flavors.
@@ -39,12 +40,23 @@ class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements St
   public const SBFL_KEY_COLLECTION = 'Strawberryfield_flavor_datasource_temp';
 
   /**
+   * The key for accessing last tracked Page information in site state for flavor datasource.
+   */
+  protected const TRACKING_OFFSET_STATE_KEY = 'search_api.datasource.strawberryfield_flavor_datasource.last_offset';
+
+  /**
    * An MINI OCR XML defined for empty pages.
    */
   public const EMPTY_MINIOCR_XML = <<<'XML'
 <?xml version="1.0" encoding="UTF-8"?>
 <ocr><p xml:id="empty_sequence" wh="100 100"><b><l><w x="0 0 0 0"> </w></l></b></p></ocr>
 XML;
+
+  /**
+   * Time to space constant. Calculated by the idea of 15 minutes per A4,
+   * Being that 3508 pixels (height because time flows down) / 15 / 60.
+   */
+  public const PIXELS_PER_SECOND = 3.8977777778;
 
   /**
    * The entity type manager.
@@ -67,6 +79,12 @@ XML;
    */
   protected $configFactory;
 
+  /**
+   * The SBF Search API State (indexing) helper.
+   *
+   * @var \Drupal\strawberryfield\StrawberryfieldSearchAPIUtilityServiceInterface;
+   */
+  protected $searchApiStateHelper;
 
   /**
    * The entity field manager.
@@ -104,6 +122,13 @@ XML;
   protected $entityDisplayRepository;
 
   /**
+   * The state service.
+   *
+   * @var \Drupal\Core\State\StateInterface
+   */
+  protected $state;
+
+  /**
    * {@inheritdoc}
    */
   public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
@@ -120,8 +145,9 @@ XML;
     $datasource->entityTypeBundleInfo = $container->get('entity_type.bundle.info');
     $datasource->typedDataManager = $container->get('typed_data_manager');
     $datasource->languageManager = $container->get('language_manager');
-    $datasource->keyValue = $container->get('keyvalue');
-
+    $datasource->keyValue = $container->get('strawberryfield.keyvalue.database');
+    $datasource->state = $container->get('state');
+    $datasource->searchApiStateHelper = $container->get('strawberryfield.search_api_state_helper');
     return $datasource;
   }
 
@@ -269,112 +295,102 @@ XML;
    * {@inheritdoc}
    */
   public function getPartialItemIds($page = NULL, array $bundles = NULL, array $languages = NULL) {
-    $select = $this->getEntityTypeManager()
-      ->getStorage($this->getEntityTypeId())
-      ->getQuery();
-
-    // When tracking items, we never want access checks.
-    $select->accessCheck(FALSE);
-
-    // We want to determine all entities of either one of the given bundles OR
-    // one of the given languages. That means we can't just filter for $bundles
-    // if $languages is given. Instead, we have to filter for all bundles we
-    // might want to include and later sort out those for which we want only the
-    // translations in $languages and those (matching $bundles) where we want
-    // all (enabled) translations.
-    if ($this->hasBundles()) {
-
-      $bundle_property = $this->getEntityType()->getKey('bundle');
-      if ($bundles && !$languages) {
-        $select->condition($bundle_property, $bundles, 'IN');
-      }
-      else {
-        $enabled_bundles = array_keys($this->getBundles());
-        // Since this is also called for removed bundles/languages,
-        // $enabled_bundles might not include $bundles.
-        if ($bundles) {
-          $enabled_bundles = array_unique(
-            array_merge($bundles, $enabled_bundles)
-          );
-        }
-        if (count($enabled_bundles) < count($this->getEntityBundles())) {
-          $select->condition($bundle_property, $enabled_bundles, 'IN');
-        }
-      }
-    }
 
     if (isset($page)) {
       $page_size = $this->getConfigValue('tracking_page_size');
       assert($page_size, 'Tracking page size is not set.');
-      $select->range($page * $page_size, $page_size);
-      // For paging to reliably work, a sort should be present.
-      $entity_id = $this->getEntityType()->getKey('id');
-      $select->sort($entity_id);
+      $offset = $page * 100; // Yeah hundred is cool.
+    }
+    else {
+      //Bananas! we can't get a Million? No, we can't
+      $page_size = $this->getConfigValue('tracking_page_size') ?? 100;
+      $page = 0;
+      $offset = $page * $page_size;
+    }
+    if ($page > 0) {
+      $offset = $this->state->get(self::TRACKING_OFFSET_STATE_KEY, $offset);
     }
 
-    $entity_ids = $select->execute();
 
-    if (!$entity_ids) {
-      return NULL;
+    $finished = FALSE;
+    $morethanone = FALSE;
+    while ((!$finished && !$morethanone)) {
+        $valid_item_ids = $this->getFlavorKeysFromBackend($offset, $page_size);
+        if ($valid_item_ids == NULL) {
+          $finished = TRUE;
+        }
+        elseif (count($valid_item_ids)) {
+          $morethanone = TRUE;
+        }
+        else {
+          $page = $page + 1;
+          $offset = $page * $page_size;
+        }
     }
 
-    // For all loaded entities, compute all their item IDs (one for each
-    // translation we want to include). For those matching the given bundles (if
-    // any), we want to include translations for all enabled languages. For all
-    // other entities, we just want to include the translations for the
-    // languages passed to the method (if any).
-    $item_ids = [];
-    $enabled_languages = array_keys($this->getLanguages());
-    // As above for bundles, $enabled_languages might not include $languages.
-    if ($languages) {
-      $enabled_languages = array_unique(
-        array_merge($languages, $enabled_languages)
-      );
+    if ($finished) {
+      $this->state->delete(self::TRACKING_OFFSET_STATE_KEY);
+      return $valid_item_ids;
     }
-    // Also, we want to always include entities with unknown language.
-    $enabled_languages[] = LanguageInterface::LANGCODE_NOT_SPECIFIED;
-    $enabled_languages[] = LanguageInterface::LANGCODE_NOT_APPLICABLE;
 
-    /** @var \Drupal\Core\Entity\ContentEntityInterface $entity */
-    foreach ($this->getEntityStorage()->loadMultiple(
-      $entity_ids
-    ) as $entity_id => $entity) {
-      $translations = array_keys($entity->getTranslationLanguages());
-      $translations = array_intersect($translations, $enabled_languages);
-      // If only languages were specified, keep only those translations matching
-      // them. If bundles were also specified, keep all (enabled) translations
-      // for those entities that match those bundles.
-      if ($languages !== NULL
-        && (!$bundles || !in_array($entity->bundle(), $bundles))) {
-        $translations = array_intersect($translations, $languages);
-      }
-      // Well, well well. Happens that we may have gotten this wrong?
-      // Flavours can be also file based. One ADO manny files?
-      // Many times files flavors...
-      // Also should we track here who provides the data
-      // SB_runners config ID?
+    // If so, i want to keep a state of the last page tracked ... bc any next page will if not repeat again the call.
+    $this->state->set(self::TRACKING_OFFSET_STATE_KEY, ($offset + $page_size));
+    return $valid_item_ids;
+  }
 
-      // We will throw the service invoke event here
-      // And fetch back which ones to be indexed?
-
-      foreach ($translations as $langcode) {
-        $sequence_id = 1;
-        $item_ids[] = "$entity_id:$sequence_id:$langcode";
-        // WE probably don't want anything here at all
-        // since this is pushed really by a queue
-        // and should never run if there is no real data source!
+  private function getFlavorKeysFromBackend($offset, $page_size) {
+    $item_ids =  $this->keyValue->get(self::SBFL_KEY_COLLECTION)->listKeys($offset, $page_size);
+    $valid_item_ids = [];
+    // Now with this in place we will actually check if Nodes/files for these exist.
+    // Should be the case always. But extra security might be good?
+    $entity_ids = [];
+    $entity_ids_splitted = [];
+    foreach ($item_ids as $id => $value) {
+      $splitted_id = explode(':', $id);
+      if (isset($splitted_id[0])) {
+        $entity_ids[$splitted_id[0]] = $splitted_id[0];
+        $entity_ids_splitted[$splitted_id[0]][$id] = $splitted_id;
       }
     }
-
+    $entity_ids = array_values($entity_ids);
+    foreach (
+      $this->getEntityStorage()->loadMultiple($entity_ids) as $entity_id =>
+      $entity
+    ) {
+      $status = $entity->isPublished();
+      $uid = $entity->getOwnerId();
+      foreach (
+        $entity_ids_splitted[$entity_id] as $item_id => $splitted_id_for_node
+      ) {
+        $fid_uuid = isset($splitted_id_for_node[3]) ? $splitted_id_for_node[3] : NULL;
+        if ($fid_uuid && $fid_uuid!= 'ado') {
+          $files = $this->entityTypeManager->getStorage('file')->loadByProperties(
+            [
+              'uuid' => $fid_uuid,
+            ]
+          );
+          $file = $files ? reset($files) : NULL;
+          if ($file) {
+            $valid_item_ids[] = $item_id;
+          }
+          unset($file);
+        }
+        else {
+          // These are valid if no UUID is given at all for a file.
+          $valid_item_ids[] = $item_id;
+        }
+      }
+    }
     if (Utility::isRunningInCli()) {
       // When running in the CLI, this might be executed for all entities from
       // within a single process. To avoid running out of memory, reset the
       // static cache after each batch.
       $this->getEntityStorage()->resetCache($entity_ids);
     }
-
-    return [];
+    // NULL here means the query returned 0, means we are done.
+    return count($item_ids) ? $valid_item_ids : NULL;
   }
+
 
   /**
    * {@inheritdoc}
@@ -561,29 +577,34 @@ XML;
     ) {
       $status = $entity->isPublished();
       $uid = $entity->getOwnerId();
-      foreach (
-        $entity_ids_splitted[$entity_id] as $item_id => $splitted_id_for_node
-      ) {
+      foreach ($entity_ids_splitted[$entity_id] as $item_id => $splitted_id_for_node) {
         $sequence_id = !empty($splitted_id_for_node[1]) ? $splitted_id_for_node[1] : 1;
         $fid_uuid = isset($splitted_id_for_node[3]) ? $splitted_id_for_node[3] : NULL;
+        // for Metadata only Processors we won't have a file. We will use the stub "ado" instead
+
         $plugin_id = isset($splitted_id_for_node[4]) ? $splitted_id_for_node[4] : NULL;
         $translation_id = isset($splitted_id_for_node[2]) ? $splitted_id_for_node[2] : NULL;
         // probably we will want to add the module/class namespace for the plugin id?
-        $files = $this->entityTypeManager->getStorage('file')->loadByProperties(
-          [
-            'uuid' => $fid_uuid,
-          ]
-        );
-        $file = $files ? reset($files) : NULL;
+        if ($fid_uuid && $fid_uuid != 'ado') {
+          $files = $this->entityTypeManager->getStorage('file')->loadByProperties(
+            [
+              'uuid' => $fid_uuid,
+            ]
+          );
+          $file = $files ? reset($files) : NULL;
+        }
 
-        if ($file && $plugin_id !== NULL
+        if (($file || $fid_uuid == 'ado') && $plugin_id !== NULL
           && ($processed_data
             = $this->getFlavorFromBackend($item_id))
         ) {
-          // Put the package File ID / Package.
+          // From 1.4.0 we will also allow Flavors that are purely metadata in its origin to exist.
+          // So file is an optional.
           $fulltext = isset($processed_data->fulltext) ? (string) $processed_data->fulltext : '';
           $label = isset($processed_data->label) ? (string) $processed_data->label : "Sequence {$sequence_id}";
           $plaintext = isset($processed_data->plaintext) ? (string) $processed_data->plaintext : '';
+          // Checksum will still exist, even if just metadata. That way on simple "ado" save if a processor
+          // is using metadata, if nothing changed we won't need to re-index.
           $checksum = isset($processed_data->checksum) ? (string) $processed_data->checksum : NULL;
           $where = isset($processed_data->where) ? (array) $processed_data->where : [];
           $where= preg_grep(
@@ -606,35 +627,49 @@ XML;
           $config_processor_id = isset($processed_data->config_processor_id) ? $processed_data->config_processor_id : '';
           $nlplang = isset($processed_data->nlplang) ? $processed_data->nlplang : [];
           $processlang = isset($processed_data->processlang) ? $processed_data->processlang : [];
+
+          // For ML generated data. We will pre-validate
+          $service_md5 =  isset($processed_data->service_md5) ? $processed_data->service_md5 : '';
+          $vector_576 = isset($processed_data->vector_576) && is_array($processed_data->vector_576) && count($processed_data->vector_576) == 576 ? $processed_data->vector_576 : NULL;
+          $vector_512 = isset($processed_data->vector_512) && is_array($processed_data->vector_512) && count($processed_data->vector_512) == 512 ? $processed_data->vector_512 : NULL;
+          $vector_1024 = isset($processed_data->vector_1024) && is_array($processed_data->vector_1024) && count($processed_data->vector_1024) == 1024 ? $processed_data->vector_1024 : NULL;
+          $vector_384 = isset($processed_data->vector_384) && is_array($processed_data->vector_384) && count($processed_data->vector_384) == 384 ? $processed_data->vector_384 : NULL;
+          $file_uuid = $file ?  $file->uuid() : NULL;
+          $target_fileid = $file ? $file->id() : NULL;
           if ($checksum) {
             $data = [
-              'item_id'             => $item_id,
-              'label'               => $label,
-              'sequence_id'         => $sequence_id,
-              'sequence_total'      => $sequence_total,
-              'target_id'           => $entity_id,
-              'parent_id'           => $entity_id,
-              'file_uuid'           => $file->uuid(),
-              'target_fileid'       => $file->id(),
+              'item_id' => $item_id,
+              'label' => $label,
+              'sequence_id' => $sequence_id,
+              'sequence_total' => $sequence_total,
+              'target_id' => $entity_id,
+              'parent_id' => $entity_id,
+              'file_uuid' => $file_uuid,
+              'target_fileid' => $target_fileid,
               'config_processor_id' => $config_processor_id,
-              'processor_id'        => $plugin_id,
-              'fulltext'            => '',
-              'plaintext'           => '',
-              'metadata'            => $metadata,
-              'who'                 => $who,
-              'nlplang'             => $nlplang,
-              'processlang'         => $processlang,
-              'where'               => $where,
-              'when'                => $when,
-              'ts'                  => $ts,
-              'sentiment'           => $sentiment,
-              'uri'                 => $uri,
-              'checksum'            => $checksum,
-              'status'              => $status,
-              'uid'                 => $uid,
+              'processor_id' => $plugin_id,
+              'fulltext' => '',
+              'plaintext' => '',
+              'metadata' => $metadata,
+              'who' => $who,
+              'nlplang' => $nlplang,
+              'processlang' => $processlang,
+              'where' => $where,
+              'when' => $when,
+              'ts' => $ts,
+              'sentiment' => $sentiment,
+              'uri' => $uri,
+              'checksum' => $checksum,
+              'status' => $status,
+              'uid' => $uid,
+              'service_md5' => $service_md5,
+              'vector_384' => $vector_384,
+              'vector_512' => $vector_512,
+              'vector_576' => $vector_576,
+              'vector_1024' => $vector_1024
             ];
             // This will then always create a new Index document, even if empty.
-            // Needed if we e.g are gonna use this for Book search/IIIF search
+            // Needed if we e.g. want to use this for Book search/IIIF search
             // to make sure it at least exists!
             if (!empty(trim($fulltext))) {
               try {
@@ -669,7 +704,7 @@ XML;
                 str_replace("<l>", PHP_EOL . "<l> ", $data['plaintext'])
               );
             }
-
+            // TODO. What if we wrap this in a try/catch?
             $documents[$item_id] = $this->typedDataManager->create(
               $sbfflavordata_definition
             );
@@ -678,7 +713,7 @@ XML;
           // As good as we can here
           // Try avoiding tracking for update if we are still processing partial sequences
           // This will of course make no difference for Single Files/Single Sequence.
-          if ($sequence_id == $sequence_total) {
+          if (($sequence_id == $sequence_total) && $this->searchApiStateHelper->isIndexing()) {
             // We store the entity. That way we can get the parents
             // out of it.
             // We don't know much at this stage
@@ -707,16 +742,18 @@ XML;
       }
     }
 
-    /** @var \Drupal\search_api\Plugin\search_api\datasource\ContentEntityTrackingManager $tracking_manager */
-    $tracking_manager = \Drupal::getContainer()
-      ->get('search_api.entity_datasource.tracking_manager');
-    // We don't want to do this many times. We only need to call fetching the index once
-    // Per bundle.
-    foreach ($content_item_ids_to_update as $bundle => $items_by_bundle) {
-      $one_entity = reset($items_by_bundle);
-      $indexes = $tracking_manager->getIndexesForEntity($one_entity);
-      foreach ($indexes as $index) {
-        $index->trackItemsUpdated('entity:node', array_keys($items_by_bundle));
+    if ($this->searchApiStateHelper->isIndexing()) {
+      /** @var \Drupal\search_api\Plugin\search_api\datasource\ContentEntityTrackingManager $tracking_manager */
+      $tracking_manager = \Drupal::getContainer()
+        ->get('search_api.entity_datasource.tracking_manager');
+      // We don't want to do this many times. We only need to call fetching the index once
+      // Per bundle.
+      foreach ($content_item_ids_to_update as $bundle => $items_by_bundle) {
+        $one_entity = reset($items_by_bundle);
+        $indexes = $tracking_manager->getIndexesForEntity($one_entity);
+        foreach ($indexes as $index) {
+          $index->trackItemsUpdated('entity:node', array_keys($items_by_bundle));
+        }
       }
     }
 
@@ -739,9 +776,8 @@ XML;
       if (!$index->isValidDatasource($datasource_id)) {
         unset($indexes[$index_id]);
       }
-
-      return $indexes;
     }
+    return $indexes;
   }
 
 
@@ -993,6 +1029,7 @@ XML;
    * @return mixed
    */
   public function getFlavorFromBackend($item_id) {
+    //@TODO work an alternative backends.
     return $this->keyValue->get(self::SBFL_KEY_COLLECTION)->get(
       $item_id
     );

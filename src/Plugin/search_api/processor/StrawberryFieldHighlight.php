@@ -435,7 +435,9 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
       // This assumes we are indeed using phrase escaping (see \Drupal\search_api_solr\Utility\Utility::flattenKeys)
       // And not term escaping (which would be desired for single keys
       // but then i will not re-write code from \Drupal\search_api_solr!
-      preg_match_all('/"([^"]+)"/', $direct_keys,$match);
+      if (!empty($direct_keys)) {
+        preg_match_all('/"([^"]+)"/', $direct_keys, $match);
+      }
       if (isset($match[1]) && is_array($match[1])) {
         $keys = array_unique($match[1]);
       }

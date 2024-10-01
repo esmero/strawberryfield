@@ -27,6 +27,7 @@ use Swaggest\JsonDiff\JsonDiff;
  * @Action(
  *   id = "entity:jsonpatch_action",
  *   action_label = @Translation("JSON Patch an ADO"),
+ *   label = @Translation("JSON Patch an ADO"),
  *   category = @Translation("Metadata"),
  *   type = "node"
  * )
