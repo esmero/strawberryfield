@@ -7,6 +7,7 @@ use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\TypedData\DataDefinition;
 use Drupal\Core\TypedData\DataReferenceDefinition;
+use Drupal\Core\TypedData\MapDataDefinition;
 use Drupal\strawberryfield\Entity\keyNameProviderEntity;
 use Drupal\Component\Utility\Random;
 use Drupal\Core\TypedData\ListDataDefinition;
@@ -196,8 +197,20 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
            }
            else {
              $is_date = $plugin_config_entity_configs[$processor_class][$property]['is_date'] ?? FALSE;
+             $is_date_range = $plugin_config_entity_configs[$processor_class][$property]['is_date_range'] ?? FALSE;
+             if ($is_date_range) {
+               $is_date == TRUE;
+             }
+             if ($is_date_range) {
+               // Override the default for now. Ideally we could keep using annotations
+               // And have for the exception case/range a special data type processor and plugin.
+               $list_definition = 'map';
+             }
+             else {
+               $list_definition = $item_types[$processor_class];
+             }
              $properties[$property] = ListDataDefinition::create(
-               $item_types[$processor_class]
+               $list_definition
              )
                ->setLabel($property)
                ->setComputed(TRUE)
@@ -205,7 +218,17 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
                ->setInternal(TRUE)
                ->setSetting('jsonkey', $keyname)
                ->setSetting('is_date', $is_date)
+               ->setSetting('is_date_range', $is_date_range)
                ->setReadOnly(TRUE);
+             if ($is_date_range) {
+               //@TODO create a data type definition class instead of building this on the fly. Annoying!
+               $data_range_ref = MapDataDefinition::create();
+               $data_range_ref->setPropertyDefinition('value', DataDefinition::create('datetime_iso8601'));
+               $data_range_ref->setPropertyDefinition('end_value', DataDefinition::create('datetime_iso8601'));
+               $data_range_ref->setMainPropertyName('value');
+               $properties[$property]->setItemDefinition($data_range_ref);
+             }
+
            }
          }
        }
