@@ -54,6 +54,9 @@ strawberryfield.strawberry_keynameprovider.jmespath:
     is_date:
       type: boolean
       label: 'If the value should be considered and validated as a date'
+    is_date_range:
+      type: boolean
+      label: 'If the value should be considered and validated as a native Drupal date range'
     exposed_key:
       type: string
       label: 'The field property we expose for the Strawberryfield'
