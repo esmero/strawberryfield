@@ -49,6 +49,7 @@ class JmesPathNameProvider extends StrawberryfieldKeyNameProviderBase {
         // Example hocr
         'exposed_key' => '',
         'is_date' => FALSE,
+        'is_date_range' => FALSE,
         // The id of the config entity from where these values came from.'
         'configEntity' => NULL
       ] + parent::defaultConfiguration();
@@ -78,6 +79,19 @@ class JmesPathNameProvider extends StrawberryfieldKeyNameProviderBase {
       '#title' => $this->t('Is Date?'),
       '#default_value' => $this->getConfiguration()['is_date'],
       '#description' => $this->t('If checked the value coming from your <em>Strawberry field</em> JSON will be validated to be a Date.'),
+      '#required' => FALSE,
+    ];
+    $element['is_date_range'] = [
+      '#id' => 'is_date_range',
+      '#type' => 'checkbox',
+      '#title' => $this->t('Is Date Range(s)?'),
+      '#default_value' => $this->getConfiguration()['is_date_range'],
+      '#description' => $this->t('If checked the value coming from your <em>Strawberry field</em> JSON will be validated to be a Date and cast into Date Ranges.'),
+      '#states' => [
+        'visible' => [
+          ':input[name="pluginconfig[is_date]"]' => ['checked' => TRUE],
+        ],
+      ],
       '#required' => FALSE,
     ];
     // We need the parent form structure, if any, to make machine name work.
