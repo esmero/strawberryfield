@@ -60,7 +60,9 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
       // jmespath's separated by comma.
       $jmespaths = $definition['settings']['jsonkey'];
       $is_date = $definition['settings']['is_date'] ?? FALSE;
-      $jmespath_array = array_map('trim', explode(',', $jmespaths));
+      // See https://github.com/esmero/strawberryfield/issues/333
+      $pattern = '/[,]+(?![^\[]*\]|[^\(]*\)|[^\{]*\})/';
+      $jmespath_array = array_map('trim', preg_split($pattern, $jmespaths));
       $jmespath_result = [];
       foreach ($jmespath_array as $jmespath) {
         $jmespath_result[] = $item->searchPath(trim($jmespath),FALSE);
