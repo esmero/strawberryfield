@@ -70,9 +70,10 @@ class StrawberryKeysFromJson extends ItemList {
     // jsonkey in this context is a string containing one or more
     // jmespath's separated by comma.
     $filter_empties = $definition['settings']['filter_empties'] ?? FALSE;
-    if (!empty($item->value)) {
+    if (!empty($item->getValue()) && isset($item->getValue()['value'])) {
       // Should 10 be enough? this is json-ld not github.. so maybe...
-      $jsonArray = json_decode($item->value, TRUE, 50);
+      // $item->value will be contained in $item->getValue()['value']
+      $jsonArray = json_decode($item->getValue()['value'], TRUE, 50);
       //@TODO deal with JSON exceptions as we have done before
 
       $flattened = [];
