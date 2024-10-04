@@ -64,10 +64,10 @@ class JmesPathNameProvider extends StrawberryfieldKeyNameProviderBase {
     $element['source_key'] = [
       '#id' => 'source_key',
       '#type' => 'textarea',
-      '#title' => $this->t('One or more comma separated valid JMESPaths.'),
-      '#size' => 40,
-      '#rows' => 4,
-      '#maxlength' => 255,
+      '#title' => $this->t('One or more comma separated valid JMESPaths. Limited to 1024 characters'),
+      '#cols' => 20,
+      '#rows' => 12,
+      '#maxlength' => 1024,
       '#default_value' => $this->getConfiguration()['source_key'],
       '#description' => $this->t('JMespath(s) will be evaluated against your <em>Strawberry field</em> JSON to extract data.<br> e.g. subject_loc[*].label'),
       '#required' => true,
@@ -86,7 +86,7 @@ class JmesPathNameProvider extends StrawberryfieldKeyNameProviderBase {
       '#type' => 'checkbox',
       '#title' => $this->t('Is Date Range(s)?'),
       '#default_value' => $this->getConfiguration()['is_date_range'],
-      '#description' => $this->t('If checked the value coming from your <em>Strawberry field</em> JSON will be validated to be a Date and cast into Date Ranges.'),
+      '#description' => $this->t('Valid dates will be processed as Date Ranges (ideally coming from EDTF formatted sources) and treated as Native Drupal Date Ranges which can be indexed as Date Range Search API types.'),
       '#states' => [
         'visible' => [
           ':input[name="pluginconfig[is_date]"]' => ['checked' => TRUE],
