@@ -56,7 +56,7 @@ class StrawberryValuesFromJson extends ItemList {
     }
     $values = [];
     $item = $this->getParent();
-    if (!empty($item->value)) {
+    if (!empty($item->getValue())) {
       /* @var $item StrawberryFieldItem */
       $flattened = $item->provideFlatten(FALSE);
       $definition = $this->getDataDefinition();
