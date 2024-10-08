@@ -5,6 +5,7 @@ namespace Drupal\strawberryfield\Plugin\search_api\processor\Property;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
+use Drupal\search_api\Entity\Index;
 use Drupal\search_api\Item\FieldInterface;
 use Drupal\search_api\Processor\ConfigurablePropertyBase;
 
@@ -24,7 +25,7 @@ class StrawberryFlavorAggregatedItemProperty extends ConfigurablePropertyBase {
     return [
       'roles' => [AccountInterface::ANONYMOUS_ROLE],
       'processor_ids' => '',
-
+      'join_fields' => ['top_parent_id','parent_id']
     ];
   }
 
@@ -32,7 +33,9 @@ class StrawberryFlavorAggregatedItemProperty extends ConfigurablePropertyBase {
    * {@inheritdoc}
    */
   public function buildConfigurationForm(FieldInterface $field, array $form, FormStateInterface $form_state) {
-    $configuration = $field->getConfiguration();
+    $configuration = $field->getConfiguration() +  $this->defaultConfiguration();
+    $index =  $field->getIndex();
+    $join_fields = $this->getSbfNidFields($index) ?? ['top_parent_id','parent_id'];
     // Note we want to aggregate across indexes in case we move
     // SBF into another. So we don't use this $index here.
     $form['#tree'] = TRUE;
@@ -62,7 +65,40 @@ class StrawberryFlavorAggregatedItemProperty extends ConfigurablePropertyBase {
       '#required' => TRUE,
     ];
 
+    $form['join_fields'] = [
+      '#type' => 'select',
+      '#multiple' => TRUE,
+      '#options' => $join_fields,
+      '#title' => $this->t('Strawberry Flavor fields referencing a parent Node ID (any level) to be used for aggregating.'),
+      '#description' => $this->t('Select the fields that reference Parent Nodes or ADOs to be used to Aggregate the Flavors to them.'),
+      '#default_value' => $configuration['join_fields'],
+      '#required' => TRUE,
+    ];
+
     return $form;
+  }
+
+  /**
+   * Retrieves a list of all available Flavor to ADO NID fields.
+   *
+   * @return string[]
+   *   An options list of SBF to ADO field identifiers mapped to their prefixed
+   *   labels.
+   */
+  protected function getSbfNidFields($index) {
+    $fields = [];
+    $fields_info = $index->getFields();
+    foreach ($fields_info as $field_id => $field) {
+      if (($field->getDatasourceId() == 'strawberryfield_flavor_datasource') && ($field->getType() == "integer")) {
+        $property_path = $field->getPropertyPath();
+        $property_path_parts = explode(":", $property_path ?? '');
+        if (end($property_path_parts) == "nid" || $property_path == 'parent_id') {
+          $fields[$field_id] = $field->getPrefixedLabel() . '('
+            . $field->getFieldIdentifier() . ')';
+        }
+      }
+    }
+    return $fields;
   }
 
 }
