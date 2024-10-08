@@ -288,6 +288,13 @@ search_api.property_configuration.sbf_flavor_aggregated_item:
       type:
         type: string
         label: 'Comma separated list of Drupal machine names (IDs) of Strawberry Runner Post processor Configuration entities.e.g "ocr,text"'
+    join_fields:
+      type: sequence
+      label: 'The Search API Solr fields to be used to harvest related Flavors'
+      sequence:
+        type: string
+        orderby: key
+        label: 'A Search API Solr fields to be used to harvest(filter) related Flavors'
 
 plugin.plugin_configuration.search_api_processor.sbf_highlight:
   type: search_api.default_processor_configuration

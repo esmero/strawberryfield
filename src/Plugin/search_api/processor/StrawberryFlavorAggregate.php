@@ -143,6 +143,7 @@ class StrawberryFlavorAggregate extends ProcessorPluginBase {
         ->filterForPropertyPath($item->getFields(), NULL, 'sbf_aggregated_items');
       foreach ($fields as $field) {
         $configuration = $field->getConfiguration();
+        $join_fields = $configuration['join_fields'] ?? ['top_parent_id','parent_id'];
         // Change the current user to our dummy implementation to ensure we are
         // using the configured roles.
         // This is really not needed given that SBF have a separate Permission
@@ -162,7 +163,7 @@ class StrawberryFlavorAggregate extends ProcessorPluginBase {
               );
               foreach ($processor_ids as $processor_id) {
                 $flavors = $this->flavorsfromSolrIndex(
-                  $node->id(), $processor_id, $indexes,  50, 500
+                  $node->id(), $processor_id, $join_fields, $indexes,  50, 500
                 );
                 $flavors = array_filter($flavors);
                 if (count($flavors)) {
@@ -207,7 +208,7 @@ class StrawberryFlavorAggregate extends ProcessorPluginBase {
    * @throws \Drupal\Component\Plugin\Exception\PluginException
    * @throws \Drupal\search_api\SearchApiException
    */
-  protected function flavorsfromSolrIndex(int $nodeid, string $processor, array $indexes, $limit = 50, $max = 500) {
+  protected function flavorsfromSolrIndex(int $nodeid, string $processor, array $join_fields, array $indexes, $limit = 50, $max = 500) {
     $values = [];
     /* @var \Drupal\search_api\IndexInterface[] $indexes */
     foreach ($indexes as $search_api_index) {
@@ -230,18 +231,19 @@ class StrawberryFlavorAggregate extends ProcessorPluginBase {
 
       /* Forcing here two fixed options, we aggregate only from two levels down */
       $parent_conditions = $query->createConditionGroup('OR');
-      if (isset($allfields_translated_to_solr['parent_id'])) {
-        $parent_conditions->addCondition('parent_id', $nodeid);
+      foreach ($join_fields as $join_field) {
+        // property paths for these will look like: target_id:field_descriptive_metadata:sbf_entity_reference_ispartof:nid
+        if (isset($allfields_translated_to_solr[$join_field])) {
+          $parent_conditions->addCondition($join_field, $nodeid);
+        }
       }
-      // The property path for this is: target_id:field_descriptive_metadata:sbf_entity_reference_ispartof:nid
-      // TODO: This needs a config form. For now let's document. Even if not present
-      // It will not fail.
-      if (isset($allfields_translated_to_solr['top_parent_id'])) {
-        $parent_conditions->addCondition('top_parent_id', $nodeid);
-      }
-
       if (count($parent_conditions->getConditions())) {
         $query->addConditionGroup($parent_conditions);
+      }
+      else {
+        // If we have no conditions the query will get everything. So we return instead.
+        $this->getLogger()->warning('No parent ADO fields configured for Aggregated Flavor Field. No Aggregation will be done. Check your Search API Index Field Configs');
+        return [];
       }
 
       $query->addCondition(
