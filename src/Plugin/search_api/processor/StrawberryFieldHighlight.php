@@ -1028,11 +1028,13 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
 
       if (!$combined_keys) {
         // FOR NOW FIXED as it was in 1.3.0. But we might also allow this to come from other
-        $nid_fields = [];
-        $nid_fields[] = 'parent_id';
+        // REview how we could provide this here. Given that the HL is based on the aggregated data
+        // Maybe we could reverse engineer the config for the aggregated field and take the new (for 1.5.0)
+        // SBF to ADO NID fields from there. Heavy lift though for every query. Maybe this should happen
+        // At the filter level and pass as an option ready to be used here?
         $combined_keys = $query->getOption('sbf_advanced_search_filter_flavor_hl') ?? NULL;
+        $nid_fields  = $query->getOption('sbf_advanced_search_filter_flavor_join_search_api_fields_hl') ?? ['parent_id'];
       }
-
 
       if ($combined_keys && is_string($combined_keys) && strlen(trim($combined_keys)) > 0
       ) {
@@ -1076,10 +1078,7 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
           $node_ids_from_result = [];
           if ($item_id && count($item_id) == 5) {
             // Gosh we need to merge this... if not we end with the last one only.
-            // @TODO. we could check here if the keys for a certain highlight
-            // were already highlighted but then we are already generating a snippet
-            // that is limited in the caller. So not sure it is worth
-            // Get every returned SBF to NODEID Int value from the chosen fields
+            // Get every returned SBF to NODEID Int value from the chosen fields in the query option for a JOIN.
             foreach ($nid_fields as $nid_field) {
                if ($item->getField($nid_field, FALSE)) {
                 $node_ids_from_result = array_merge($node_ids_from_result, $item->getField($nid_field, FALSE)->getValues());
@@ -1088,7 +1087,7 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
             $node_ids_from_result = array_unique($node_ids_from_result);
             $matched_node_id = array_intersect($node_ids_from_result, $entities);
             foreach ($matched_node_id as $node_id) {
-              // being  $item_id[2]; the language.
+              // being  $item_id[2]; the language of the Flavor.
               $entity_id = 'entity:node/'.$node_id . ':' . $item_id[2];
               $highlighted_fields[$entity_id]['highlighted_fields']
                 = array_merge_recursive($highlighted_fields[$entity_id]['highlighted_fields'] ?? [], $item->getExtraData('highlighted_fields', []));
