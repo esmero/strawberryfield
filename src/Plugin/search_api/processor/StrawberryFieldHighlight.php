@@ -999,36 +999,65 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
       // Important NOTE: e.g if you are using a global AND, means for a search
       // ALL WORDS need to match, this in NO CASE means all the words need to match
       // THE OCR flavor or any flavor. The combined result (JOIN time + main query) need to match
-      // SO here we can not use the 'v' from $query->getOption('sbf_join_flavor')['v']; that was used
+      // SO here we can not use the 'v' from $query->getOption('sbf_join_flavor')[index]['v']; that was used
       // to generate the JOIN because only on rare cases (e.g ONLY OCR matched all) will give us
       // any highlights. This is a complexity of our process
       // and OK if we handle this differently.
       // Just in case someone tried to copy the code without understanding, let's be safe
-      $combined_keys = $query->getOption('sbf_join_flavor')['hl'] ??
-        ($query->getOption('sbf_join_flavor')['v'] ?? NULL);
+      // Because the JOIN might be happening across multiple source to target fields
+      // we will use a single hl/v (all will be the same)
+      // but variate the "fields" for grouping and also the conditions based on ['from']
+      $options =  $query->getOption('sbf_join_flavor');
+      $combined_keys = NULL;
+      $nid_fields = [];
+      if ($options && is_array($options)) {
+        $option = reset($options);
+        $combined_keys = $option['hl'] ?? ($option['v']  ?? NULL);
+        foreach ($options as $option) {
+          // Note that 'from_search_api' keeps the native search API Fields
+          // While 'from' the already resolved Solr ones.
+          if ($option['from_search_api'] ?? NULL) {
+            $nid_fields[] = $option['from_search_api'];
+          }
+        }
+      }
+
       // No join. Try with the Advanced Search Flavor Filter
       // Sweet and made for a hit summer of advanced Searching!
       // @See \Drupal\format_strawberryfield_views\Plugin\views\filter\AdvancedSearchApiFulltext::query
+
       if (!$combined_keys) {
+        // FOR NOW FIXED as it was in 1.3.0. But we might also allow this to come from other
+        $nid_fields = [];
+        $nid_fields[] = 'parent_id';
         $combined_keys = $query->getOption('sbf_advanced_search_filter_flavor_hl') ?? NULL;
       }
+
+
       if ($combined_keys && is_string($combined_keys) && strlen(trim($combined_keys)) > 0
       ) {
         $group_options = [
           'use_grouping' => TRUE,
-          'fields'       => ['parent_id'],
+          'fields'       => $nid_fields,
           'truncate'     => TRUE,
           'group_limit'  => 3,
           'group_sort'   => [],
         ];
         $flavor_query->setOption('search_api_grouping', $group_options);
         $flavor_query->keys("{$combined_keys}");
-        $flavor_query->addCondition('parent_id', $entities, 'IN');
+        $nid_fields_group = $flavor_query->createConditionGroup('OR', ['sbf_hl_source']);
+        foreach($nid_fields as $nid_field) {
+          $nid_fields_group->addCondition($nid_field, $entities, 'IN');
+        }
+        if (!empty($nid_fields_group->getConditions())) {
+          $flavor_query->addConditionGroup($nid_fields_group);
+        }
 
         // This is just to avoid Search API rewriting the query
         $flavor_query->setOption('solr_param_defType', 'edismax');
         // This will allow us to remove the edismax processor on a hook/event subscriber.
         $flavor_query->setOption('sbf_advanced_highlight_flavor', TRUE);
+
         $flavor_query->addCondition(
           'search_api_datasource', 'strawberryfield_flavor_datasource'
         );
@@ -1036,9 +1065,9 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
         $flavor_query->setOption('search_api_bypass_access', TRUE);
         $flavor_query->setFulltextFields([]);
         $flavor_query->setProcessingLevel(QueryInterface::PROCESSING_BASIC);
+
         $flavor_query->setOption(
-          'search_api_retrieved_field_values',
-          ['parent_id' => 'parent_id', 'processor_id' => 'processor_id']
+          'search_api_retrieved_field_values', array_combine($nid_fields, $nid_fields) + [ 'processor_id' => 'processor_id']
         );
         $results = $flavor_query->execute();
         foreach ($results as $item_id => $item) {
