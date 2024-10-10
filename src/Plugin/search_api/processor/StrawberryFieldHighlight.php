@@ -1090,10 +1090,10 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
             foreach ($matched_node_id as $node_id) {
               // being  $item_id[2]; the language.
               $entity_id = 'entity:node/'.$node_id . ':' . $item_id[2];
-              $highlighted_fields[$node_id]['highlighted_fields']
-                = array_merge_recursive($highlighted_fields[$node_id]['highlighted_fields'] ?? [], $item->getExtraData('highlighted_fields', []));
-              $highlighted_fields[$node_id]['highlighted_keys']
-                = array_unique(array_merge($highlighted_fields[$node_id]['highlighted_keys'] ?? [], $item->getExtraData('highlighted_keys', [])));
+              $highlighted_fields[$entity_id]['highlighted_fields']
+                = array_merge_recursive($highlighted_fields[$entity_id]['highlighted_fields'] ?? [], $item->getExtraData('highlighted_fields', []));
+              $highlighted_fields[$entity_id]['highlighted_keys']
+                = array_unique(array_merge($highlighted_fields[$entity_id]['highlighted_keys'] ?? [], $item->getExtraData('highlighted_keys', [])));
             }
           }
         }
