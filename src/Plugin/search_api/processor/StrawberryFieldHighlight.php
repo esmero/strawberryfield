@@ -1038,14 +1038,17 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
 
       if ($combined_keys && is_string($combined_keys) && strlen(trim($combined_keys)) > 0
       ) {
-        $group_options = [
-          'use_grouping' => TRUE,
-          'fields'       => $nid_fields,
-          'truncate'     => TRUE,
-          'group_limit'  => 3,
-          'group_sort'   => [],
-        ];
-        $flavor_query->setOption('search_api_grouping', $group_options);
+        if (in_array('parent_id', $nid_fields)) {
+          // We can't group on multivalued fields but we know 'parent_id' is always single valued.
+          $group_options = [
+            'use_grouping' => TRUE,
+            'fields' => ['parent_id'],
+            'truncate' => TRUE,
+            'group_limit' => 3,
+            'group_sort' => [],
+          ];
+          $flavor_query->setOption('search_api_grouping', $group_options);
+        }
         $flavor_query->keys("{$combined_keys}");
         $nid_fields_group = $flavor_query->createConditionGroup('OR', ['sbf_hl_source']);
         foreach($nid_fields as $nid_field) {
