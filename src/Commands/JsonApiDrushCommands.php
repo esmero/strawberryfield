@@ -298,16 +298,6 @@ JSON;
         )
       );
     }
-    //@see https://www.drupal.org/project/drupal/issues/3072076
-    if (!\Drupal::moduleHandler()->moduleExists(
-      'jsonapi_earlyrendering_workaround'
-    )) {
-      throw new \Exception(
-        dt(
-          'This module needs the jsonapi_earlyrendering_workaround module installed while https://www.drupal.org/project/drupal/issues/3072076 gets merged. Please run php -dmemory_limit=-1 /usr/bin/composer require drupal/jsonapi_earlyrendering_workaround; drush en jsonapi_earlyrendering_workaround; '
-        )
-      );
-    }
 
     if (!ExecTrait::programExists('curl')) {
       throw new \Exception(
@@ -447,7 +437,6 @@ JSON;
           'filename' => 'metadatadisplay_entity_03.json',
           'name' => 'metadatadisplay_entity_03',
         ); */
-
         $args = [
           'curl',
           '-L',
@@ -469,7 +458,7 @@ JSON;
             ]
           );
           $this->output()->writeln(implode(' ', $args));
-          $process = Drush::process(implode(' ', $args));
+          $process = Drush::shell(implode(' ', $args));
           $process->mustRun();
           if ($process->getExitCode() == 0) {
 
@@ -583,7 +572,7 @@ JSON;
         );
 
         $this->output()->writeln(implode(' ', $args_node));
-        $process_node = Drush::process(implode(' ', $args_node));
+        $process_node = Drush::shell(implode (' ', $args_node));
         $process_node->mustRun();
 
         if ($process_node->getExitCode() == 0) {
