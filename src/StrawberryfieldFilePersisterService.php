@@ -767,7 +767,9 @@ class StrawberryfieldFilePersisterService {
       $entity = $field->getEntity();
       $entity_type_id = $entity->getEntityTypeId();
       foreach ($field->getIterator() as $delta => $itemfield) {
-        // Note: we are not longer touching the metadata here.
+        // Note: we are not longer touching the metadata here except under the presence of ap:forcefilemanage.
+        // @TODO. WE should disallow that key on new entities?
+        // Also add a special permission.
         /** @var $itemfield \Drupal\strawberryfield\Plugin\Field\FieldType\StrawberryFieldItem */
         $flatvalues = (array) $itemfield->provideFlatten();
         if (isset($flatvalues['dr:fid'])) {
