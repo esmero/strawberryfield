@@ -795,7 +795,9 @@ class StrawberryfieldFilePersisterService {
               // We need to remove this now. Can't run again.
               if ($force_file_manage) {
                 $fullvalues = $itemfield->provideDecoded(TRUE);
-                unset($fullvalues[["ap:tasks"]["ap:forcefilemanage"]]);
+
+                unset($fullvalues["ap:tasks"]["ap:forcefilemanage"]);
+
                 if (!$itemfield->setMainValueFromArray((array) $fullvalues)) {
                   $this->messenger->addError($this->t('We failed unsetting ap:forcefilemanage. Please remove manually.'));
                 }
