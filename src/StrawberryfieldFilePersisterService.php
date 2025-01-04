@@ -784,8 +784,25 @@ class StrawberryfieldFilePersisterService {
               // Naming service will always try to name things in a certain
               // way. So either we allow both to act everytime or we
               // have a other 'move your files' service?
+
+
+              // New option. {
+              //    "ap:tasks": {
+              //        "ap:forcefilemanage": true
+              //    }
+              //}
+              $force_file_manage =  $flatvalues["ap:tasks"]["ap:forcefilemanage"] ?? FALSE;
+              // We need to remove this now. Can't run again.
+              if ($force_file_manage) {
+                $fullvalues = $itemfield->provideDecoded(TRUE);
+                unset($fullvalues[["ap:tasks"]["ap:forcefilemanage"]]);
+                if (!$itemfield->setMainValueFromArray((array) $fullvalues)) {
+                  $this->messenger->addError($this->t('We failed unsetting ap:forcefilemanage. Please remove manually.'));
+                }
+              }
+
               $scheme = $file ? $this->streamWrapperManager::getScheme($file->getFileUri()) : NULL;
-              if ($file && ($file->isTemporary() || $scheme == 'temporary')) {
+              if ($file && ($file->isTemporary() || $scheme == 'temporary' || $force_file_manage)) {
                 // This is tricky. We will allow non temporary to be moved if
                 // The only usage is the current node!
                 $uuid = $file->uuid();
@@ -820,7 +837,7 @@ class StrawberryfieldFilePersisterService {
                         $destination_uri
                       );
                     }
-                    // Means moving was successful
+                    // Means copying was successful
                     if ($destination_uri) {
                       $file->setFileUri($destination_uri);
                     }
