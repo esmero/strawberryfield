@@ -21,8 +21,11 @@ class StrawberryfieldFlavorDataDefinition extends ComplexDataDefinitionBase {
       $info = &$this->propertyDefinitions;
       $info['item_id'] = DataDefinition::create('string')->setLabel('Item ID');
       $info['label'] = DataDefinition::create('string')->setLabel('A Label');
-      $info['sequence_id'] = DataDefinition::create('string')->setLabel('Sequence ID');
-      $info['sequence_total'] = DataDefinition::create('string')->setLabel('Expected total sequence count');
+      // Image based offset. e.g PDF with 2 means second page. Inside the same image
+      $info['sequence_id'] = DataDefinition::create('string')->setLabel('Sequence ID. e.g for PDF, second Page, will be 2');
+      // Inside the same Image internal sequence_id. E.g a single JPEG with 5 annotations.
+      $info['internal_sequence_id'] = DataDefinition::create('string')->setLabel('Internal Sequence ID. PDF, second Page, first ML annotation will be 1.');
+      $info['sequence_total'] = DataDefinition::create('string')->setLabel('Expected total sequence count of sequence_id values');
       $info['uri'] = DataDefinition::create('string')->setLabel('A source or related Uri/URL');
       $info['checksum'] = DataDefinition::create('string')->setLabel('Checksum that can be used to check if the source needs reprocessing');
       $info['processor_id'] = DataDefinition::create('string')->setLabel('Processor Plugin id that populated this data');
@@ -60,6 +63,7 @@ class StrawberryfieldFlavorDataDefinition extends ComplexDataDefinitionBase {
       $info['vector_1024'] = ListDataDefinition::create('float')->setLabel('Vector of size 1024 coming from ML')->addConstraint('Length', ['max' => 1024]);
       $info['vector_384'] = ListDataDefinition::create('float')->setLabel('Vector of size 384 coming from ML')->addConstraint('Length', ['max' => 384]);
       $info['vector_512'] = ListDataDefinition::create('float')->setLabel('Vector of size 512 coming from ML')->addConstraint('Length', ['max' => 512]);
+      $info['vector_768'] = ListDataDefinition::create('float')->setLabel('Vector of size 768 coming from ML')->addConstraint('Length', ['max' => 768]);
     }
     return $this->propertyDefinitions;
   }

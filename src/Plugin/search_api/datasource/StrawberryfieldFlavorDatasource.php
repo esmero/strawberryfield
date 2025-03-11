@@ -579,6 +579,14 @@ XML;
       $uid = $entity->getOwnerId();
       foreach ($entity_ids_splitted[$entity_id] as $item_id => $splitted_id_for_node) {
         $sequence_id = !empty($splitted_id_for_node[1]) ? $splitted_id_for_node[1] : 1;
+
+        // New on 1.5.0. In the case of files that have sequences (e.g PDF), but still multiple flavors inside that one
+        // $sequence_id here might have a dash to separate relative to file (page), and relative to sequence of a file (annotation number)
+        // In other words:  for a PDF, second page, first annotation can be: 2-1
+        $sequence_parts = !empty($sequence_id) ? explode('-', $sequence_id) : [1,1];
+        $sequence_id = $sequence_parts[0] ?? 1;
+        $internal_sequence_id = $sequence_parts[1] ?? $sequence_id;
+
         $fid_uuid = isset($splitted_id_for_node[3]) ? $splitted_id_for_node[3] : NULL;
         // for Metadata only Processors we won't have a file. We will use the stub "ado" instead
 
@@ -624,6 +632,7 @@ XML;
           $uri = isset($processed_data->uri) ? (string) $processed_data->uri : '';
           $sequence_total = isset($processed_data->sequence_total) ? (string) $processed_data->sequence_total : $sequence_id;
           $sequence_id = isset($processed_data->sequence_id) ? (int) $processed_data->sequence_id : $sequence_id;
+          $internal_sequence_id = isset($processed_data->internal_sequence_id) ? (int) $processed_data->internal_sequence_id : $internal_sequence_id;
           $config_processor_id = isset($processed_data->config_processor_id) ? $processed_data->config_processor_id : '';
           $nlplang = isset($processed_data->nlplang) ? $processed_data->nlplang : [];
           $processlang = isset($processed_data->processlang) ? $processed_data->processlang : [];
@@ -634,6 +643,7 @@ XML;
           $vector_512 = isset($processed_data->vector_512) && is_array($processed_data->vector_512) && count($processed_data->vector_512) == 512 ? $processed_data->vector_512 : NULL;
           $vector_1024 = isset($processed_data->vector_1024) && is_array($processed_data->vector_1024) && count($processed_data->vector_1024) == 1024 ? $processed_data->vector_1024 : NULL;
           $vector_384 = isset($processed_data->vector_384) && is_array($processed_data->vector_384) && count($processed_data->vector_384) == 384 ? $processed_data->vector_384 : NULL;
+          $vector_768 = isset($processed_data->vector_768) && is_array($processed_data->vector_768) && count($processed_data->vector_768) == 768 ? $processed_data->vector_768 : NULL;
           $file_uuid = $file ?  $file->uuid() : NULL;
           $target_fileid = $file ? $file->id() : NULL;
           if ($checksum) {
@@ -641,6 +651,7 @@ XML;
               'item_id' => $item_id,
               'label' => $label,
               'sequence_id' => $sequence_id,
+              'internal_sequence_id' => $internal_sequence_id,
               'sequence_total' => $sequence_total,
               'target_id' => $entity_id,
               'parent_id' => $entity_id,
@@ -666,7 +677,8 @@ XML;
               'vector_384' => $vector_384,
               'vector_512' => $vector_512,
               'vector_576' => $vector_576,
-              'vector_1024' => $vector_1024
+              'vector_1024' => $vector_1024,
+              'vector_768' => $vector_768
             ];
             // This will then always create a new Index document, even if empty.
             // Needed if we e.g. want to use this for Book search/IIIF search
