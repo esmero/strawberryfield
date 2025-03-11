@@ -147,6 +147,35 @@ interface StrawberryfieldUtilityServiceInterface {
   public function getCountByProcessorInSolr(EntityInterface $entity, string $processor, array $indexes = [], string $checksum = NULL): int;
 
   /**
+   * Gets the number of documents that match an entity and processor.
+   *
+   * @param \Drupal\Core\Entity\EntityInterface $entity
+   *   Entity to search for.
+   * @param array $processors
+   *   Processors to filter, e.g. ocr.
+   * @param string $processor_op
+   *    Accepted values are OR/AND
+   * @param bool $direct
+   *    Find directly on ADO
+   * @param bool $children
+   *    Find on ADO children
+   * @param bool $grandchildren
+   *    Find on ADO GrandChildren
+   * @param string $level_op
+   *    If count is OR/AND of the previos direct, children of grandchildren bool
+   * @param \Drupal\search_api\IndexInterface[] $indexes
+   *   Indexes that are searched, empty for all indexes. (optiona)
+   * @return int
+   *   Count of documents found.
+   *
+   * @throws \Drupal\search_api\SearchApiException
+   */
+  public function getCountByProcessorsAndLevelInSolr(EntityInterface $entity, array $processors, string $processor_op = 'OR', bool $direct = TRUE, bool $children = FALSE, bool $grandchildren = FALSE, string $level_op = 'OR',  array $indexes = []): int;
+
+
+
+
+  /**
    * Determines if a file system path is valid and can be written to.
    * Utilizes more restrictive Amazon S3 file prefix rules that are
    * described here: https://www.ezs3.com/public/232.cfm:
