@@ -844,7 +844,7 @@ XML;
    * Retrieves the entity display repository.
    *
    * @return \Drupal\Core\Entity\EntityDisplayRepositoryInterface
-   *   The entity entity display repository.
+   *   The entity display repository.
    */
   protected function getEntityDisplayRepository() {
     return $this->entityDisplayRepository ?: \Drupal::service(
