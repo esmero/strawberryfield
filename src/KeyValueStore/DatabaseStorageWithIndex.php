@@ -54,7 +54,7 @@ class DatabaseStorageWithIndex extends DatabaseStorage {
       $values = [];
       foreach ($result as $item) {
         if ($item) {
-          $values[$item->name] = $values[$item->name];
+          $values[$item->name] = $item->name;
         }
       }
       return $values;

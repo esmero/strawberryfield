@@ -241,7 +241,7 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
     * {@inheritdoc}
     */
    public function isEmpty() {
-     // Lets optimize.
+     // Let's optimize.
      // All our properties are computed
      // So if main value is empty rest will be too
      $mainproperty = $this->mainPropertyName();

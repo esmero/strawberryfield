@@ -447,7 +447,7 @@ class StrawberryfieldJsonHelper {
         $value = is_string($data['value']) ? "'" . $data['value'] . "'" : "`" . $data['value'] . "`";
       }
       else {
-        // Maybe there is a smater way?
+        // Maybe there is a smarter way?
         $value = "`null`";
       }
       if (in_array($data['op'], self::JMESPATH_FILTER_COMPARATOR)) {
@@ -598,7 +598,7 @@ class StrawberryfieldJsonHelper {
    *
    * @return bool|array
    * @throws \Exception
-   */  
+   */
   public static function isValidJsonSchema(string $jsonstring, string $acceptedjsonschema) {
     $jsonarray = json_decode(trim($jsonstring));
     $json_error = json_last_error();

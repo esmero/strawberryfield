@@ -60,7 +60,7 @@ class StrawberryfieldEventCompostBinSubscriber implements EventSubscriberInterfa
    */
   public function onTempFilePushed(StrawberryfieldFileEvent $event) {
     // Not much here to see. The Queue Worker does the logic
-    // We want to be quick as quick as we can.
+    // We want to be quick, as quick as we can.
     $data = new \stdClass();
     $data->uri = $event->getURI();
     $data->module = $event->getModule();
