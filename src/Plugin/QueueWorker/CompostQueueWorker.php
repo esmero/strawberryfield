@@ -186,12 +186,21 @@ class CompostQueueWorker extends QueueWorkerBase implements ContainerFactoryPlug
     $unsafe_prefix = ["."];
     $unsafe_suffix = [".php", ".conf", ".yml", "settings"];
 
+    // See \strawberryfield_entity_base_field_info()
+    // field_file_drop (computed) field used by JSON API ingest needs to be in the
+    // safe_paths too.
+    $scheme_options_for_field_file_drop = 'public';
+    if ( $this->streamWrapperManager->isValidScheme('private')) {
+      $scheme_options_for_field_file_drop = 'private';
+    }
+
     $safe_paths
       = $safe_paths_default = [
       $this->fileSystem->getTempDirectory(),
       'temporary://',
       'private://webform/',
-      's3://webform/'
+      's3://webform/',
+      $scheme_options_for_field_file_drop.'://sbf_tmp/'
     ];
     $this->moduleHandler->alter(
       'strawberryfield_compost_safe_basepaths',
