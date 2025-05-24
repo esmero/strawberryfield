@@ -148,7 +148,11 @@ class StrawberryfieldHydroponicsService {
         catch (\Exception $e) {
           // In case of any other kind of exception, log it and leave the item
           // in the queue to be processed again later.
-          watchdog_exception('cron', $e);
+          $this->logger->error('Exception was thrown by queue @queue during Hydroponics processing with error @e', [
+              '@queue' => $name,
+              '@e' => $e->getMessage(),
+            ]
+          );
         }
       }
       $this->logger->info('--- --- Lease time is out for  @queue', [
@@ -157,6 +161,10 @@ class StrawberryfieldHydroponicsService {
       return $queue->numberOfItems();
     }
     else {
+      $this->logger->error('Queue definition for queue @queue during Hydroponics processing is missing. Bailing out. ', [
+          '@queue' => $name,
+        ]
+      );
       return 0;
     }
   }
