@@ -50,13 +50,18 @@ class HydroponicsDrushCommands extends DrushCommands {
     $idle = [];
 
     // Get which queues we should run:
+    if (count($active_queues)) {
+      \Drupal::logger('hydroponics')
+        ->info("Hydroponics is waking up, will process the following queues: @queues", [
+          '@queues' => implode(",", $active_queues)
+        ]);
+    }
 
     foreach($active_queues as $queue) {
 
       // Set number of idle cycle to wait
       $idle[$queue] = 3;
 
-//      $done[$queue] = $loop->addPeriodicTimer(1.0, function ($timer) use ($loop, $queue) {
       $done[$queue] = $loop->addPeriodicTimer(1.0, function ($timer) use ($loop, $queue, &$idle) {
         \Drupal::logger('hydroponics')->info("Starting to process queue @queue", [
           '@queue' => $queue
