@@ -5,6 +5,8 @@ namespace Drupal\strawberryfield\Form;
 use Drupal\Core\Ajax\AjaxResponse;
 use Drupal\Core\Ajax\HtmlCommand;
 use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\Entity\EntityTypeManager;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Extension\ModuleHandler;
 use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
@@ -68,6 +70,12 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
    * @var \Drupal\strawberryfield\StrawberryfieldHydroponicsService
    */
   protected $hydroponicsService;
+
+  /**
+   * @var \Drupal\Core\Entity\EntityTypeManagerInterface
+   */
+  protected EntityTypeManagerInterface $entityTypeManager;
+
   /**
    * OverviewForm constructor.
    *
@@ -79,8 +87,9 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
    * @param \Drupal\Core\Queue\QueueWorkerManagerInterface $queueWorkerManager
    * @param \Drupal\Core\Messenger\Messenger $messenger
    * @param \Drupal\strawberryfield\StrawberryfieldHydroponicsService $hydroponics_service
+   * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entitytype_manager
    */
-  public function __construct(ConfigFactoryInterface $config_factory, QueueFactory $queue_factory, AccountInterface $current_user, StateInterface $state, ModuleHandler $module_handler, QueueWorkerManagerInterface $queueWorkerManager, Messenger $messenger, StrawberryfieldHydroponicsService $hydroponics_service) {
+  public function __construct(ConfigFactoryInterface $config_factory, QueueFactory $queue_factory, AccountInterface $current_user, StateInterface $state, ModuleHandler $module_handler, QueueWorkerManagerInterface $queueWorkerManager, Messenger $messenger, StrawberryfieldHydroponicsService $hydroponics_service, EntityTypeManagerInterface $entitytype_manager) {
     parent::__construct($config_factory);
     $this->queueFactory = $queue_factory;
     $this->currentUser = $current_user;
@@ -90,6 +99,7 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
     $this->messenger = $messenger;
     $this->queues = $this->queueWorkerManager->getDefinitions();
     $this->hydroponicsService = $hydroponics_service;
+    $this->entityTypeManager = $entitytype_manager;
   }
 
   /**
@@ -121,7 +131,8 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
       $container->get('module_handler'),
       $container->get('plugin.manager.queue_worker'),
       $container->get('messenger'),
-      $container->get('strawberryfield.hydroponics')
+      $container->get('strawberryfield.hydroponics'),
+      $container->get('entity_type.manager')
     );
   }
 
@@ -137,6 +148,20 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
     $drush_path = $config->get('drush_path') ?  $config->get('drush_path') : NULL;
     $home_path = $config->get('home_path') ?  $config->get('home_path') : NULL;
     $enabled_queues =  !empty($config->get('queues')) ? array_flip($config->get('queues')) : [];
+    $enabled_search_api_indexes = !empty($config->get('search_api_indexes')) ? array_values($config->get('search_api_indexes')) : [];
+    $search_api_indexes_count =  !empty($config->get('search_api_indexes_count')) ? $config->get('search_api_indexes_count') : 0;
+
+    /** @var \Drupal\search_api\IndexInterface[] $indexes */
+    $indexes = $this->entityTypeManager
+      ->getStorage('search_api_index')
+      ->loadMultiple();
+    $valid_indexes = [];
+    foreach ($indexes as $index_id => $index) {
+      // Filter out indexes that don't contain the datasource in question.
+      if ($index->isValidDatasource('strawberryfield_flavor_datasource') || $index->isValidDatasource('entity:node')) {
+        $valid_indexes[$index_id] = $index->label();
+      }
+    }
 
     $current_status = $this->hydroponicsService->checkRunning();
 
@@ -225,6 +250,53 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
       'event' => 'change'
       ]
     ];
+    /*
+    '#states' => [
+      'visible' => [
+        [
+          ':input[name="ado_context_preview"]' => ['filled' => true]
+        ],
+        'or',
+        [
+          ':input[name="ado_amiset_preview"]' => ['filled' => true],
+          ':input[name="ado_amiset_row_context_preview"]' => ['filled' => true]
+        ]
+      ],
+    ],*/
+
+    $dynamic_search_index_states = [];
+    $i = 0;
+    foreach ($valid_indexes as $index => $label) {
+      $i++;
+      $dynamic_search_index_states['visible'][] = [
+          ':input[data-config-selector="searchapiindexes"][value="'.$index.'"]' => ['checked' => TRUE],
+      ];
+      if ($i < count($valid_indexes)) {
+        $dynamic_search_index_states['visible'][] = 'or';
+      }
+    }
+
+
+
+    $form['search_api_indexes'] = [
+      '#title' => 'Allow Hydroponics to help with any of the following Search API Indexes',
+      '#description' => 'Check which Search API Indexes (holding Nodes/Strawberry Flavors) should Hydroponics contribute to.',
+      '#type' => 'checkboxes',
+      '#attributes' => [
+        'data-config-selector' => 'searchapiindexes',
+       ],
+      '#default_value' => $enabled_search_api_indexes,
+      '#options' => $valid_indexes
+    ];
+    $form['search_api_indexes_count'] = [
+      '#title' => 'Number of items to be indexed by Hydroponics at the same time .',
+      '#description' => 'Similar to the Search API\'s "Cron Batch size" config option. Defines how many Search API Items will be sent at once to the backend server.',
+      '#type' => 'number',
+      '#min' => 0,
+      '#max' => 100,
+      '#default_value' => $search_api_indexes_count,
+      '#states' => $dynamic_search_index_states
+    ];
 
     $form['table-row'] = [
       '#type' => 'table',
@@ -257,7 +329,6 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
           '#default_value' => isset($enabled_queues[$name]) ? TRUE: FALSE
         ]
       ];
-
     }
 
     return parent::buildForm($form, $form_state);
@@ -320,6 +391,10 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
     $drush_path = rtrim($form_state->getValue('drush_path'), '/');
     $home_path = rtrim($form_state->getValue('home_path'), '/');
     $time_to_expire = (int) trim($form_state->getValue('time_to_expire', 720));
+    $search_indexes = $form_state->getValue('search_api_indexes', []);
+    $search_indexes = array_filter($search_indexes);
+    $search_indexes = array_values($search_indexes);
+    $search_api_indexes_count = (int) $form_state->getValue('search_api_indexes_count', 10);
     foreach($form_state->getValue('table-row') as $queuename => $queue) {
       if ($queue['active'] == 1) {
         $enabled[] = $queuename;
@@ -332,6 +407,8 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
       ->set('home_path', $home_path)
       ->set('queues', $enabled)
       ->set('time_to_expire', $time_to_expire)
+      ->set('search_api_indexes', $search_indexes)
+      ->set('search_api_indexes_count', $search_api_indexes_count)
       ->save();
     parent::submitForm($form, $form_state);
   }

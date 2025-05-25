@@ -244,6 +244,15 @@ strawberryfield.hydroponics_settings:
     home_path:
       type: string
       label: 'Full system path to a folder we can use as webserver user home for Drush'
+    search_api_indexes:
+      type: sequence
+      label: 'Search API Indexes marked as to be run by the Hydroponics Service'
+      sequence:
+        type: string
+        label: 'Search API index'
+    search_api_indexes_count:
+      type: integer
+      label: 'Number of Items to process per index/per cycle'
     queues:
       type: sequence
       label: 'Queues marked as to be run by the Hydroponics Service'
