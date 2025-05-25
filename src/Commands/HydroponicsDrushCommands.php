@@ -59,7 +59,7 @@ class HydroponicsDrushCommands extends DrushCommands {
           '@queues' => implode(",", $active_queues)
         ]);
     }
-     // Get which queues we should run:
+     // Get which Search API Indexes we should run:
     $loaded_indexes = [];
     if (count($active_indexes) && $indexes_batch_size) {
       \Drupal::logger('hydroponics')
