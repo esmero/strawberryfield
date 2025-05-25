@@ -212,6 +212,7 @@ JSON;
   public function execute($entity = NULL) {
     /** @var \Drupal\Core\Entity\EntityInterface $entity */
     $patched = FALSE;
+    $result = NULL;
     if ($entity) {
       if ($sbf_fields = $this->strawberryfieldUtility->bearsStrawberryfield(
         $entity
@@ -249,37 +250,40 @@ JSON;
                 );
                 // We just keep track of the changes. If none! Then we do not set
                 // the formstate flag.
-                  $message = $this->formatPlural($r->getDiffCnt(),
-                    'Simulated patch: Digital Object @label would one modification',
-                    'Simulated patch: Digital Object @label would @count modifications',
-                    ['@label' => $entity->label()]);
-                 // This is not as accurate as the JSON Patch but is a good hint
+                $message = $this->formatPlural($r->getDiffCnt(),
+                  'Simulated patch: Digital Object @label would one modification',
+                  'Simulated patch: Digital Object @label would @count modifications',
+                  ['@label' => $entity->label()]);
+                // This is not as accurate as the JSON Patch but is a good hint
                 $visualjsondiff = new Diff(explode(PHP_EOL,json_encode($fullvaluesoriginal,JSON_PRETTY_PRINT)), explode(PHP_EOL,json_encode($fullvalues, JSON_PRETTY_PRINT)));
                 $formatter = new DiffFormatter();
                 $output = $formatter->format($visualjsondiff);
                 $this->messenger()->addMessage($message);
                 $this->messenger()->addMessage($output);
-               }
+                $result = $message;
+              }
               $patched = TRUE;
             } catch (JsonDiffException $exception) {
               $patched = FALSE;
-              $this->messenger()->addWarning(
-                $this->t(
-                  'Patch could not be applied for @entity',
-                  [
-                    '@entity' => $entity->label()
-                  ]
-                )
+              $message = $this->t(
+                'Patch could not be applied for @entity with @error',
+                [
+                  '@entity' => $entity->label(),
+                  '@error' => $exception->getMessage(),
+                ]
               );
+              $this->messenger()->addWarning($message);
+              $result = $message;
             }
           }
         }
         if ($patched) {
-          $this->logger->notice('%label had the following JSON Patch applied: @jsonpatch', [
+          $message = $this->t('%label had the following JSON Patch applied: @jsonpatch', [
             '%label' => $entity->label(),
             '@jsonpatch' => '<pre><code>'.$this->configuration['jsonpatch'].'</code></pre>'
-
           ]);
+          $this->logger->info($message);
+          $result = $message;
           if (!$this->configuration['simulate']) {
             if ($entity->getEntityType()->isRevisionable()) {
               // Forces a New Revision for Not-create Operations.
@@ -294,6 +298,7 @@ JSON;
         }
       }
     }
+    return $result;
   }
 
 
