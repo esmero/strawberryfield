@@ -3,9 +3,7 @@
 namespace Drupal\strawberryfield\Form;
 
 use Drupal\Core\Ajax\AjaxResponse;
-use Drupal\Core\Ajax\HtmlCommand;
 use Drupal\Core\Config\ConfigFactoryInterface;
-use Drupal\Core\Entity\EntityTypeManager;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Extension\ModuleHandler;
 use Drupal\Core\Form\ConfigFormBase;
@@ -250,19 +248,6 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
       'event' => 'change'
       ]
     ];
-    /*
-    '#states' => [
-      'visible' => [
-        [
-          ':input[name="ado_context_preview"]' => ['filled' => true]
-        ],
-        'or',
-        [
-          ':input[name="ado_amiset_preview"]' => ['filled' => true],
-          ':input[name="ado_amiset_row_context_preview"]' => ['filled' => true]
-        ]
-      ],
-    ],*/
 
     $dynamic_search_index_states = [];
     $i = 0;
