@@ -178,14 +178,27 @@ class StrawberryfieldHydroponicsService {
   /**
    * Processes Search API Indexes queues.
    *
-   * @param \Drupal\search_api\IndexInterface $index
+   * @param string $index_id
    * @param $batch_size
    * @param int $time
    *
    * @return int
    * @throws \Drupal\search_api\SearchApiException
    */
-  public function processSearchApiIndex(IndexInterface $index, $batch_size, int $time = 120): int {
+  public function processSearchApiIndex(string $index_id, $batch_size, int $time = 120): int {
+
+    /* @var IndexInterface $index */
+    $index = \Drupal::getContainer()
+      ->get('entity_type.manager')
+      ->getStorage('search_api_index')
+      ->load($index_id);
+    if (!$index) {
+      $this->logger->Error('--- @index is not existent or could not be loaded. Check your Hydroponics Config and remove that index .', [
+          '@index' => $index_id,
+        ]
+      );
+      return 0;
+    }
     $remaining_item_count = ($index->hasValidTracker() ? $index->getTrackerInstance()->getRemainingItemsCount() : 0);
     if (!\Drupal::lock()->lockMayBeAvailable($index->getLockId())) {
       $this->logger->warning('--- Items for Search API index @index are being indexed in a different process that Hydroponics, skippig until our next cycle.', [
@@ -199,6 +212,7 @@ class StrawberryfieldHydroponicsService {
           '@index' => $index->label(),
         ]
       );
+      unset($index);
       return 0;
     }
     if (!$batch_size) {
@@ -206,10 +220,12 @@ class StrawberryfieldHydroponicsService {
           '@index' => $index->label(),
         ]
       );
+      unset($index);
       return 0;
     }
     $end = time() + $time;
     $indexed = 0;
+    $bailout = FALSE;
     while (time() < $end) {
       // Determine the number of items to index for this run.
       $to_index = min(($remaining_item_count - $indexed), $batch_size);
@@ -226,8 +242,16 @@ class StrawberryfieldHydroponicsService {
       // Catch any exception that may occur during indexing.
       try {
         // Index items limited by the given count.
+        $enabled_mem = $this->memory_limit_bytes();
+
+        if ($enabled_mem > 0 && (memory_get_usage() * 1.5) >= $enabled_mem) {
+          $this->logger->warning($this->t("--- Search API Indexing has consumed in excess of 50% of available memory. Bailing out for this run."));
+          gc_collect_cycles();
+          $bailout = TRUE;
+          break;
+        }
+
         $indexed = $indexed + $index->indexItems($to_index);
-        // Increment the indexed result and progress.
 
         // Display progress message.
         if ($indexed > 0) {
@@ -257,7 +281,9 @@ class StrawberryfieldHydroponicsService {
         '@index' => $index->label()
       ]
     );
-    return $index->getTrackerInstance()->getRemainingItemsCount();
+    $remaining = !$bailout ? $index->getTrackerInstance()->getRemainingItemsCount() : -1;
+    unset($index);
+    return $remaining;
   }
 
 
@@ -291,6 +317,7 @@ class StrawberryfieldHydroponicsService {
         $pid = exec(
           sprintf("%s > /dev/null 2>&1 & echo $!", $cmd)
         );
+
         \Drupal::state()->set('hydroponics.queurunner_last_pid', $pid);
         $this->logger->info('PID for Hydroponics Service: @pid', [
             '@pid' => $pid]
@@ -351,7 +378,6 @@ class StrawberryfieldHydroponicsService {
         $this->logger->info('Hydroponics Service could not stop because of @code', [
             '@code' => posix_strerror($errorcode)]
         );
-
         return posix_strerror($errorcode);
       } else {
         \Drupal::state()->set('hydroponics.queurunner_last_pid', 0);
@@ -360,7 +386,18 @@ class StrawberryfieldHydroponicsService {
       }
     }
   }
-
-
-
+  public function memory_limit_bytes(): int {
+    $mem = trim(ini_get('memory_limit'));
+    $last = strtolower($mem[strlen($mem)-1]);
+    $mem = (int) rtrim($mem, 'GgMmKk');
+    switch ($last) {
+      case 'g':
+        $mem *= 1024;
+      case 'm':
+        $mem *= 1024;
+      case 'k':
+        $mem *= 1024;
+    }
+    return $mem;
+  }
 }

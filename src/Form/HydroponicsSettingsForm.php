@@ -154,12 +154,18 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
       ->getStorage('search_api_index')
       ->loadMultiple();
     $valid_indexes = [];
+    $enabled_search_api_indexes_default = [];
     foreach ($indexes as $index_id => $index) {
       // Filter out indexes that don't contain the datasource in question.
       if ($index->isValidDatasource('strawberryfield_flavor_datasource') || $index->isValidDatasource('entity:node')) {
-        $valid_indexes[$index_id] = $index->label();
+        $valid_indexes[$index->id()] = $this->t($index->label());
+        if (in_array($index->id(), $enabled_search_api_indexes)) {
+          $enabled_search_api_indexes_default[$index->id()] = $index->id();
+        }
       }
     }
+    // Filter against real ones
+    $enabled_search_api_indexes = array_intersect(array_keys($valid_indexes), $enabled_search_api_indexes);
 
     $current_status = $this->hydroponicsService->checkRunning();
 
@@ -270,9 +276,10 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
       '#attributes' => [
         'data-config-selector' => 'searchapiindexes',
        ],
-      '#default_value' => $enabled_search_api_indexes,
+      '#default_value' => $enabled_search_api_indexes_default,
       '#options' => $valid_indexes
     ];
+
     $form['search_api_indexes_count'] = [
       '#title' => 'Number of items to be indexed by Hydroponics at the same time .',
       '#description' => 'Similar to the Search API\'s "Cron Batch size" config option. Defines how many Search API Items will be sent at once to the backend server.',
