@@ -8,6 +8,8 @@
 namespace Drupal\strawberryfield\Plugin\DataType;
 use DateTime;
 use Drupal\Core\TypedData\Plugin\DataType\ItemList;
+use Drupal\Core\TypedData\MapDataDefinition;
+use Drupal\Core\TypedData\DataDefinition;
 use Drupal\strawberryfield\Plugin\Field\FieldType\StrawberryFieldItem;
 use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
 use EDTF\EdtfFactory;
@@ -52,15 +54,24 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
       return;
     }
     $item = $this->getParent();
-    if (!empty($item->value)) {
-      /* @var $item StrawberryFieldItem */
+    if (!empty($item->getValue())) {
       $definition = $this->getDataDefinition();
       // This key is passed by the property definition in the field class
       // jsonkey in this context is a string containing one or more
       // jmespath's separated by comma.
-      $jmespaths = $definition['settings']['jsonkey'];
+      $jmespaths = $definition['settings']['jsonkey'] ?? '';
       $is_date = $definition['settings']['is_date'] ?? FALSE;
-      $jmespath_array = array_map('trim', explode(',', $jmespaths));
+      $is_date_range = $definition['settings']['is_date_range'] ?? FALSE;
+      $pattern = '/[,]+(?![^\[]*\]|[^\(]*\)|[^\{]*\})/';
+      $jmespaths_split = preg_split($pattern, $jmespaths);
+      $jmespath_array = [];
+      if ($jmespaths_split && is_array($jmespaths_split) && count($jmespaths_split) > 0 ) {
+        $jmespath_array = array_map('trim', $jmespaths_split);
+      }
+      else {
+        // Regular expression for splitting failed. Return silently.
+        return;
+      }
       $jmespath_result = [];
       foreach ($jmespath_array as $jmespath) {
         $jmespath_result[] = $item->searchPath(trim($jmespath),FALSE);
@@ -98,74 +109,11 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
         return ($value !== NULL && $value !== '');
       });
       $values = array_map('stripslashes', $values);
-      if ($is_date) {
-        $values_parsed = [];
-        $parser = EdtfFactory::newParser();
-        foreach ($values as $value) {
-          $result = $parser->parse($value);
-          if ($result->isValid()) {
-            $edtf_value = $result->getEdtfValue();
-            // @todo remove once EDTF fixes their invalid Constructor for EDTF\Model\Interval that should per interface never allow NULL for start nor end date
-            if (get_class($edtf_value) == "EDTF\Model\Set") {
-              //means we have something like [1977, 1984/2023] or {1977, 1984/2023}
-              // and each entry needs to be processed like individual elements
-              foreach ($edtf_value->getElements() as $element) {
-                switch(get_class($element)) {
-                  case "EDTF\Model\SetElement\RangeSetElement":
-                    $values_parsed[] = date('c', $element->getMinAsUnixTimestamp());
-                    $values_parsed[] = date('c', $element->getMaxAsUnixTimestamp());
-                    break;
-                  default:
-                    // Make sure we do not index same day twice
-                    $start_day = date('Y-m-d', $element->getMinAsUnixTimestamp());
-                    $end_day = date('Y-m-d', $element->getMaxAsUnixTimestamp());
-                    if ($start_day === $end_day) {
-                      // if this is the same day just index one.
-                      $values_parsed[] = date('c',  $element->getMinAsUnixTimestamp());
-                    }
-                    else {
-                      $values_parsed[] = date('c', $element->getMinAsUnixTimestamp());
-                      $values_parsed[] = date('c', $element->getMaxAsUnixTimestamp());
-                    }
-                    break;
-                }
-              }
-            }
-            else {
-              //single entries.
-              switch (get_class($edtf_value)) {
-                case "EDTF\Model\Interval":
-                  if ($edtf_value->hasStartDate()) {
-                    $values_parsed[] = date('c', $edtf_value->getMin());
-                  }
-                  if ($edtf_value->hasEndDate()) {
-                    $values_parsed[] = date('c', $edtf_value->getMax());
-                  }
-                  break;
-                default:
-                  // Make sure we do not index same day twice
-                  $start_day = date('Y-m-d', $edtf_value->getMin());
-                  $end_day = date('Y-m-d', $edtf_value->getMax());
-                  if ($start_day === $end_day) {
-                    // if this is the same day just index one.
-                    $values_parsed[] = date('c', $edtf_value->getMin());
-                  } else {
-                    $values_parsed[] = date('c', $edtf_value->getMin());
-                    $values_parsed[] = date('c', $edtf_value->getMax());
-                  }
-                  break;
-              }
-            }
-          }
-          else {
-            // If not EDTF (e.g an already ISO8601 date)
-            // try with string based parsing
-            $parsed_from_string = $this->parseStringToDate($value);
-            $values_parsed[] = $parsed_from_string ? $parsed_from_string: NULL;
-          }
-        }
-        $values = array_unique($values_parsed);
-        $values = array_filter(array_values($values));
+      if ($is_date && !$is_date_range) {
+       $values = $this->processDatesFromValues($values);
+      }
+      elseif ($is_date_range) {
+        $values = $this->processDateRangesFromValues($values);
       }
       $this->processed = array_values($values);
       $this->list = [];
@@ -264,6 +212,144 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
    */
   public function applyDefaultValue($notify = TRUE) {
     return $this;
+  }
+
+  protected function processDatesFromValues($values):array {
+    $values_parsed = [];
+    $parser = EdtfFactory::newParser();
+    foreach ($values as $value) {
+      $result = $parser->parse($value);
+      if ($result->isValid()) {
+        $edtf_value = $result->getEdtfValue();
+        // @todo remove once EDTF fixes their invalid Constructor for EDTF\Model\Interval that should per interface never allow NULL for start nor end date
+        if (get_class($edtf_value) == "EDTF\Model\Set") {
+          //means we have something like [1977, 1984/2023] or {1977, 1984/2023}
+          // and each entry needs to be processed like individual elements
+          foreach ($edtf_value->getElements() as $element) {
+            switch(get_class($element)) {
+              case "EDTF\Model\SetElement\RangeSetElement":
+                $values_parsed[] = date('c', $element->getMinAsUnixTimestamp());
+                $values_parsed[] = date('c', $element->getMaxAsUnixTimestamp());
+                break;
+              default:
+                // Make sure we do not index same day twice
+                $start_day = date('Y-m-d', $element->getMinAsUnixTimestamp());
+                $end_day = date('Y-m-d', $element->getMaxAsUnixTimestamp());
+                if ($start_day === $end_day) {
+                  // if this is the same day just index one.
+                  $values_parsed[] = date('c',  $element->getMinAsUnixTimestamp());
+                }
+                else {
+                  $values_parsed[] = date('c', $element->getMinAsUnixTimestamp());
+                  $values_parsed[] = date('c', $element->getMaxAsUnixTimestamp());
+                }
+                break;
+            }
+          }
+        }
+        else {
+          //single entries.
+          switch (get_class($edtf_value)) {
+            case "EDTF\Model\Interval":
+              if ($edtf_value->hasStartDate()) {
+                $values_parsed[] = date('c', $edtf_value->getMin());
+              }
+              if ($edtf_value->hasEndDate()) {
+                $values_parsed[] = date('c', $edtf_value->getMax());
+              }
+              break;
+            default:
+              // Make sure we do not index same day twice
+              $start_day = date('Y-m-d', $edtf_value->getMin());
+              $end_day = date('Y-m-d', $edtf_value->getMax());
+              if ($start_day === $end_day) {
+                // if this is the same day just index one.
+                $values_parsed[] = date('c', $edtf_value->getMin());
+              } else {
+                $values_parsed[] = date('c', $edtf_value->getMin());
+                $values_parsed[] = date('c', $edtf_value->getMax());
+              }
+              break;
+          }
+        }
+      }
+      else {
+        // If not EDTF (e.g an already ISO8601 date)
+        // try with string based parsing
+        $parsed_from_string = $this->parseStringToDate($value);
+        $values_parsed[] = $parsed_from_string ? $parsed_from_string: NULL;
+      }
+    }
+    $values = array_unique($values_parsed);
+    $values = array_filter(array_values($values));
+    return $values;
+  }
+
+  protected function processDateRangesFromValues($values) {
+    $values_parsed = [];
+    $parser = EdtfFactory::newParser();
+    // Setup the map data type
+    $data_range_ref = MapDataDefinition::create();
+    $data_range_ref->setPropertyDefinition('value', DataDefinition::create('datetime_iso8601'));
+    $data_range_ref->setPropertyDefinition('end_value', DataDefinition::create('datetime_iso8601'));
+    $data_range_ref->setMainPropertyName('value');
+
+    foreach ($values as $value) {
+      $result = $parser->parse($value);
+      if ($result->isValid()) {
+        $edtf_value = $result->getEdtfValue();
+        // @todo remove once EDTF fixes their invalid Constructor for EDTF\Model\Interval that should per interface never allow NULL for start nor end date
+        if (get_class($edtf_value) == "EDTF\Model\Set") {
+          // means we have something like [1977, 1984/2023] or {1977, 1984/2023}
+          // and each entry needs to be processed like individual elements
+          foreach ($edtf_value->getElements() as $element) {
+                $new_date_range = [];
+                $new_date_range['value'] = date('c', $element->getMinAsUnixTimestamp());
+                $new_date_range['end_value'] = date('c', $element->getMaxAsUnixTimestamp());
+                $values_parsed[] = $this->getTypedDataManager()->create($data_range_ref, $new_date_range)->getValue();
+            }
+        }
+        else {
+          //single entries.
+          switch (get_class($edtf_value)) {
+            case "EDTF\Model\Interval":
+              // Skip any Interval that is Open?
+              if ($edtf_value->hasStartDate() && $edtf_value->hasEndDate()) {
+                $new_date_range = [];
+                $new_date_range['value'] = date('c', $edtf_value->getMin());
+                $new_date_range['end_value'] = date('c', $edtf_value->getMax());
+                $values_parsed[] = $this->getTypedDataManager()->create($data_range_ref, $new_date_range)->getValue();
+              }
+              break;
+            default:
+              $new_date_range = [];
+              $new_date_range['value'] = date('c', $edtf_value->getMin());
+              $new_date_range['end_value'] = date('c', $edtf_value->getMax());
+              $values_parsed[] = $this->getTypedDataManager()->create($data_range_ref, $new_date_range)->getValue();
+              break;
+          }
+        }
+      }
+      else {
+        // If not EDTF (e.g an already ISO8601 date)
+        // try with string based parsing
+
+        $parsed_from_string = $this->parseStringToDate($value);
+        if ($parsed_from_string) {
+          $result = $parser->parse($value);
+          if ($result->isValid()) {
+            // Single Dates/ISO8601 will generate a standard EDTF Object
+            $edtf_value = $result->getEdtfValue();
+            $new_date_range = [];
+            $new_date_range['value'] = date('c', $edtf_value->getMin());
+            $new_date_range['end_value'] = date('c', $edtf_value->getMax());
+            $values_parsed[] = $this->getTypedDataManager()->create($data_range_ref, $new_date_range)->getValue();
+          }
+        }
+      }
+    }
+    // Really not needed?
+    return $values_parsed;
   }
 
   /**

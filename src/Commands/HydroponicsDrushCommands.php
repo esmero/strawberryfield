@@ -15,7 +15,7 @@ use React\EventLoop\Loop;
 
 
 /**
- * A SBF Drush commandfile for ground-less Strawberry Growing.
+ * A SBF Drush command file for ground-less Strawberry Growing.
  *
  * Forks and executes a reactPHP loop to handle queues in background
  *
@@ -36,7 +36,6 @@ class HydroponicsDrushCommands extends DrushCommands {
    */
   public function hydroponics(
   ) {
-
     $loop = Loop::get();
     $timer_ping = $loop->addPeriodicTimer(3.0, function () {
       // store a heartbeat every 3 seconds.
@@ -44,20 +43,36 @@ class HydroponicsDrushCommands extends DrushCommands {
       \Drupal::state()->set('hydroponics.heartbeat', $currenttime);
     });
     $active_queues = \Drupal::config('strawberryfield.hydroponics_settings')->get('queues');
+    $active_indexes = \Drupal::config('strawberryfield.hydroponics_settings')->get('search_api_indexes') ?? [];
+    $indexes_batch_size = \Drupal::config('strawberryfield.hydroponics_settings')->get('search_api_indexes_count') ?? 0;
     $done = [];
 
     //track when queue are empty for n cycles
     $idle = [];
+    $search_api_idle = [];
 
     // Get which queues we should run:
+    if (count($active_queues)) {
+      \Drupal::logger('hydroponics')
+        ->info("Hydroponics is waking up, will process the following queues: @queues", [
+          '@queues' => implode(",", $active_queues)
+        ]);
+    }
+     // Get which Search API Indexes we should run:
+    $loaded_indexes = [];
+    if (count($active_indexes) && $indexes_batch_size) {
+      \Drupal::logger('hydroponics')
+        ->info("Hydroponics is waking up for Search API Indexing and will process the following indexes: @indexes", [
+          '@indexes' => implode(",", $active_indexes)
+        ]);
+    }
+
 
     foreach($active_queues as $queue) {
-
       // Set number of idle cycle to wait
-      $idle[$queue] = 3;
+      $idle['queue:'.$queue] = 3;
 
-//      $done[$queue] = $loop->addPeriodicTimer(1.0, function ($timer) use ($loop, $queue) {
-      $done[$queue] = $loop->addPeriodicTimer(1.0, function ($timer) use ($loop, $queue, &$idle) {
+      $done['queue:'.$queue] = $loop->addPeriodicTimer(1.0, function ($timer) use ($loop, $queue, &$idle) {
         \Drupal::logger('hydroponics')->info("Starting to process queue @queue", [
           '@queue' => $queue
         ]);
@@ -69,22 +84,61 @@ class HydroponicsDrushCommands extends DrushCommands {
           '@queue' => $queue
         ]);
 
-
         if ($number == 0) {
           \Drupal::logger('hydroponics')->info("No items left on queue @queue", [
             '@queue' => $queue
           ]);
-
-
           // decrement idle counter
-          $idle[$queue] -= 1;
+          $idle['queue:'.$queue] -= 1;
         }
-
         else {
           // no empty so reset idle counter
-          $idle[$queue] = 3;
+          $idle['queue:'.$queue] = 3;
         }
+      });
+    }
 
+    foreach($active_indexes as $index_id) {
+      // Set number of idle cycle to wait
+      $idle['search_api_index:'.$index_id] = 3;
+
+      $done['search_api_index:'.$index_id] = $loop->addPeriodicTimer(1.0, function ($timer) use ($loop, $index_id, $indexes_batch_size, &$idle) {
+        if (!$idle['search_api_index:'.$index_id]) {
+          return;
+        }
+        \Drupal::logger('hydroponics')->info("Starting to process Index @index with @batch increments", [
+          '@index' => $index_id,
+          '@batch' => $indexes_batch_size,
+        ]);
+
+        $number = \Drupal::getContainer()
+          ->get('strawberryfield.hydroponics')
+          ->processSearchApiIndex($index_id, $indexes_batch_size, 30);
+        \Drupal::logger('hydroponics')->info("Finished processing Search API Index @index", [
+          '@index' => $index_id
+        ]);
+
+        if ($number == 0) {
+          \Drupal::logger('hydroponics')->info("No items left on Search API Index @index", [
+            '@index' => $index_id
+          ]);
+          // decrement idle counter
+          $idle['search_api_index:'.$index_id] -= 1;
+        }
+        elseif ($number == -1) {
+          \Drupal::logger('hydroponics')->info("Hydroponics did as much indexing Search API index @index as it could, but it bailed out before it used too much memory in this push", [
+            '@index' => $index_id
+          ]);
+          $idle['search_api_index:'.$index_id] = 0;
+        }
+        else {
+          // no empty so reset idle counter
+          \Drupal::logger('hydroponics')->info("@number items left on Search API Index @index", [
+            '@index' => $index_id,
+            '@number' => $number
+          ]);
+          $idle['search_api_index:'.$index_id] = 3;
+        }
       });
     }
 
@@ -103,7 +157,7 @@ class HydroponicsDrushCommands extends DrushCommands {
           $loop->cancelTimer($queue_timer);
         }
         \Drupal::state()->set('hydroponics.queurunner_last_pid', 0);
-        \Drupal::logger('hydroponics')->info("All queues are idle, closing timers");
+        \Drupal::logger('hydroponics')->info("All tasks are idle, closing timers");
 
         $loop->cancelTimer($timer);
         $loop->stop();

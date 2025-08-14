@@ -166,15 +166,14 @@ function strawberryfield_entity_base_field_info(EntityTypeInterface $entity_type
   if ($entity_type->id() != 'node') {
     return [];
   }
-  $scheme_options = \Drupal::service('stream_wrapper_manager')->getNames(StreamWrapperInterface::WRITE_VISIBLE);
-  if (isset($scheme_options['private'])) {
+  /** @var \Drupal\Core\StreamWrapper\StreamWrapperManagerInterface $stream_wrapper_manager */
+  $stream_wrapper_manager = \Drupal::service('stream_wrapper_manager');
+  // WOW. Since Drupal 10.4, after a cache clear, this function is no longer working.
+  // Chances are the hook_entity_base_field_info is called before the streamwrappers are registered
+  //$scheme_options = $stream_wrapper_manager->getNames(StreamWrapperInterface::WRITE_VISIBLE);
+  $schema = 'public';
+  if ($stream_wrapper_manager->isValidScheme('private')) {
     $schema = 'private';
-  }
-  elseif (isset($scheme_options['public'])) {
-    $schema = 'public';
-  }
-  else {
-    $schema = 'public';
   }
 
   $fields = [];
@@ -192,6 +191,10 @@ function strawberryfield_entity_base_field_info(EntityTypeInterface $entity_type
   // BaseFieldDefinition.
   // That manages without hickups the 'Bundle' option
   // \Drupal\Core\Field\BaseFieldDefinition::setTargetBundle
+
+  // @new since 10.3+ JSON API uses the same controller for uploading as Core
+  // Which means filetypes are being checked (before it was the tmp controller)
+  // @see https://www.drupal.org/node/3445266. So we add empty file_extensions settings
   $fields['field_file_drop'] = BaseFieldDefinition::create('entity_reference')
     ->setName('field_file_drop')
     ->setLabel(t('Drop Files'))
@@ -206,6 +209,7 @@ function strawberryfield_entity_base_field_info(EntityTypeInterface $entity_type
         'target_type' => 'file',
         'file_directory' => 'sbf_tmp',
         'uri_scheme' => $schema,
+        'file_extensions' => ''
       ]
     )
     ->setClass(StrawberryFieldFileComputedItemList::class)

@@ -186,12 +186,21 @@ class CompostQueueWorker extends QueueWorkerBase implements ContainerFactoryPlug
     $unsafe_prefix = ["."];
     $unsafe_suffix = [".php", ".conf", ".yml", "settings"];
 
+    // See \strawberryfield_entity_base_field_info()
+    // field_file_drop (computed) field used by JSON API ingest needs to be in the
+    // safe_paths too.
+    $scheme_options_for_field_file_drop = 'public';
+    if ( $this->streamWrapperManager->isValidScheme('private')) {
+      $scheme_options_for_field_file_drop = 'private';
+    }
+
     $safe_paths
       = $safe_paths_default = [
       $this->fileSystem->getTempDirectory(),
       'temporary://',
       'private://webform/',
-      's3://webform/'
+      's3://webform/',
+      $scheme_options_for_field_file_drop.'://sbf_tmp/'
     ];
     $this->moduleHandler->alter(
       'strawberryfield_compost_safe_basepaths',
@@ -201,21 +210,31 @@ class CompostQueueWorker extends QueueWorkerBase implements ContainerFactoryPlug
     if (empty($safe_paths)) {
       $safe_paths = $safe_paths_default;
     }
+    $uri = $data->uri ?? NULL;
+    if (!$uri) {
+      $this->loggerFactory->get('archipelago')->warning('Attempt to compost without a valid path. This is unusual. Please report to your system admin.');
+      return;
+    }
+
 
     // First check if the file is there at all
-    if (!file_exists($data->uri)) {
+    if (!file_exists($uri)) {
+      $this->loggerFactory->get('archipelago')->info('Attempt to compost a non existing file with path @path. You can ignore this message.',[
+        '@path' => $data->uri
+      ]);
       // Nothing to check, nothing to do. Done.
       return;
     }
     $safe = FALSE;
     foreach ($safe_paths as $prefix) {
-      if (str_starts_with($data->uri, $prefix)) {
+      if (str_starts_with($uri, $prefix)) {
         $safe = TRUE;
         break;
       }
     }
 
-    $base_name = $this->fileSystem->basename($data->uri);
+    $base_name = $this->fileSystem->basename($uri);
+    error_log($base_name);
     // Bypass prefix check if enabled and in a safe place already
     $bypass_dot = ($this->config->get('compost_dot_files') && $safe);
 
@@ -244,7 +263,7 @@ class CompostQueueWorker extends QueueWorkerBase implements ContainerFactoryPlug
 
     if (!$safe) {
       $this->loggerFactory->get('archipelago')->warning('Attempt to compost an unsafe File with path <em>@path</em> was made. If you need to remove it, please do it so manually. If not, you can ignore this warning.',[
-        '@path' => $data->uri
+        '@path' => $uri
       ]);
       return;
     }
@@ -252,10 +271,13 @@ class CompostQueueWorker extends QueueWorkerBase implements ContainerFactoryPlug
     /** @var \Drupal\file\FileInterface[] $files */
     $files = $this->entityTypeManager
       ->getStorage('file')
-      ->loadByProperties(['uri' => $data->uri]);
+      ->loadByProperties(['uri' => $uri]);
     /** @var \Drupal\file\FileInterface|null $file */
     $file = reset($files) ?: NULL;
     if ($file) {
+      $this->loggerFactory->get('archipelago')->error('Attempt to compost a File at <em>@path</em> failed. The file is associated to a Drupal entity. This is OK and normally you can ignore this warning.',[
+        '@path' => $data->uri
+      ]);
       // return silently. Means some File entity took control over it
       // Nothing we can do. Eventually someone will trigger the event
       // Or Drupal will clean its mess.
@@ -263,11 +285,14 @@ class CompostQueueWorker extends QueueWorkerBase implements ContainerFactoryPlug
     }
     // Finall, now check the modification date: This is documented to work with
     // S3:// too
-    $file_timestamp = filemtime($data->uri);
+    $file_timestamp = filemtime($uri);
 
     if (!$file_timestamp) {
       // return silently. Means we can not stat the file. Means we won't be able
       // to delete it.
+      $this->loggerFactory->get('archipelago')->error('Attempt to compost a File at <em>@path</em> failed. We can not get a hold of this file\'s timestamp. Permissions might be wrong? Please correct and/or delete manually.',[
+        '@path' => $data->uri
+      ]);
       return;
     }
 
@@ -281,12 +306,13 @@ class CompostQueueWorker extends QueueWorkerBase implements ContainerFactoryPlug
         // This will log errors but we do not want to throw and exception
         // So we will get it
         // ::unlink() will be silent but we do want to keep logs around i guess?
-        $uri = $data->uri ?? NULL;
-        if ($uri) {
-          $this->fileSystem->delete($uri);
-        }
+        $this->fileSystem->delete($uri);
       }
       catch (FileException $exception) {
+        $this->loggerFactory->get('archipelago')->error('Attempt to compost a File at <em>@path</em> failed. The error was @e. Please correct and/or delete manually.',[
+          '@path' => $uri,
+          '@e' => $exception->getMessage(),
+        ]);
         // Fail silently. We won't be able to delete it anyways.
         return;
       }

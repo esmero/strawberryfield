@@ -59,7 +59,7 @@ class StrawberryValuesFromFlavorJson extends Map {
         "dr:uuid": {
             "type": "string",
             "pattern": "^[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}$"
-            
+
         },
         "checksum": {
            "type": "string"
@@ -97,8 +97,9 @@ JSON;
 
     $item = $this->getParent();
 
-    if (!empty($item->value)) {
+    if (!empty($item->getValue())) {
       /* @var $item StrawberryFieldItem */
+      // $item->value will be contained in $item->getValue()['value']
       $flattened = $item->provideFlatten(FALSE);
       $definition = $this->getDataDefinition();
       // This key is passed by the property definition in the field class
@@ -169,7 +170,7 @@ JSON;
     }
     $this->computed = TRUE;
   }
-  
+
 
   /**
    * Ensures that values are only computed once.

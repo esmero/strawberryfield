@@ -54,7 +54,8 @@ class StrawberryEntitiesViaJmesPathFromJson extends StrawberryValuesViaJmesPathF
       return;
     }
     $item = $this->getParent();
-    if (!empty($item->value)) {
+    if (!empty($item->getValue())) {
+      // $item->value will be contained in $item->getValue()['value']
       $node_entities = [];
       /* @var $item StrawberryFieldItem */
       $definition = $this->getDataDefinition();
@@ -64,7 +65,16 @@ class StrawberryEntitiesViaJmesPathFromJson extends StrawberryValuesViaJmesPathF
       // jmespath's separated by comma.
       $jmespaths = $definition['settings']['jsonkey'];
       $entity_type = $definition['settings']['entitytype'] ?? 'node';
-      $jmespath_array = array_map('trim', explode(',', $jmespaths));
+      $pattern = '/[,]+(?![^\[]*\]|[^\(]*\)|[^\{]*\})/';
+      $jmespaths_split = preg_split($pattern, $jmespaths);
+      $jmespath_array = [];
+      if ($jmespaths_split && is_array($jmespaths_split) && count($jmespaths_split) > 0 ) {
+        $jmespath_array = array_map('trim', $jmespaths_split);
+      }
+      else {
+        // Regular expression for splitting failed. Return silently.
+        return;
+      }
       $jmespath_result = [];
       foreach ($jmespath_array as $jmespath) {
         $jmespath_result[] = $item->searchPath(trim($jmespath ?? ''),FALSE);

@@ -504,4 +504,88 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
     return !empty($valid);
   }
 
+  /**
+   * @inheritDoc
+   */
+  public function getCountByProcessorsAndLevelInSolr(EntityInterface $entity, array $processors, string $processor_op = 'OR', bool $direct = TRUE, bool $children = FALSE, bool $grandchildren = FALSE, string $level_op = 'OR', array $indexes = []): int {
+    $count = 0;
+
+    if (!in_array($processor_op, ['OR','AND'])) {
+      return $count;
+    }
+    if (!in_array($level_op, ['OR','AND'])) {
+      return $count;
+    }
+    // If no index specified, query all that implement the strawberry flavor
+    // datasource.
+    if (empty($indexes)) {
+      $indexes = StrawberryfieldFlavorDatasource::getValidIndexes();
+    }
+
+    foreach ($indexes as $index) {
+      // Create the query.
+      $query = $index->query([
+        'limit' => 1,
+        'offset' => 0,
+      ]);
+
+      $allfields_translated_to_solr = $index->getServerInstance()
+        ->getBackend()
+        ->getSolrFieldNames($index);
+
+      $parse_mode = $this->parseModeManager->createInstance('terms');
+      $query->setParseMode($parse_mode);
+      $query->sort('search_api_relevance', 'DESC');
+
+      /* Forcing here two fixed options */
+      $parent_conditions = $query->createConditionGroup($level_op);
+      /* Forcing here two fixed options */
+      $processor_conditions = $query->createConditionGroup($processor_op);
+
+      if (isset($allfields_translated_to_solr['parent_id']) && $direct) {
+        $parent_conditions->addCondition('parent_id',  $entity->id());
+      }
+      // The property path for this is: target_id:field_descriptive_metadata:sbf_entity_reference_ispartof:nid
+      // TODO: This needs a config form. For now let's document. Even if not present
+      // It will not fail.
+      if (isset($allfields_translated_to_solr['top_parent_id']) && $children) {
+        $parent_conditions->addCondition('top_parent_id',  $entity->id());
+      }
+      // This fields should be target_id:field_descriptive_metadata:sbf_entity_reference_ispartof:field_descriptive_metadata:sbf_entity_reference_ispartof:nid
+      if (isset($allfields_translated_to_solr['top_parent_parent_id']) && $children) {
+        $parent_conditions->addCondition('top_parent_parent_id',  $entity->id());
+      }
+
+
+      if (count($parent_conditions->getConditions())) {
+        $query->addConditionGroup($parent_conditions);
+      }
+      else {
+        // If no Flavor to NODE conditions are set we can't do anything ok?
+        // Would return all Flavors from the index. Too much.
+        continue;
+      }
+
+      foreach ($processors as $processor) {
+        $processor = trim($processor);
+        $processor_conditions->addCondition('processor_id', $processor);
+      }
+      if (count($processor_conditions->getConditions())) {
+        $query->addConditionGroup($processor_conditions);
+      }
+      $query->addCondition('search_api_datasource',
+          'strawberryfield_flavor_datasource');
+
+      $query->setProcessingLevel(QueryInterface::PROCESSING_NONE);
+      // @see strawberryfield_search_api_solr_query_alter()
+      $query->setOption('ocr_highlight', 'on');
+      $results = $query->execute();
+
+      // In case of more than one Index with the same Data Source we accumulate.
+      $count += (int) $results->getResultCount();
+    }
+
+    return $count;
+  }
+
 }

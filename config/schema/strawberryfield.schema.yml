@@ -54,6 +54,9 @@ strawberryfield.strawberry_keynameprovider.jmespath:
     is_date:
       type: boolean
       label: 'If the value should be considered and validated as a date'
+    is_date_range:
+      type: boolean
+      label: 'If the value should be considered and validated as a native Drupal date range'
     exposed_key:
       type: string
       label: 'The field property we expose for the Strawberryfield'
@@ -241,6 +244,15 @@ strawberryfield.hydroponics_settings:
     home_path:
       type: string
       label: 'Full system path to a folder we can use as webserver user home for Drush'
+    search_api_indexes:
+      type: sequence
+      label: 'Search API Indexes marked as to be run by the Hydroponics Service'
+      sequence:
+        type: string
+        label: 'Search API index'
+    search_api_indexes_count:
+      type: integer
+      label: 'Number of Items to process per index/per cycle'
     queues:
       type: sequence
       label: 'Queues marked as to be run by the Hydroponics Service'
@@ -284,6 +296,13 @@ search_api.property_configuration.sbf_flavor_aggregated_item:
       type:
         type: string
         label: 'Comma separated list of Drupal machine names (IDs) of Strawberry Runner Post processor Configuration entities.e.g "ocr,text"'
+    join_fields:
+      type: sequence
+      label: 'The Search API Solr fields to be used to harvest related Flavors'
+      sequence:
+        type: string
+        orderby: key
+        label: 'A Search API Solr fields to be used to harvest(filter) related Flavors'
 
 plugin.plugin_configuration.search_api_processor.sbf_highlight:
   type: search_api.default_processor_configuration

@@ -999,36 +999,70 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
       // Important NOTE: e.g if you are using a global AND, means for a search
       // ALL WORDS need to match, this in NO CASE means all the words need to match
       // THE OCR flavor or any flavor. The combined result (JOIN time + main query) need to match
-      // SO here we can not use the 'v' from $query->getOption('sbf_join_flavor')['v']; that was used
+      // SO here we can not use the 'v' from $query->getOption('sbf_join_flavor')[index]['v']; that was used
       // to generate the JOIN because only on rare cases (e.g ONLY OCR matched all) will give us
       // any highlights. This is a complexity of our process
       // and OK if we handle this differently.
       // Just in case someone tried to copy the code without understanding, let's be safe
-      $combined_keys = $query->getOption('sbf_join_flavor')['hl'] ??
-        ($query->getOption('sbf_join_flavor')['v'] ?? NULL);
+      // Because the JOIN might be happening across multiple source to target fields
+      // we will use a single hl/v (all will be the same)
+      // but variate the "fields" for grouping and also the conditions based on ['from']
+      $options =  $query->getOption('sbf_join_flavor');
+      $combined_keys = NULL;
+      $nid_fields = [];
+      if ($options && is_array($options)) {
+        $option = reset($options);
+        $combined_keys = $option['hl'] ?? ($option['v']  ?? NULL);
+        foreach ($options as $option) {
+          // Note that 'from_search_api' keeps the native search API Fields
+          // While 'from' the already resolved Solr ones.
+          if ($option['from_search_api'] ?? NULL) {
+            $nid_fields[] = $option['from_search_api'];
+          }
+        }
+      }
+
       // No join. Try with the Advanced Search Flavor Filter
       // Sweet and made for a hit summer of advanced Searching!
       // @See \Drupal\format_strawberryfield_views\Plugin\views\filter\AdvancedSearchApiFulltext::query
+
       if (!$combined_keys) {
+        // FOR NOW FIXED as it was in 1.3.0. But we might also allow this to come from other
+        // REview how we could provide this here. Given that the HL is based on the aggregated data
+        // Maybe we could reverse engineer the config for the aggregated field and take the new (for 1.5.0)
+        // SBF to ADO NID fields from there. Heavy lift though for every query. Maybe this should happen
+        // At the filter level and pass as an option ready to be used here?
         $combined_keys = $query->getOption('sbf_advanced_search_filter_flavor_hl') ?? NULL;
+        $nid_fields  = $query->getOption('sbf_advanced_search_filter_flavor_join_search_api_fields_hl') ?? ['parent_id'];
       }
+
       if ($combined_keys && is_string($combined_keys) && strlen(trim($combined_keys)) > 0
       ) {
-        $group_options = [
-          'use_grouping' => TRUE,
-          'fields'       => ['parent_id'],
-          'truncate'     => TRUE,
-          'group_limit'  => 3,
-          'group_sort'   => [],
-        ];
-        $flavor_query->setOption('search_api_grouping', $group_options);
+        if (in_array('parent_id', $nid_fields)) {
+          // We can't group on multivalued fields but we know 'parent_id' is always single valued.
+          $group_options = [
+            'use_grouping' => TRUE,
+            'fields' => ['parent_id'],
+            'truncate' => TRUE,
+            'group_limit' => 3,
+            'group_sort' => [],
+          ];
+          $flavor_query->setOption('search_api_grouping', $group_options);
+        }
         $flavor_query->keys("{$combined_keys}");
-        $flavor_query->addCondition('parent_id', $entities, 'IN');
+        $nid_fields_group = $flavor_query->createConditionGroup('OR', ['sbf_hl_source']);
+        foreach($nid_fields as $nid_field) {
+          $nid_fields_group->addCondition($nid_field, $entities, 'IN');
+        }
+        if (!empty($nid_fields_group->getConditions())) {
+          $flavor_query->addConditionGroup($nid_fields_group);
+        }
 
         // This is just to avoid Search API rewriting the query
         $flavor_query->setOption('solr_param_defType', 'edismax');
         // This will allow us to remove the edismax processor on a hook/event subscriber.
         $flavor_query->setOption('sbf_advanced_highlight_flavor', TRUE);
+
         $flavor_query->addCondition(
           'search_api_datasource', 'strawberryfield_flavor_datasource'
         );
@@ -1036,26 +1070,33 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
         $flavor_query->setOption('search_api_bypass_access', TRUE);
         $flavor_query->setFulltextFields([]);
         $flavor_query->setProcessingLevel(QueryInterface::PROCESSING_BASIC);
+
         $flavor_query->setOption(
-          'search_api_retrieved_field_values',
-          ['parent_id' => 'parent_id', 'processor_id' => 'processor_id']
+          'search_api_retrieved_field_values', array_combine($nid_fields, $nid_fields) + [ 'processor_id' => 'processor_id']
         );
         $results = $flavor_query->execute();
         foreach ($results as $item_id => $item) {
           [$unused, $item_id] = Utility::splitCombinedId($item->getId());
           $item_id = explode(':', $item_id);
+          $node_ids_from_result = [];
           if ($item_id && count($item_id) == 5) {
-            // For now this is fixed SBF can not be generated by other Entity Types
-            $node_id = 'entity:node/' . $item_id[0] . ':' . $item_id[2];
-            // ocr is 4, File id is 1,
             // Gosh we need to merge this... if not we end with the last one only.
-            // @TODO. we could check here if the keys for a certain highlight
-            // were already highlighted but then we are already generating a snippet
-            // that is limited in the caller. So not sure it is worth
-            $highlighted_fields[$node_id]['highlighted_fields']
-              = array_merge_recursive( $highlighted_fields[$node_id]['highlighted_fields'] ?? [], $item->getExtraData('highlighted_fields', []));
-            $highlighted_fields[$node_id]['highlighted_keys']
-              = array_unique(array_merge($highlighted_fields[$node_id]['highlighted_keys'] ?? [], $item->getExtraData('highlighted_keys', [])));
+            // Get every returned SBF to NODEID Int value from the chosen fields in the query option for a JOIN.
+            foreach ($nid_fields as $nid_field) {
+               if ($item->getField($nid_field, FALSE)) {
+                $node_ids_from_result = array_merge($node_ids_from_result, $item->getField($nid_field, FALSE)->getValues());
+              }
+            }
+            $node_ids_from_result = array_unique($node_ids_from_result);
+            $matched_node_id = array_intersect($node_ids_from_result, $entities);
+            foreach ($matched_node_id as $node_id) {
+              // being  $item_id[2]; the language of the Flavor.
+              $entity_id = 'entity:node/'.$node_id . ':' . $item_id[2];
+              $highlighted_fields[$entity_id]['highlighted_fields']
+                = array_merge_recursive($highlighted_fields[$entity_id]['highlighted_fields'] ?? [], $item->getExtraData('highlighted_fields', []));
+              $highlighted_fields[$entity_id]['highlighted_keys']
+                = array_unique(array_merge($highlighted_fields[$entity_id]['highlighted_keys'] ?? [], $item->getExtraData('highlighted_keys', [])));
+            }
           }
         }
       }

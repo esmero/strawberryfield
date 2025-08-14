@@ -18,10 +18,11 @@ use Drupal\Core\Queue\QueueWorkerManagerInterface;
 use Drupal\Core\Queue\RequeueException;
 use Drupal\Core\Queue\SuspendQueueException;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
+use Drupal\search_api\IndexInterface;
 use Psr\Log\LoggerInterface;
 
 /**
- * Provides a SBF utility class.
+ * Provides a Hydroponics/background processing utility class.
  */
 class StrawberryfieldHydroponicsService {
 
@@ -76,6 +77,7 @@ class StrawberryfieldHydroponicsService {
    * @param \Drupal\Core\Config\ConfigFactoryInterface $config_factory
    * @param \Drupal\Core\Extension\ModuleHandlerInterface $module_handler
    * @param \Drupal\Core\Queue\QueueWorkerManagerInterface $queue_manager
+   * @param \Drupal\Core\Queue\QueueFactory $queue_factory
    * @param \Psr\Log\LoggerInterface $hydroponics_logger
    */
   public function __construct(
@@ -105,7 +107,7 @@ class StrawberryfieldHydroponicsService {
    * @throws \Drupal\Component\Plugin\Exception\PluginException
    * @throws \Drupal\Component\Plugin\Exception\PluginNotFoundException
    */
-  public function processQueue($name, $time = 120) {
+  public function processQueue($name, int $time = 120) {
     // Grab the defined cron queues.
     $info = $this->queueManager->getDefinition($name);
     if ($info) {
@@ -131,7 +133,11 @@ class StrawberryfieldHydroponicsService {
         catch (SuspendQueueException $e) {
           // If the worker indicates there is a problem with the whole queue,
           $queue->releaseItem($item);
-          watchdog_exception('cron', $e);
+          $this->logger->error('Exception was thrown by queue @queue during Hydroponics processing with error @e', [
+              '@queue' => $name,
+              '@e' => $e->getMessage(),
+            ]
+          );
         }
         catch (DelayedRequeueException $e) {
           // The worker requested the task not be immediately re-queued.
@@ -148,7 +154,11 @@ class StrawberryfieldHydroponicsService {
         catch (\Exception $e) {
           // In case of any other kind of exception, log it and leave the item
           // in the queue to be processed again later.
-          watchdog_exception('cron', $e);
+          $this->logger->error('Exception was thrown by queue @queue during Hydroponics processing with error @e', [
+              '@queue' => $name,
+              '@e' => $e->getMessage(),
+            ]
+          );
         }
       }
       $this->logger->info('--- --- Lease time is out for  @queue', [
@@ -157,8 +167,123 @@ class StrawberryfieldHydroponicsService {
       return $queue->numberOfItems();
     }
     else {
+      $this->logger->error('Queue definition for queue @queue during Hydroponics processing is missing. Bailing out. ', [
+          '@queue' => $name,
+        ]
+      );
       return 0;
     }
+  }
+
+  /**
+   * Processes Search API Indexes queues.
+   *
+   * @param string $index_id
+   * @param $batch_size
+   * @param int $time
+   *
+   * @return int
+   * @throws \Drupal\search_api\SearchApiException
+   */
+  public function processSearchApiIndex(string $index_id, $batch_size, int $time = 120): int {
+
+    /* @var IndexInterface $index */
+    $index = \Drupal::getContainer()
+      ->get('entity_type.manager')
+      ->getStorage('search_api_index')
+      ->load($index_id);
+    if (!$index) {
+      $this->logger->Error('--- @index is not existent or could not be loaded. Check your Hydroponics Config and remove that index .', [
+          '@index' => $index_id,
+        ]
+      );
+      return 0;
+    }
+    $remaining_item_count = ($index->hasValidTracker() ? $index->getTrackerInstance()->getRemainingItemsCount() : 0);
+    if (!\Drupal::lock()->lockMayBeAvailable($index->getLockId())) {
+      $this->logger->warning('--- Items for Search API index @index are being indexed in a different process that Hydroponics, skippig until our next cycle.', [
+          '@index' => $index->label(),
+        ]
+      );
+      return $remaining_item_count;
+    }
+    if (!$remaining_item_count) {
+      $this->logger->info('--- Search API index @index has no items left. All (and well) done.', [
+          '@index' => $index->label(),
+        ]
+      );
+      unset($index);
+      return 0;
+    }
+    if (!$batch_size) {
+      $this->logger->warning('--- Ups. Search API index @index will not be processed because batch size is 0.', [
+          '@index' => $index->label(),
+        ]
+      );
+      unset($index);
+      return 0;
+    }
+    $end = time() + $time;
+    $indexed = 0;
+    $bailout = FALSE;
+    while (time() < $end) {
+      // Determine the number of items to index for this run.
+      $to_index = min(($remaining_item_count - $indexed), $batch_size);
+      $to_index = (int) $to_index > 0 ? (int) $to_index : 0;
+      if (!$to_index) {
+        $this->logger->info($this->t('--- Nothing left to index for Search API index @index. Moving on!',
+          [
+            '@index' => $index->label(),
+            '@to_index' => $to_index,
+          ]
+        ));
+        break;
+      }
+      // Catch any exception that may occur during indexing.
+      try {
+        // Index items limited by the given count.
+        $enabled_mem = $this->memory_limit_bytes();
+
+        if ($enabled_mem > 0 && (memory_get_usage() * 1.5) >= $enabled_mem) {
+          $this->logger->warning($this->t("--- Search API Indexing has consumed in excess of 50% of available memory. Bailing out for this run."));
+          gc_collect_cycles();
+          $bailout = TRUE;
+          break;
+        }
+
+        $indexed = $indexed + $index->indexItems($to_index);
+
+        // Display progress message.
+        if ($indexed > 0) {
+          $message = $this->formatPlural($indexed, '--- Successfully indexed 1 item on Search API index @index.', '--- Successfully indexed @count items on Search API index @index.', ['@index' => $index->label()]);
+          $this->logger->info($message);
+        }
+        else {
+          $this->logger->info($this->t('--- We sent @to_index items for Search API index @index but nothing was indexed',
+            [
+              '@index' => $index->label(),
+              '@to_index' => $to_index,
+            ]
+          ));
+        }
+      }
+      catch (\Exception $e) {
+        // Log exception to watchdog and abort the batch job.
+        $message = $this->t('--- An error occurred during indexing on Search API index @index: @message', [
+          '@index' => $index->label(),
+          '@message' => $e->getMessage()
+        ]);
+        $this->logger->error($message);
+        break;
+      }
+    }
+    $this->logger->info('--- --- Lease time is out for Search API index @index', [
+        '@index' => $index->label()
+      ]
+    );
+    $remaining = !$bailout ? $index->getTrackerInstance()->getRemainingItemsCount() : -1;
+    unset($index);
+    return $remaining;
   }
 
 
@@ -192,6 +317,7 @@ class StrawberryfieldHydroponicsService {
         $pid = exec(
           sprintf("%s > /dev/null 2>&1 & echo $!", $cmd)
         );
+
         \Drupal::state()->set('hydroponics.queurunner_last_pid', $pid);
         $this->logger->info('PID for Hydroponics Service: @pid', [
             '@pid' => $pid]
@@ -203,9 +329,6 @@ class StrawberryfieldHydroponicsService {
           ]
         );
       }
-    }
-    else {
-      return;
     }
   }
 
@@ -237,8 +360,6 @@ class StrawberryfieldHydroponicsService {
 
   public function stop() {
     $queuerunner_pid = (int) \Drupal::state()->get('hydroponics.queurunner_last_pid', 0);
-    $lastRunTime = intval(\Drupal::state()->get('hydroponics.heartbeat'));
-    $currentTime = intval(\Drupal::time()->getRequestTime());
     error_log($queuerunner_pid);
     $running_posix = posix_kill($queuerunner_pid, 0);
     if (!$running_posix || !$queuerunner_pid) {
@@ -257,7 +378,6 @@ class StrawberryfieldHydroponicsService {
         $this->logger->info('Hydroponics Service could not stop because of @code', [
             '@code' => posix_strerror($errorcode)]
         );
-
         return posix_strerror($errorcode);
       } else {
         \Drupal::state()->set('hydroponics.queurunner_last_pid', 0);
@@ -266,7 +386,18 @@ class StrawberryfieldHydroponicsService {
       }
     }
   }
-
-
-
+  public function memory_limit_bytes(): int {
+    $mem = trim(ini_get('memory_limit'));
+    $last = strtolower($mem[strlen($mem)-1]);
+    $mem = (int) rtrim($mem, 'GgMmKk');
+    switch ($last) {
+      case 'g':
+        $mem *= 1024;
+      case 'm':
+        $mem *= 1024;
+      case 'k':
+        $mem *= 1024;
+    }
+    return $mem;
+  }
 }
