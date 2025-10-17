@@ -385,12 +385,26 @@ class StrawberryfieldFileMetadataService {
    * @param array $metadata
    */
   public function extractPronom(string $askey, string $exec_path, FileInterface $file, string $templocation, &$metadata = []) {
+    $output_fido = NULL;
     $templocation_for_exec = escapeshellarg($templocation);
-    $result_fido = exec(
-      $exec_path . ' ' . $templocation_for_exec,
-      $output_fido,
-      $status_fido
-    );
+    try {
+      $result_fido = exec(
+        $exec_path . ' ' . $templocation_for_exec,
+        $output_fido,
+        $status_fido
+      );
+    }
+    catch (\Exception $e) {
+      $this->loggerFactory->get('strawberryfield')->error(
+        'Exception while processing FIDO on @templocation for @fileurl with error @e',
+        [
+          '@fileurl' => $file->getFileUri(),
+          '@templocation' => $templocation,
+          '@e' => $e->getMessage(),
+        ]
+      );
+      return;
+    }
 
     // Second FIDO
     if ($status_fido != 0) {
@@ -404,6 +418,14 @@ class StrawberryfieldFileMetadataService {
       );
     }
     else {
+      // $output_fido as an array might have a list/in which 0 is closer/accurate than the next ones.
+      if (is_array($output_fido) && !empty($output_fido)) {
+        $result_fido = $output_fido[0];
+      }
+      else {
+        $result_fido = strlen($result_fido ?? '') > 0 ? $result_fido : '';
+      }
+
       $output_fido = preg_split('/("[^"]*")|[,]+/', $result_fido, -1,
         PREG_SPLIT_NO_EMPTY|PREG_SPLIT_DELIM_CAPTURE);
       $output_fido = is_array($output_fido) ? $output_fido : [];
