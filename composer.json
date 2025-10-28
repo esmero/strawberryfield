@@ -15,7 +15,7 @@
     "require": {
         "php": ">=8.1",
         "ext-json": "*",
-        "drupal/core": "^10.3",
+        "drupal/core": "^10.3 || ^11",
         "ml/json-ld": "~1.1",
         "mtdowling/jmespath.php":"~2.6",
         "swaggest/json-schema":"~0.12",
