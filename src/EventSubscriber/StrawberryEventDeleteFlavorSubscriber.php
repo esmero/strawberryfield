@@ -2,6 +2,8 @@
 
 namespace Drupal\strawberryfield\EventSubscriber;
 
+use Drupal\Component\Utility\DeprecationHelper;
+use Drupal\Core\Utility\Error;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Field\EntityReferenceFieldItemListInterface;
 use Drupal\search_api\Query\QueryInterface;
@@ -108,7 +110,7 @@ class StrawberryEventDeleteFlavorSubscriber extends StrawberryfieldEventDeleteSu
         }
       }
       catch (SearchApiException $searchApiException) {
-        watchdog_exception('strawberryfield', $searchApiException, 'We could not untrack Strawberry Flavor Documents from Index because the Solr Query returned an exception at server level.');
+        DeprecationHelper::backwardsCompatibleCall(\Drupal::VERSION, '10.1.0', fn() => Error::logException(\Drupal::logger('strawberryfield'), $searchApiException, 'We could not untrack Strawberry Flavor Documents from Index because the Solr Query returned an exception at server level.'), fn() => watchdog_exception('strawberryfield', $searchApiException, 'We could not untrack Strawberry Flavor Documents from Index because the Solr Query returned an exception at server level.'));
       }
     }
 
