@@ -37,7 +37,7 @@ class HydroponicsDrushCommands extends DrushCommands {
   public function hydroponics(
   ) {
     $loop = Loop::get();
-    $timer_ping = $loop->addPeriodicTimer(3.0, function () {
+    $timer_ping = $loop->addPeriodicTimer(3.0, function (): void {
       // store a heartbeat every 3 seconds.
       $currenttime = \Drupal::time()->getCurrentTime();
       \Drupal::state()->set('hydroponics.heartbeat', $currenttime);
@@ -72,7 +72,7 @@ class HydroponicsDrushCommands extends DrushCommands {
       // Set number of idle cycle to wait
       $idle['queue:'.$queue] = 3;
 
-      $done['queue:'.$queue] = $loop->addPeriodicTimer(1.0, function ($timer) use ($loop, $queue, &$idle) {
+      $done['queue:'.$queue] = $loop->addPeriodicTimer(1.0, function ($timer) use ($loop, $queue, &$idle): void {
         \Drupal::logger('hydroponics')->info("Starting to process queue @queue", [
           '@queue' => $queue
         ]);
@@ -102,7 +102,7 @@ class HydroponicsDrushCommands extends DrushCommands {
       // Set number of idle cycle to wait
       $idle['search_api_index:'.$index_id] = 3;
 
-      $done['search_api_index:'.$index_id] = $loop->addPeriodicTimer(1.0, function ($timer) use ($loop, $index_id, $indexes_batch_size, &$idle) {
+      $done['search_api_index:'.$index_id] = $loop->addPeriodicTimer(1.0, function ($timer) use ($loop, $index_id, $indexes_batch_size, &$idle): void {
         if (!$idle['search_api_index:'.$index_id]) {
           return;
         }
@@ -142,7 +142,7 @@ class HydroponicsDrushCommands extends DrushCommands {
       });
     }
 
-    $idle_timer = $loop->addPeriodicTimer(60.0, function ($timer) use ($loop, $timer_ping, &$done, &$idle) {
+    $idle_timer = $loop->addPeriodicTimer(60.0, function ($timer) use ($loop, $timer_ping, &$done, &$idle): void {
       // Finish all if all queues return 0 elements for at least 3 cycles
       // Check this every 60 s
       $all_idle = 1;
@@ -168,7 +168,7 @@ class HydroponicsDrushCommands extends DrushCommands {
     if ($time_to_expire > 0 ) {
       $time_to_expire = round($time_to_expire, 1);
       $securitytimer = $loop->addTimer($time_to_expire,
-        function ($timer) use ($loop, $timer_ping, $idle_timer, &$done, $time_to_expire) {
+        function ($timer) use ($loop, $timer_ping, $idle_timer, &$done, $time_to_expire): void {
           // Finish all if Time to live in seconds is reached
           \Drupal::logger('hydroponics')
             ->info("@time_to_expire seconds passed closing Hydroponics Service", [

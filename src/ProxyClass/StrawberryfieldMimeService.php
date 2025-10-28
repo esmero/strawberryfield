@@ -7,6 +7,8 @@
 
 namespace Drupal\strawberryfield\ProxyClass {
 
+  use Drupal\Core\DependencyInjection\DependencySerializationTrait;
+  use Symfony\Component\DependencyInjection\ContainerInterface;
   use Drupal\Core\File\MimeType\ExtensionMimeTypeGuesser;
 
   /**
@@ -16,7 +18,7 @@ namespace Drupal\strawberryfield\ProxyClass {
    */
   class StrawberryfieldMimeService extends ExtensionMimeTypeGuesser {
 
-    use \Drupal\Core\DependencyInjection\DependencySerializationTrait;
+    use DependencySerializationTrait;
 
     /**
      * The id of the original proxied service.
@@ -47,7 +49,7 @@ namespace Drupal\strawberryfield\ProxyClass {
      * @param string $drupal_proxy_original_service_id
      *   The service ID of the original service.
      */
-    public function __construct(\Symfony\Component\DependencyInjection\ContainerInterface $container, $drupal_proxy_original_service_id)
+    public function __construct(ContainerInterface $container, $drupal_proxy_original_service_id)
     {
       $this->container = $container;
       $this->drupalProxyOriginalServiceId = $drupal_proxy_original_service_id;
@@ -96,9 +98,9 @@ namespace Drupal\strawberryfield\ProxyClass {
     /**
      * {@inheritdoc}
      */
-    public function setMapping(array $mapping = NULL)
+    public function setMapping(array $mapping = NULL): void
     {
-      return $this->lazyLoadItself()->setMapping($mapping);
+      $this->lazyLoadItself()->setMapping($mapping);
     }
 
   }

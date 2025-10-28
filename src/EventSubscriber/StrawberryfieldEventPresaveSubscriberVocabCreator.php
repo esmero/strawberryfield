@@ -2,6 +2,7 @@
 
 namespace Drupal\strawberryfield\EventSubscriber;
 
+use Drupal\taxonomy\Entity\Term;
 use Drupal\strawberryfield\Event\StrawberryfieldCrudEvent;
 use Drupal\Core\Messenger\MessengerInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
@@ -107,7 +108,7 @@ class StrawberryfieldEventPresaveSubscriberVocabCreator extends StrawberryfieldE
               $query->condition('parent', $parent_id, 'IN');
               $tids = $query->accessCheck(FALSE)->execute();
               if (count($tids) == 0) {
-                $new_term = \Drupal\taxonomy\Entity\Term::create(
+                $new_term = Term::create(
                   [
                     'vid' => 'strawberryfield_voc_id',
                     'name' => $path,

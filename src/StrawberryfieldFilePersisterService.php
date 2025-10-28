@@ -8,6 +8,11 @@
 
 namespace Drupal\strawberryfield;
 
+use Drupal\Core\Entity\EntityStorageException;
+use Aws\S3\ObjectCopier;
+use Aws\Exception\MultipartUploadException;
+use Aws\S3\ObjectUploader;
+use Aws\S3\MultipartUploader;
 use Drupal\Core\Datetime\DrupalDateTime;
 use Drupal\Core\File\FileSystemInterface;
 use Drupal\Core\Session\AccountInterface;
@@ -866,7 +871,7 @@ class StrawberryfieldFilePersisterService {
                       $this->eventDispatcher->dispatch($event, $event_type);
                     }
                   }
-                  catch (\Drupal\Core\Entity\EntityStorageException $e) {
+                  catch (EntityStorageException $e) {
                     $this->messenger()->addError(
                       t(
                         'Something went wrong when saving file @filename:, please check your logs.',
@@ -1437,13 +1442,13 @@ class StrawberryfieldFilePersisterService {
           }
 
           try {
-            $objectCopierPromise = new \Aws\S3\ObjectCopier($client, ['Bucket' => $bucket, 'Key' => $source_key], ['Bucket' => $bucket, 'Key' => $destination_key], 'private', $options);
+            $objectCopierPromise = new ObjectCopier($client, ['Bucket' => $bucket, 'Key' => $source_key], ['Bucket' => $bucket, 'Key' => $destination_key], 'private', $options);
             $result = $objectCopierPromise->copy();
             $destination_wrapper->writeUriToCache($destination_uri);
             $this->loggerFactory->get('strawberryfield')->info('File was successfully Copied to S3 at @destination_uri via Multipart', ['@destination_uri' => $destination_uri]);
             return $destination_uri;
           }
-          catch (\Aws\Exception\MultipartUploadException $e) {
+          catch (MultipartUploadException $e) {
             $this->loggerFactory->get('sbf')->error($e->getMessage());
           }
           catch (\Exception $e) {
@@ -1454,7 +1459,7 @@ class StrawberryfieldFilePersisterService {
           // Use a stream instead of a file path.
           $source = fopen($source_uri, 'rb');
           if ($source) {
-            $objectUploaderPromise = new \Aws\S3\ObjectUploader($client, $bucket, $destination_key, $source, 'private', $options);
+            $objectUploaderPromise = new ObjectUploader($client, $bucket, $destination_key, $source, 'private', $options);
             do {
               try {
                 $result = $objectUploaderPromise->upload();
@@ -1464,11 +1469,11 @@ class StrawberryfieldFilePersisterService {
                 // If the SDK chooses a multipart upload, try again if there is an exception.
                 // Unlike PutObject calls, multipart upload calls are not automatically retried.
               }
-              catch (\Aws\Exception\MultipartUploadException $e) {
+              catch (MultipartUploadException $e) {
                 rewind($source);
                 $this->loggerFactory->get('strawberryfield')->warning('File failed uploading to S3 at @destination_uri via Multipart but we will try again', ['@destination_uri' => $destination_uri]);
                 try {
-                  $uploader = new \Aws\S3\MultipartUploader($client, $source, [
+                  $uploader = new MultipartUploader($client, $source, [
                     'state' => $e->getState(),
                   ]);
                 }

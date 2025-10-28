@@ -2,6 +2,8 @@
 
 namespace Drupal\strawberryfield\Plugin\search_api\processor;
 
+use Drupal\Core\Link;
+use Drupal\search_api_solr\SolrBackendInterface;
 use Drupal\Component\Utility\Html;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Language\LanguageInterface;
@@ -371,7 +373,7 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
             else {
               $uri->setOptions(['fragment' => 'search/'.$key]);
             }
-            $rendered_url = \Drupal\Core\Link::fromTextAndUrl(
+            $rendered_url = Link::fromTextAndUrl(
               $key, $uri
             );
             $item_keys_with_links[$key] = $rendered_url->toString()->getGeneratedLink();
@@ -1117,7 +1119,7 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
     $backend = $query->getIndex()->getServerInstance()->getBackend();
     $index_fields = $query->getIndex()->getFields();
     $backend_highlights = [];
-    if ($backend instanceof \Drupal\search_api_solr\SolrBackendInterface && $this->configuration['highlight_processing'] == 'backend') {
+    if ($backend instanceof SolrBackendInterface && $this->configuration['highlight_processing'] == 'backend') {
         $excerpt_fulltext_fields = $this->index->getFulltextFields();
         if (!empty($this->configuration['exclude_fields'])) {
           $excerpt_fulltext_fields = array_diff(

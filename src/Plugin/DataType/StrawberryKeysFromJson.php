@@ -168,7 +168,7 @@ class StrawberryKeysFromJson extends ItemList {
   /**
    * {@inheritdoc}
    */
-  public function offsetExists($offset) {
+  public function offsetExists($offset): bool {
     $this->ensureComputedValue();
     return parent::offsetExists($offset);
   }
@@ -176,7 +176,7 @@ class StrawberryKeysFromJson extends ItemList {
   /**
    * {@inheritdoc}
    */
-  public function getIterator() {
+  public function getIterator() :\ArrayIterator {
     $this->ensureComputedValue();
     return parent::getIterator();
   }
@@ -184,7 +184,7 @@ class StrawberryKeysFromJson extends ItemList {
   /**
    * {@inheritdoc}
    */
-  public function count() {
+  public function count(): int {
     $this->ensureComputedValue();
     return parent::count();
   }

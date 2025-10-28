@@ -2,6 +2,7 @@
 
 namespace Drupal\strawberryfield\Plugin\Field\FieldType;
 
+use Drupal\Component\Utility\Environment;
 use Drupal\Component\Utility\Bytes;
 use Drupal\Component\Render\PlainTextOutput;
 use Drupal\Component\Utility\Random;
@@ -163,7 +164,7 @@ class StrawberryFieldFileComputedItem extends EntityReferenceItem {
     $settings = $this->getSettings();
 
     // Cap the upload size according to the PHP limit.
-    $max_filesize = Bytes::toNumber(\Drupal\Component\Utility\Environment::getUploadMaxSize());
+    $max_filesize = Bytes::toNumber(Environment::getUploadMaxSize());
     if (!empty($settings['max_filesize'])) {
       $max_filesize = min($max_filesize, Bytes::toNumber($settings['max_filesize']));
     }
