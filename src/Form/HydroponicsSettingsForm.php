@@ -19,6 +19,7 @@ use Drupal\Core\Ajax\MessageCommand;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Drupal\strawberryfield\StrawberryfieldHydroponicsService;
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
+use Drupal\Core\Config\TypedConfigManagerInterface;
 
 /**
  * ConfigurationForm for Queue Worker Selection to be run by Hydroponics Service.
@@ -86,9 +87,10 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
    * @param \Drupal\Core\Messenger\Messenger $messenger
    * @param \Drupal\strawberryfield\StrawberryfieldHydroponicsService $hydroponics_service
    * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entitytype_manager
+   * @param \Drupal\Core\Config\TypedConfigManagerInterface $typed_config_manager
    */
-  public function __construct(ConfigFactoryInterface $config_factory, QueueFactory $queue_factory, AccountInterface $current_user, StateInterface $state, ModuleHandler $module_handler, QueueWorkerManagerInterface $queueWorkerManager, Messenger $messenger, StrawberryfieldHydroponicsService $hydroponics_service, EntityTypeManagerInterface $entitytype_manager) {
-    parent::__construct($config_factory);
+  public function __construct(ConfigFactoryInterface $config_factory, QueueFactory $queue_factory, AccountInterface $current_user, StateInterface $state, ModuleHandler $module_handler, QueueWorkerManagerInterface $queueWorkerManager, Messenger $messenger, StrawberryfieldHydroponicsService $hydroponics_service, EntityTypeManagerInterface $entitytype_manager, TypedConfigManagerInterface $typed_config_manager) {
+    parent::__construct($config_factory, $typed_config_manager);
     $this->queueFactory = $queue_factory;
     $this->currentUser = $current_user;
     $this->state = $state;
@@ -130,7 +132,8 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
       $container->get('plugin.manager.queue_worker'),
       $container->get('messenger'),
       $container->get('strawberryfield.hydroponics'),
-      $container->get('entity_type.manager')
+      $container->get('entity_type.manager'),
+      $container->get('config.typed'),
     );
   }
 
