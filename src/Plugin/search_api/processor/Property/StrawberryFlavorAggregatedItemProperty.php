@@ -7,6 +7,7 @@ use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\search_api\Entity\Index;
 use Drupal\search_api\Item\FieldInterface;
+use Drupal\user\Entity\Role;
 use Drupal\search_api\Processor\ConfigurablePropertyBase;
 
 /**
@@ -47,7 +48,11 @@ class StrawberryFlavorAggregatedItemProperty extends ConfigurablePropertyBase {
 
     $configuration['processor_ids'] = implode(",", $processor_ids);
 
-    $roles = user_role_names();
+
+    $roles_from_entity = Role::loadMultiple();
+    $roles = array_map(fn($role) => $role->label(), $roles_from_entity);
+
+
     $form['roles'] = [
       '#type' => 'select',
       '#title' => $this->t('User roles'),
