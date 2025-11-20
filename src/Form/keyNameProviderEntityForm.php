@@ -69,6 +69,7 @@ class keyNameProviderEntityForm extends EntityForm {
     ];
     /* @var \Drupal\strawberryfield\Plugin\StrawberryfieldKeyNameProviderManager $keyprovider_plugin_definitions */
     $keyprovider_plugin_definitions = $this->strawberryfieldKeyNameProviderManager->getDefinitions();
+    $options = [];
     foreach ($keyprovider_plugin_definitions as $id => $definition) {
       $options[$id] = $definition['label'];
     }
