@@ -46,6 +46,15 @@ class StrawberryfieldFieldItemNormalizer extends FieldItemNormalizer {
   /**
    * {@inheritdoc}
    */
+  public function getSupportedTypes(?string $format): array {
+    return [
+      StrawberryFieldItem::class => TRUE,
+    ];
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   public function normalize($object, $format = NULL, array $context = []): ArrayObject|array|string|int|float|bool|null {
     //@TODO check what options we can get from $context
     //@TODO allow per Field instance to limit which prop is internal or external

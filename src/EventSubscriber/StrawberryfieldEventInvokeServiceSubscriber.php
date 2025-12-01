@@ -14,7 +14,7 @@ abstract class StrawberryfieldEventInvokeServiceSubscriber implements EventSubsc
   /**
    * {@inheritdoc}
    */
-  public static function getSubscribedEvents() {
+  public static function getSubscribedEvents(): array {
 
     // @TODO check event priority and adapt to future D9 needs.
     $events[StrawberryfieldEventType::INVOKE_SERVICE][] = ['onEntityInvokeService', 100];

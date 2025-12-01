@@ -2,6 +2,7 @@
 
 namespace Drupal\strawberryfield\Plugin\Field\FieldType;
 
+use Drupal\Component\Utility\Environment;
 use Drupal\Component\Utility\Bytes;
 use Drupal\Component\Render\PlainTextOutput;
 use Drupal\Component\Utility\Random;
@@ -163,17 +164,25 @@ class StrawberryFieldFileComputedItem extends EntityReferenceItem {
     $settings = $this->getSettings();
 
     // Cap the upload size according to the PHP limit.
-    $max_filesize = Bytes::toNumber(\Drupal\Component\Utility\Environment::getUploadMaxSize());
+    $max_filesize = Bytes::toNumber(Environment::getUploadMaxSize());
     if (!empty($settings['max_filesize'])) {
       $max_filesize = min($max_filesize, Bytes::toNumber($settings['max_filesize']));
     }
 
-    // There is always a file size limit due to the PHP server limit.
-    $validators['file_validate_size'] = [$max_filesize];
+    if (version_compare(\Drupal::VERSION, '10.2', '>=')) {
+      if (!empty($settings['file_extensions'])) {
+        $validators['FileExtension']['extensions'] = $settings['file_extensions'];
+      }
+      $validators['FileSizeLimit']['fileLimit'] = $max_filesize;
+    }
+    else {
+      // There is always a file size limit due to the PHP server limit.
+      $validators['file_validate_size'] = [$max_filesize];
 
-    // Add the extension check if necessary.
-    if (!empty($settings['file_extensions'])) {
-      $validators['file_validate_extensions'] = [$settings['file_extensions']];
+      // Add the extension check if necessary.
+      if (!empty($settings['file_extensions'])) {
+        $validators['file_validate_extensions'] = [$settings['file_extensions']];
+      }
     }
 
     return $validators;

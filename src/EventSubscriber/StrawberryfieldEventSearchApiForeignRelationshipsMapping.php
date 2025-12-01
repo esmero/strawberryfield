@@ -27,7 +27,7 @@ class StrawberryfieldEventSearchApiForeignRelationshipsMapping implements EventS
   /**
    * {@inheritdoc}
    */
-  public static function getSubscribedEvents() {
+  public static function getSubscribedEvents(): array {
 
     $events[SearchApiEvents::MAPPING_FOREIGN_RELATIONSHIPS][] = ['alterMapping', static::$priority];
     return $events;

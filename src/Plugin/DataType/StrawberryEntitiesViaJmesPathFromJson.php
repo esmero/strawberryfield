@@ -178,28 +178,28 @@ class StrawberryEntitiesViaJmesPathFromJson extends StrawberryValuesViaJmesPathF
   /**
    * {@inheritdoc}
    */
-  public function isEmpty() {
+  public function isEmpty(): bool {
     $this->ensureComputedValue();
     return parent::isEmpty();
   }
   /**
    * {@inheritdoc}
    */
-  public function offsetExists($offset) {
+  public function offsetExists($offset): bool {
     $this->ensureComputedValue();
     return parent::offsetExists($offset);
   }
   /**
    * {@inheritdoc}
    */
-  public function getIterator() {
+  public function getIterator(): \ArrayIterator {
     $this->ensureComputedValue();
     return parent::getIterator();
   }
   /**
    * {@inheritdoc}
    */
-  public function count() {
+  public function count(): int {
     $this->ensureComputedValue();
     return parent::count();
   }

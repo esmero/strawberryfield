@@ -2,6 +2,7 @@
 
 namespace Drupal\strawberryfield\Plugin\QueueWorker;
 
+use Drupal\Core\Queue\DelayedRequeueException;
 use Drupal\Core\Config\ImmutableConfig;
 use Drupal\Core\Datetime\DrupalDateTime;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
@@ -319,7 +320,7 @@ class CompostQueueWorker extends QueueWorkerBase implements ContainerFactoryPlug
     }
     else {
       if (class_exists('\Drupal\Core\Queue\DelayedRequeueException')) {
-        throw new \Drupal\Core\Queue\DelayedRequeueException(
+        throw new DelayedRequeueException(
           0, 'Not yet the time to compost'
         );
       }

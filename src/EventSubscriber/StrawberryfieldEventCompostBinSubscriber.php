@@ -46,7 +46,7 @@ class StrawberryfieldEventCompostBinSubscriber implements EventSubscriberInterfa
   /**
    * {@inheritdoc}
    */
-  public static function getSubscribedEvents() {
+  public static function getSubscribedEvents(): array {
 
     $events[StrawberryfieldEventType::TEMP_FILE_CREATION][] = ['onTempFilePushed', static::$priority];
     return $events;

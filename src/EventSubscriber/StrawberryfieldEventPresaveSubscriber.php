@@ -19,7 +19,7 @@ abstract class StrawberryfieldEventPresaveSubscriber implements EventSubscriberI
   /**
    * {@inheritdoc}
    */
-  public static function getSubscribedEvents() {
+  public static function getSubscribedEvents(): array {
     // Make sure we have access before everything else here since we want
     // Enrich our JSON before anything runs.
     // @TODO check event priority and adapt to future D9 needs.

@@ -4,6 +4,7 @@ namespace Drupal\strawberryfield\Form;
 
 use Drupal\Core\Ajax\AjaxResponse;
 use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\Config\TypedConfigManagerInterface;
 use Drupal\Core\Datetime\DateFormatterInterface;
 use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
@@ -50,9 +51,10 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
    *   The factory for configuration objects.
    * @param \Drupal\Core\Datetime\DateFormatterInterface $date_formatter
    *   The date formatter service.
+   * @param \Drupal\Core\Config\TypedConfigManagerInterface $typed_config_manager
    */
-  public function __construct(ConfigFactoryInterface $config_factory, DateFormatterInterface $date_formatter) {
-    parent::__construct($config_factory);
+  public function __construct(ConfigFactoryInterface $config_factory, DateFormatterInterface $date_formatter, TypedConfigManagerInterface $typed_config_manager) {
+    parent::__construct($config_factory, $typed_config_manager);
     $this->dateFormatter = $date_formatter;
   }
 
@@ -63,6 +65,7 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
     return new static(
       $container->get('config.factory'),
       $container->get('date.formatter'),
+      $container->get('config.typed')
     );
   }
 

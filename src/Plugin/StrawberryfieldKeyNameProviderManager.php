@@ -25,14 +25,15 @@ class StrawberryfieldKeyNameProviderManager extends DefaultPluginManager{
   public function __construct(
     \Traversable $namespaces,
     CacheBackendInterface $cache_backend,
-    \Drupal\Core\Extension\ModuleHandlerInterface $module_handler
+    ModuleHandlerInterface $module_handler
   ) {
     parent::__construct(
       'Plugin/StrawberryfieldKeyNameProvider',
       $namespaces,
       $module_handler,
       'Drupal\strawberryfield\Plugin\StrawberryfieldKeyNameProviderInterface',
-      'Drupal\strawberryfield\Annotation\StrawberryfieldKeyNameProvider'
+      'Drupal\strawberryfield\Attribute\StrawberryfieldKeyNameProvider',
+      'Drupal\strawberryfield\Annotation\StrawberryfieldKeyNameProvider',
     );
 
     $this->alterInfo('strawberryfield_strawberryfieldkeynameprovider_info');
