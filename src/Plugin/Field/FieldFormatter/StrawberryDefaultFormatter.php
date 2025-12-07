@@ -10,6 +10,7 @@ namespace Drupal\strawberryfield\Plugin\Field\FieldFormatter;
 
 use Drupal\Core\Field\FormatterBase;
 use Drupal\Core\Field\FieldItemListInterface;
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\user\EntityOwnerInterface;
 use Drupal\Core\Entity\ContentEntityBase;
@@ -38,6 +39,9 @@ class StrawberryDefaultFormatter extends FormatterBase {
   public function settingsSummary() {
     $summary = [];
     $summary[] = $this->t('Displays JSON');
+    $summary[] = $this->t('Label to be used on the accordion Drop down: %value', [
+      '%value' => $this->getSetting('label') ??  static::defaultSettings()['label']
+    ]);
     return $summary;
   }
 
@@ -47,6 +51,19 @@ class StrawberryDefaultFormatter extends FormatterBase {
   public static function defaultSettings() {
     return [
       'limit_access' => 'edit',
+      'label' => 'Raw Metadata (JSON)',
+    ];
+  }
+
+  public function settingsForm(array $form, FormStateInterface $form_state) {
+    return [
+      'label' => [
+        '#type' => 'textfield',
+        '#title' => t('Label to be used on the accordion Drop down'),
+        '#description' => t('Defaults to (historically) to "Raw Metadata (JSON)"'),
+        '#default_value' => $this->getSetting('label'),
+        '#required' => TRUE,
+      ]
     ];
   }
 
@@ -56,6 +73,7 @@ class StrawberryDefaultFormatter extends FormatterBase {
   public function viewElements(FieldItemListInterface $items, $langcode) {
     $element = [];
     $account = $this->prepareUser();
+    $label =  $this->getSetting('label') ?? static::defaultSettings()['label'];
 
     // Only enforce owner permissions here if the entity has an owner
     $entity = $items->getEntity();
@@ -85,7 +103,7 @@ class StrawberryDefaultFormatter extends FormatterBase {
         // Render each element as markup.
         $element[$delta] = [
           '#type' => 'details',
-          '#title' => t('Raw Metadata (JSON)'),
+          '#title' => t('@label', ['@label' => $label]),
           '#open' => FALSE,
           'json' => [
             '#markup' => json_encode(
