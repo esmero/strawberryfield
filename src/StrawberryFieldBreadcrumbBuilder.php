@@ -11,6 +11,7 @@ use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Field\EntityReferenceFieldItemListInterface;
 use Drupal\Core\Link;
 use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\Render\BubbleableMetadata;
 use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
@@ -79,7 +80,7 @@ class StrawberryFieldBreadcrumbBuilder implements BreadcrumbBuilderInterface {
     $entity = $route_match->getParameter('node');
     $qualifies = $route_match->getRouteName() == "entity.node.canonical" && $entity instanceof NodeInterface && $this->strawberryfieldUtility->bearsStrawberryfield($entity);
     if ($qualifies) {
-        return $this->configFactory->get('strawberryfield.breadcrumbs')->get('enabled');
+      return $this->configFactory->get('strawberryfield.breadcrumbs')->get('enabled');
     }
     return FALSE;
   }
@@ -173,11 +174,11 @@ class StrawberryFieldBreadcrumbBuilder implements BreadcrumbBuilderInterface {
   }
 
   /**
-  * Best Longest Trail by comparing common Node IDs with the shorter ones.
+   * Best Longest Trail by comparing common Node IDs with the shorter ones.
    *
    *  @param array $trail_flat
    *   A list of Trails
-  */
+   */
   protected function smartTrail(array $trail_flat) {
 
     if (count($trail_flat) == 0) {
@@ -210,4 +211,62 @@ class StrawberryFieldBreadcrumbBuilder implements BreadcrumbBuilderInterface {
     $key = $max[0] ?? NULL;
     return !empty($key) && isset($trail_flat[$key]) ? $trail_flat[$key] :  $longest_trail;
   }
+
+  /**
+   * Public method/builds Multiple Flat trails recursively filtered by predicate/ado type.
+   *
+   * @param \Drupal\Core\Entity\EntityInterface $node
+   *   A  Node
+   * @param array $trail
+   *   All Trails keyed by a randon hash.
+   * @param int $depth
+   *  Current Depth of the recursive function
+   * @param string $current_path
+   *  The current Forked/flat Path (Key)
+   * @param array $predicates
+   * @param array $ado_type
+   * @param \Drupal\Core\Render\BubbleableMetadata $bubbleableMetadata
+   *
+   * @throws \Exception
+   */
+  public function recursiveParentPathsByTypeAndPredicate(EntityInterface $node, array &$trail, int $depth, string $current_path, array $predicates, array $ado_type, BubbleableMetadata $bubbleableMetadata) {
+    if ($depth >= 5) { return; }
+    // Everytime we diverge/multiple parents (like in git) we need to create a
+    // new Path ID/array that includes the previous one
+    // The idea is that this way we create multiple/overlapping paths/breacrumbs.
+    $old_depth = $depth;
+    $depth++;
+    $i = 0;
+    $seen = [];
+
+    foreach($this->strawberryfieldUtility->getStrawberryfieldParentADOs($node) as $predicate => $referencedEntitys) {
+
+      foreach ($referencedEntitys as $nid => $referencedEntity) {
+        $access = $referencedEntity->access('view', $this->account, TRUE);
+        $bubbleableMetadata->addCacheableDependency($access);
+        if ($access->isAllowed()) {
+          $bubbleableMetadata->addCacheableDependency($referencedEntity);
+        }
+        if ($i > 0) {
+          if (!in_array($referencedEntity->id(), $seen)){
+            $newpath = bin2hex(random_bytes(16));
+            $oldpath = $trail[$current_path];
+            $trail[$newpath] = array_slice($oldpath, 0, ($old_depth - 1), TRUE);
+            $trail[$newpath]["{$referencedEntity->id()}"] = $referencedEntity->label();
+
+            $this->recursiveParentPathsByTypeAndPredicate($referencedEntity, $trail,$depth, $newpath, $bubbleableMetadata);
+            $seen[] = $referencedEntity->id();
+          }
+        }
+        else {
+          $trail[$current_path]["{$referencedEntity->id()}"] = $referencedEntity->label();
+          $this->recursiveParentPathsByTypeAndPredicate($referencedEntity, $trail, $depth, $current_path, $bubbleableMetadata);
+          $seen[]  = $referencedEntity->id();
+        }
+        $i++;
+      }
+    }
+
+  }
+
 }

@@ -24,6 +24,7 @@ use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\Entity\Display\EntityViewDisplayInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\node\NodeInterface;
+use Drupal\Core\Render\BubbleableMetadata;
 
 
 /**
@@ -375,8 +376,142 @@ function strawberryfield_entity_view_alter(array &$build, EntityInterface $entit
 }
 
 /**
-* Implements hook_element_info_alter().
+ * Implements hook_element_info_alter().
  */
 function strawberryfield_element_info_alter(array &$info): void {
   array_unshift($info['view']['#pre_render'], 'Drupal\strawberryfield\StrawberryfieldRenderCallbacks::preRender');
+}
+
+/**
+ * Implements hook_token_info().
+ */
+function strawberryfield_token_info() {
+  $types['ado'] = [
+    'name' => t('Archipelago Digital Object'),
+    'description' => t('Defines custom tokens for Strawberryfield Bearing Nodes (ADOs).'),
+    'needs-data' => 'node'
+  ];
+  $tokens['type'] = [
+    'name' => t('ADO Type'),
+    'description' => t('Token to get the main JSON type of an ADO.'),
+  ];
+  $tokens['types'] = [
+    'name' => t('ADO Types'),
+    'description' => t('Token to get all JSON types (flattened type key at any hierarchy) of an ADO.'),
+    'type' => 'array',
+  ];
+
+  $tokens['breadcrumps'] = [
+    'name' => t('All Breadcrumb'),
+    'description' => t('Token to get all JSON types (flattened type key at any hierarchy) of an ADO.'),
+    'type' => 'array',
+  ];
+  $tokens['breadcrump_by_ado_type'] = [
+    'name' => t('ADO Parentship breadcrumb filtered by ADO type'),
+    'description' => t('Token to get the complete parent (ADO to ADO) breadcrump, but filtering out any ADO type that is not provided'),
+    'dynamic' => TRUE,
+    'type' => 'array',
+  ];
+  $tokens['breadcrumps_by_relation'] = [
+    'name' => t('ADO Parentship breadcrumb filtered by connecting relationship'),
+    'description' => t('Token to get the complete parent (ADO to ADO) breadcrump, but for specific relationships (e.g ismemberof)'),
+    'dynamic' => TRUE,
+    'type' => 'array',
+  ];
+  return [
+    'types' => $types,
+    'tokens' => ['ado' => $tokens],
+  ];
+}
+
+/**
+ * Implements hook_tokens().
+ */
+function strawberryfield_tokens($type, array $tokens, array $data, array $options, BubbleableMetadata $bubbleable_metadata) {
+  $replacements = [];
+  $token_service = \Drupal::token();
+  if ($type === 'ado' && !empty($data['node'])) {
+    /** @var \Drupal\webform\WebformSubmissionInterface $webform_submission */
+    $node = $data['node'];
+    $sbf_fields = \Drupal::service('strawberryfield.utility')->bearsStrawberryfield($node);
+
+    if (empty($sbf_fields)) {
+      return $replacements;
+    }
+    $parents = \Drupal::service('strawberryfield.utility')->getStrawberryfieldParentADOs($node);
+    $trail = [];
+    $start_path = bin2hex(random_bytes(16));
+    $paths =  \Drupal::service('strawberryfield.semantic_breadcrumb')->recursiveParentPathsByTypeAndPredicate($node, $trail, 1, $start_path, $bubbleable_metadata);
+
+    foreach ($sbf_fields as $field_name) {
+      /* @var \Drupal\strawberryfield\Plugin\Field\FieldType\StrawberryFieldItem $field */
+      $field = $node->get($field_name);
+      if (!$field->isEmpty()) {
+        foreach ($field->getIterator() as $delta => $itemfield) {
+          /** @var \Drupal\strawberryfield\Plugin\Field\FieldType\StrawberryFieldItem $itemfield */
+          /* @var \Drupal\strawberryfield\Field\StrawberryFieldItemList $field */
+          // This will try with any possible match.
+          $jsondata = json_decode($itemfield->value, TRUE);
+          $flatvalues = (array) $itemfield->provideFlatten();
+          // @TODO use future flatversion precomputed at field level as a property
+          $json_error = json_last_error();
+          if ($json_error == JSON_ERROR_NONE) {
+            foreach ($tokens as $name => $original) {
+              switch ($name) {
+                case 'type':
+                  // If for some reason a SBF is multivalued, we return any
+                  // previously set *(first one only)
+                  if (empty($replacements[$original])) {
+                    $type = $jsondata['type'] ?? NULL;
+                    if (is_array($type) ) {
+                      $type = reset($type);
+                    }
+                    $type = is_string($type) ? $type : NULL;
+                    if ($type) {
+                      $replacements[$original] = $type;
+                    }
+                  }
+                  break;
+                case 'types':
+                  // If for some reason a SBF is multivalued, we return any
+                  // previously set *(first one only)
+                  // Run first on entity:files
+                  $sbf_type = [];
+                  if (isset($flatvalues['type'])) {
+                    $sbf_type = (array) $flatvalues['type'];
+                    $sbf_type = array_filter($sbf_type, 'is_string');
+                  }
+                  // if called without chainging return the first string?
+                  $replacements[$original] = array_merge(($replacements[$original] ?? []), $sbf_type);
+                  $replacements[$original] = array_unique($replacements[$original]);
+                  $replacements[$original] = reset( $replacements[$original]);
+                  break;
+              }
+            }
+
+          // For chaining.
+            if ($types_tokens = $token_service->findWithPrefix($tokens, 'types')) {
+              // Run first on entity:files
+              $sbf_type = [];
+              if (isset($flatvalues['type'])) {
+                $sbf_type = (array) $flatvalues['type'];
+                $sbf_type = array_filter($sbf_type, 'is_string');
+              }
+              $replacements += $token_service->generate('array', $types_tokens, ['array' => $sbf_type], $options, $bubbleable_metadata);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  /*if ($types_tokens = $token_service->findWithPrefix($tokens, 'types')) {
+    $replacements += $token_service->generate('array', $tokens, ['array' => ['ml','js']], $options, $bubbleable_metadata);
+  }*/
+
+  /*if ($entity_tokens = $token_service->findWithPrefix($tokens, 'node')) {
+    $replacements += $token_service->generate('node', $entity_tokens, ['node' => $source_entity], $options, $bubbleable_metadata);
+  }*/
+return $replacements;
+
 }

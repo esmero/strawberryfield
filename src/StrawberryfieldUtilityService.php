@@ -24,6 +24,7 @@ use Drupal\search_api\ParseMode\ParseModePluginManager;
 use Drupal\search_api\Query\QueryInterface;
 use Drupal\strawberryfield\Plugin\search_api\datasource\StrawberryfieldFlavorDatasource;
 use Drupal\Core\StreamWrapper\StreamWrapperManagerInterface;
+use Ramsey\Uuid\Uuid;
 use SplFileObject;
 
 /**
@@ -161,6 +162,104 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
       }
     }
     return $hassbf[$key];
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getStrawberryfieldParentADOs(ContentEntityInterface $entity) {
+
+    $sbf_fields = $this->bearsStrawberryfield($entity);
+
+    $node_entities['nids'] = [];
+    $node_entities['uuids'] = [];
+    $node_entities_by_predicate = [];
+
+    foreach ($sbf_fields as $field_name) {
+      /* @var $field \Drupal\Core\Field\FieldItemInterface */
+      $field = $entity->get($field_name);
+      $node_entities = [];
+      if (!$field->isEmpty()) {
+        foreach ($field->getIterator() as $delta => $itemfield) {
+          // Note: we are not longer touching the metadata here.
+          /** @var $itemfield \Drupal\strawberryfield\Plugin\Field\FieldType\StrawberryFieldItem */
+          $flatvalues = (array) $itemfield->provideFlatten();
+          $values = (array) $itemfield->provideDecoded();
+          // This is just for semantic consistency since we DO allow
+          // dr:fid.
+          // only try to fetch these if we are not asking for a predicate
+          //  dr:fid is not in use in production, but if found will be a generic
+          // predicate
+          if (isset($flatvalues['dr:nid']) && !empty($flatvalues['dr:nid'])) {
+            $entity_ids = (array) $flatvalues['dr:nid'];
+            $node_entities = array_filter($entity_ids, 'is_integer');
+            if (count($node_entities)) {
+              $node_entities['nids']['dr:nid'] = $node_entities;
+            }
+          }
+          // Get mapped ones
+          if (isset($values["ap:entitymapping"]["entity:node"]) &&
+            !empty($values["ap:entitymapping"]["entity:node"])) {
+            $jsonkeys_with_node_entities = (array) $values["ap:entitymapping"]["entity:node"];
+            foreach ($jsonkeys_with_node_entities as $jsonkey_with_node_entity) {
+              if (is_string($jsonkey_with_node_entity)) {
+                if (isset($values[$jsonkey_with_node_entity]) && !empty($values[$jsonkey_with_node_entity])) {
+                  $entity_ids = (array) $values[$jsonkey_with_node_entity];
+                  // We filter for scalar that way we don't end sending an array or object to UUid validator.
+                  $entity_ids = array_filter($entity_ids, 'is_scalar');
+                  $node_entities_ids = array_filter($entity_ids, 'is_integer');
+                  $node_entities_uuids = array_filter($entity_ids, [
+                    '\Ramsey\Uuid\Uuid',
+                    'isValid'
+                  ]);
+                  $node_entities['nids'][$jsonkey_with_node_entity] = array_merge($node_entities['nids'][$jsonkey_with_node_entity] ?? [], $node_entities_ids);
+                  $node_entities['uuids'][$jsonkey_with_node_entity] = array_merge($node_entities['uuids'][$jsonkey_with_node_entity] ?? [], $node_entities_uuids);
+                }
+              }
+            }
+          }
+        }
+      }
+      // Now see if we can load the Node entities
+      // If the user repeats the ADOs, then we will load multiple times
+      // This is less optimal than loading All IDs
+      // Then all UUIDs
+      // And then distributing based on source
+      // But it is easier to read.
+      try {
+        if (is_array($node_entities['uuids'] ?? NULL)) {
+          foreach ($node_entities['uuids'] as $predicate => $nodelist) {
+            if (is_array($nodelist) && !empty($nodelist)) {
+              $ados_from_uuid = $this->entityTypeManager->getStorage('node')
+                ->loadByProperties(['uuid' => $nodelist]);
+              if (count($ados_from_uuid)) {
+                $node_entities_by_predicate[$predicate] = $ados_from_uuid;
+              }
+            }
+          }
+        }
+        if (is_array($node_entities['nids'] ?? NULL)) {
+          foreach ($node_entities['nids'] as $predicate => $nodelist) {
+            // We can remove here by key, $node_entities_by_predicate[$predicate] will have NODE_ID as indexes
+            // To avoid duplicates
+            $loaded_node_ids = array_keys($node_entities_by_predicate[$predicate] ?? []);
+            $not_loaded_yet_is = array_diff($nodelist, $loaded_node_ids);
+            if (is_array($not_loaded_yet_is) && !empty($not_loaded_yet_is)) {
+              $ados_from_id = $this->entityTypeManager->getStorage('node')
+                ->loadMultiple($not_loaded_yet_is);
+              if (count($ados_from_id)) {
+                $node_entities_by_predicate[$predicate] = ($node_entities_by_predicate[$predicate] ?? []) + $ados_from_id;
+              }
+            }
+          }
+        }
+      }
+      catch (\Throwable) {
+        $this->loggerFactory->get('strawberryfield')->error($this->t('Error while computing parent ADOs for Node ID @nid', ['@nid' => $entity->id()]));
+        $node_entities_by_predicate = [];
+      }
+    }
+    return $node_entities_by_predicate;
   }
 
   /**
