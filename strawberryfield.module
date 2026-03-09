@@ -444,9 +444,15 @@ function strawberryfield_token_info() {
     'dynamic' => TRUE,
     'type' => 'array',
   ];
+  // Also create an ADO wrapper inside node
+  $token_ado['ado'] = [
+    'name' => t('ADO'),
+    'description' => t('Wrapper on the Node Token so we can call the other tokens when modules only call Core ones'),
+    'dynamic' => TRUE,
+  ] ;
   return [
     'types' => $types,
-    'tokens' => ['ado' => $tokens],
+    'tokens' => ['ado' => $tokens, 'node' => $token_ado],
   ];
 }
 
@@ -456,6 +462,16 @@ function strawberryfield_token_info() {
 function strawberryfield_tokens($type, array $tokens, array $data, array $options, BubbleableMetadata $bubbleable_metadata) {
   $replacements = [];
   $token_service = \Drupal::token();
+  // First check for a Top node:ado... then chain
+  if ($type === 'node' && !empty($data['node'])) {
+    if ($ado_from_node = $token_service->findWithPrefix($tokens, 'ado')) {
+      foreach ($ado_from_node as $passed_from_node => $original) {
+        $token_to_call = [$passed_from_node => $original];
+        $replacements += $token_service->generate('ado', $token_to_call, $data, $options, $bubbleable_metadata);
+      }
+    }
+  }
+
   if ($type === 'ado' && !empty($data['node'])) {
     /** @var \Drupal\webform\WebformSubmissionInterface $webform_submission */
     $node = $data['node'];
