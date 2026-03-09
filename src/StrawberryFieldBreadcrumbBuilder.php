@@ -254,13 +254,13 @@ class StrawberryFieldBreadcrumbBuilder implements BreadcrumbBuilderInterface {
             $trail[$newpath] = array_slice($oldpath, 0, ($old_depth - 1), TRUE);
             $trail[$newpath]["{$referencedEntity->id()}"] = $referencedEntity->label();
 
-            $this->recursiveParentPathsByTypeAndPredicate($referencedEntity, $trail,$depth, $newpath, $bubbleableMetadata);
+            $this->recursiveParentPathsByTypeAndPredicate($referencedEntity, $trail,$depth, $newpath, $predicates, $ado_type, $bubbleableMetadata);
             $seen[] = $referencedEntity->id();
           }
         }
         else {
           $trail[$current_path]["{$referencedEntity->id()}"] = $referencedEntity->label();
-          $this->recursiveParentPathsByTypeAndPredicate($referencedEntity, $trail, $depth, $current_path, $bubbleableMetadata);
+          $this->recursiveParentPathsByTypeAndPredicate($referencedEntity, $trail, $depth, $current_path, $predicates, $ado_type, $bubbleableMetadata);
           $seen[]  = $referencedEntity->id();
         }
         $i++;

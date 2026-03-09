@@ -17,6 +17,7 @@ use Drupal\Core\StreamWrapper\StreamWrapperInterface;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\strawberryfield\Field\StrawberryFieldFileComputedItemList;
 use Drupal\strawberryfield\Field\StrawberryFieldEntityComputedItemList;
+use  Drupal\strawberryfield\Field\StrawberryFieldEntityComputedSemanticTypeItemList;
 use Drupal\strawberryfield\StrawberryfieldRenderCallbacks;
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Field\FieldDefinitionInterface;
@@ -232,6 +233,19 @@ function strawberryfield_entity_base_field_info(EntityTypeInterface $entity_type
     ->setTranslatable(FALSE)
     ->setClass(StrawberryFieldEntityComputedItemList::class);
 
+  $fields['field_sbf_semantictype'] = BaseFieldDefinition::create('string')
+    ->setName('field_sbf_semantictype')
+    ->setLabel('ADOs semantic type ("type" json key)')
+    ->setDescription(t('Computed "type" key value from the RAW JSON as a single string'))
+    ->setCardinality(FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED)
+    ->setComputed(TRUE)
+    ->setRevisionable(FALSE)
+    ->setReadOnly(TRUE)
+    ->setTranslatable(FALSE)
+    ->setClass(\Drupal\strawberryfield\Field\StrawberryFieldEntityComputedSemanticTypeItemList::class)
+    ->setDisplayConfigurable('view', FALSE)
+    ->setDisplayConfigurable('form', FALSE);
+
   return $fields;
 }
 
@@ -269,6 +283,23 @@ function strawberryfield_entity_bundle_field_info(EntityTypeInterface $entity_ty
       $base_field_definitions['field_sbf_nodetonode']->setTargetBundle($bundle);
       return [
         'field_sbf_nodetonode' => $base_field_definitions['field_sbf_nodetonode'],
+      ];
+    }
+  }
+
+
+  if (($entity_type->id() == 'node') && isset($base_field_definitions['field_sbf_semantictype'])) {
+    if (\Drupal::service('strawberryfield.utility')
+      ->bundleHasStrawberryfield($bundle)) {
+
+      // Add the target bundle to the field_file_drop base field
+      // only if it carries a Strawberryfield
+      // In practice this will allow Bundle specific create access permissions
+      // to work and force anything not Strawberryfield to either have the node
+      // access override or simply not work.
+      $base_field_definitions['field_sbf_semantictype']->setTargetBundle($bundle);
+      return [
+        'field_sbf_semantictype' => $base_field_definitions['field_sbf_semantictype'],
       ];
     }
   }
@@ -402,18 +433,18 @@ function strawberryfield_token_info() {
     'type' => 'array',
   ];
 
-  $tokens['breadcrumps'] = [
-    'name' => t('All Breadcrumb'),
-    'description' => t('Token to get all JSON types (flattened type key at any hierarchy) of an ADO.'),
+  $tokens['breadcrumb'] = [
+    'name' => t('Semantic Breadcrumb'),
+    'description' => t('Token to get the ADO Semantic Breadcrumb as an Array using the same stragegy as configured for rendering.'),
     'type' => 'array',
   ];
-  $tokens['breadcrump_by_ado_type'] = [
+  $tokens['breadcrumb_by_ado_type'] = [
     'name' => t('ADO Parentship breadcrumb filtered by ADO type'),
     'description' => t('Token to get the complete parent (ADO to ADO) breadcrump, but filtering out any ADO type that is not provided'),
     'dynamic' => TRUE,
     'type' => 'array',
   ];
-  $tokens['breadcrumps_by_relation'] = [
+  $tokens['breadcrumb_by_relation'] = [
     'name' => t('ADO Parentship breadcrumb filtered by connecting relationship'),
     'description' => t('Token to get the complete parent (ADO to ADO) breadcrump, but for specific relationships (e.g ismemberof)'),
     'dynamic' => TRUE,
@@ -439,80 +470,70 @@ function strawberryfield_tokens($type, array $tokens, array $data, array $option
     if (empty($sbf_fields)) {
       return $replacements;
     }
-    $parents = \Drupal::service('strawberryfield.utility')->getStrawberryfieldParentADOs($node);
-    $trail = [];
-    $start_path = bin2hex(random_bytes(16));
-    $paths =  \Drupal::service('strawberryfield.semantic_breadcrumb')->recursiveParentPathsByTypeAndPredicate($node, $trail, 1, $start_path, $bubbleable_metadata);
 
-    foreach ($sbf_fields as $field_name) {
-      /* @var \Drupal\strawberryfield\Plugin\Field\FieldType\StrawberryFieldItem $field */
-      $field = $node->get($field_name);
-      if (!$field->isEmpty()) {
-        foreach ($field->getIterator() as $delta => $itemfield) {
-          /** @var \Drupal\strawberryfield\Plugin\Field\FieldType\StrawberryFieldItem $itemfield */
-          /* @var \Drupal\strawberryfield\Field\StrawberryFieldItemList $field */
-          // This will try with any possible match.
-          $jsondata = json_decode($itemfield->value, TRUE);
-          $flatvalues = (array) $itemfield->provideFlatten();
-          // @TODO use future flatversion precomputed at field level as a property
-          $json_error = json_last_error();
-          if ($json_error == JSON_ERROR_NONE) {
-            foreach ($tokens as $name => $original) {
-              switch ($name) {
-                case 'type':
-                  // If for some reason a SBF is multivalued, we return any
-                  // previously set *(first one only)
-                  if (empty($replacements[$original])) {
-                    $type = $jsondata['type'] ?? NULL;
-                    if (is_array($type) ) {
-                      $type = reset($type);
-                    }
-                    $type = is_string($type) ? $type : NULL;
-                    if ($type) {
-                      $replacements[$original] = $type;
-                    }
-                  }
-                  break;
-                case 'types':
-                  // If for some reason a SBF is multivalued, we return any
-                  // previously set *(first one only)
-                  // Run first on entity:files
-                  $sbf_type = [];
-                  if (isset($flatvalues['type'])) {
-                    $sbf_type = (array) $flatvalues['type'];
-                    $sbf_type = array_filter($sbf_type, 'is_string');
-                  }
-                  // if called without chainging return the first string?
-                  $replacements[$original] = array_merge(($replacements[$original] ?? []), $sbf_type);
-                  $replacements[$original] = array_unique($replacements[$original]);
-                  $replacements[$original] = reset( $replacements[$original]);
-                  break;
-              }
-            }
-
-          // For chaining.
-            if ($types_tokens = $token_service->findWithPrefix($tokens, 'types')) {
-              // Run first on entity:files
-              $sbf_type = [];
-              if (isset($flatvalues['type'])) {
-                $sbf_type = (array) $flatvalues['type'];
-                $sbf_type = array_filter($sbf_type, 'is_string');
-              }
-              $replacements += $token_service->generate('array', $types_tokens, ['array' => $sbf_type], $options, $bubbleable_metadata);
+    foreach ($tokens as $name => $original) {
+      switch ($name) {
+        case 'type':
+          if ($node->hasField('field_sbf_semantictype')) {
+            $types = $node->get('field_sbf_semantictype')->getValue();
+            if (is_array($types) && count($types)) {
+              $type =  reset($types);
+              $sbf_type = $type['value'] ?? '';
+              $replacements[$original] = $sbf_type;
             }
           }
+          break;
+        case 'types':
+          if ($node->hasField('field_sbf_semantictype')) {
+            $types = $node->get('field_sbf_semantictype')->getValue();
+            if (is_array($types) && count($types)) {
+              $sbf_type = [];
+              foreach($types as $type) {
+                $sbf_type[] = $type['value'] ?? NULL;
+              }
+              $replacements[$original] = $sbf_type;
+            }
+          }
+          break;
+      }
+    }
+
+    // For chaining "types" into an array.
+    if ($types_tokens = $token_service->findWithPrefix($tokens, 'types')) {
+      if ($node->hasField('field_sbf_semantictype')) {
+        $types = $node->get('field_sbf_semantictype')->getValue();
+        if (is_array($types) && count($types)) {
+          $sbf_type = [];
+          foreach ($types as $type) {
+            $sbf_type[] = $type['value'] ?? NULL;
+          }
+          $replacements += $token_service->generate('array', $types_tokens, ['array' => $sbf_type], $options, $bubbleable_metadata);
         }
       }
     }
+
+    if ($breadcrump_by_ado_type_tokens = $token_service->findWithPrefix($tokens, 'breadcrumb_by_ado_type')) {
+      foreach($breadcrump_by_ado_type_tokens as $passed_type_with_suffix => $original) {
+        $trail = [];
+        $parent_array = [];
+        $ado_type = explode(":",$passed_type_with_suffix, 2);
+
+        $start_path = bin2hex(random_bytes(16));
+        \Drupal::service('strawberryfield.semantic_breadcrumb')
+          ->recursiveParentPathsByTypeAndPredicate($node, $trail, 1, $start_path, [$ado_type[0] ?? NULL], [], $bubbleable_metadata);
+        $single_path = reset($trail);
+        $single_path = array_values($single_path);
+        $breadcrump_by_ado_type_token = [$ado_type[1] => $original];
+        $replacements += $token_service->generate('array', $breadcrump_by_ado_type_token, ['array' => $single_path], $options, $bubbleable_metadata);
+        //$replacements += $token_service->generate('array', $breadcrump_by_ado_type_tokens, ['array' => $single_path], $options, $bubbleable_metadata);
+      }
+    }
+
+
+
+
+
+
   }
-
-  /*if ($types_tokens = $token_service->findWithPrefix($tokens, 'types')) {
-    $replacements += $token_service->generate('array', $tokens, ['array' => ['ml','js']], $options, $bubbleable_metadata);
-  }*/
-
-  /*if ($entity_tokens = $token_service->findWithPrefix($tokens, 'node')) {
-    $replacements += $token_service->generate('node', $entity_tokens, ['node' => $source_entity], $options, $bubbleable_metadata);
-  }*/
-return $replacements;
-
+  return $replacements;
 }
