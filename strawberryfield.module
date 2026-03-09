@@ -466,7 +466,6 @@ function strawberryfield_tokens($type, array $tokens, array $data, array $option
     /** @var \Drupal\webform\WebformSubmissionInterface $webform_submission */
     $node = $data['node'];
     $sbf_fields = \Drupal::service('strawberryfield.utility')->bearsStrawberryfield($node);
-
     if (empty($sbf_fields)) {
       return $replacements;
     }
@@ -515,27 +514,39 @@ function strawberryfield_tokens($type, array $tokens, array $data, array $option
     if ($breadcrump_by_ado_type_tokens = $token_service->findWithPrefix($tokens, 'breadcrumb_by_ado_type')) {
       foreach($breadcrump_by_ado_type_tokens as $passed_type_with_suffix => $original) {
         $trail = [];
-        $parent_array = [];
+        // @TODO. this logic works when the token is called with an array operator
+        // but will fail if the user forgets.
         $ado_type = explode(":",$passed_type_with_suffix, 2);
 
         $start_path = bin2hex(random_bytes(16));
-        \Drupal::service('strawberryfield.semantic_breadcrumb')
-          ->recursiveParentPathsByTypeAndPredicate($node, $trail, 1, $start_path, [], [$ado_type[0] ?? NULL], $bubbleable_metadata);
-        // Now we can have multiple paths here.
-        // And bacause we are filtering each path might have FALSE entries (to keep the length/dept)
-        $array_for_token = [];
-        $longest = 0;
-        foreach ($trail as $randomkey => $apath) {
-          $apath = is_array($apath) ? array_filter($apath) : [];
-          if (!empty($apath)) {
-            if (count($apath) > $longest) {
-              $array_for_token = array_reverse($apath);
-              $longest =  count($apath);
+        try {
+          \Drupal::service('strawberryfield.semantic_breadcrumb')
+            ->recursiveParentPathsByTypeAndPredicate($node, $trail, 1, $start_path, [], [$ado_type[0] ?? NULL], $bubbleable_metadata);
+          // Now we can have multiple paths here.
+          // And because we are filtering each path might have FALSE entries (to keep the length/dept)
+          $array_for_token = [];
+          $longest = 0;
+          foreach ($trail as $randomkey => $apath) {
+            $apath = is_array($apath) ? array_filter($apath) : [];
+            if (!empty($apath)) {
+              if (count($apath) > $longest) {
+                $array_for_token = array_reverse($apath);
+                $longest =  count($apath);
+              }
             }
           }
+          $breadcrump_by_ado_type_token = [$ado_type[1] => $original];
+          $replacements += $token_service->generate('array', $breadcrump_by_ado_type_token, ['array' => $array_for_token], $options, $bubbleable_metadata);
         }
-        $breadcrump_by_ado_type_token = [$ado_type[1] => $original];
-        $replacements += $token_service->generate('array', $breadcrump_by_ado_type_token, ['array' => $array_for_token], $options, $bubbleable_metadata);
+        catch (\Throwable $e) {
+          \Drupal::logger('strawberryfield')->error(
+            'ADO with UUID @uuid failed parsing Token @token <br><ul>@events</ul>',
+            [
+              '@uuid' => $node->uuid(),
+              '@token' => $original
+            ]
+          );
+        }
       }
     }
 
