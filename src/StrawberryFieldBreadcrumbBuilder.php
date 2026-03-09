@@ -295,9 +295,10 @@ class StrawberryFieldBreadcrumbBuilder implements BreadcrumbBuilderInterface {
 
 
   private function shouldTrackCrumb(EntityInterface $node, $holding_predicate, $predicates, $ado_types) {
-    $should_track = TRUE;
+    $should_track = FALSE;
     $in_type = TRUE;
     if (empty($predicates) || in_array($holding_predicate, $predicates)) {
+      $should_track = TRUE;
       // Only accumulate and mark as seen if we have no restrictions
       if (!empty($ado_types) && $node->hasField('field_sbf_semantictype')) {
         $types = $node->get('field_sbf_semantictype')->getValue();
