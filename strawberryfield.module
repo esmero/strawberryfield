@@ -519,12 +519,16 @@ function strawberryfield_tokens($type, array $tokens, array $data, array $option
 
         $start_path = bin2hex(random_bytes(16));
         \Drupal::service('strawberryfield.semantic_breadcrumb')
-          ->recursiveParentPathsByTypeAndPredicate($node, $trail, 1, $start_path, [$ado_type[0] ?? NULL], [], $bubbleable_metadata);
+          ->recursiveParentPathsByTypeAndPredicate($node, $trail, 1, $start_path, [], [$ado_type[0] ?? NULL], $bubbleable_metadata);
         $single_path = reset($trail);
-        $single_path = array_values($single_path);
+        if ($single_path !== FALSE) {
+          $single_path = array_values($single_path);
+        }
+        else {
+          $single_path = [];
+        }
         $breadcrump_by_ado_type_token = [$ado_type[1] => $original];
         $replacements += $token_service->generate('array', $breadcrump_by_ado_type_token, ['array' => $single_path], $options, $bubbleable_metadata);
-        //$replacements += $token_service->generate('array', $breadcrump_by_ado_type_tokens, ['array' => $single_path], $options, $bubbleable_metadata);
       }
     }
 
