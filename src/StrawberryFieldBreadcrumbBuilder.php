@@ -238,7 +238,10 @@ class StrawberryFieldBreadcrumbBuilder implements BreadcrumbBuilderInterface {
     $depth++;
     $i = 0;
     $seen = [];
-
+    // Note: Filtering by Type && Property does not mean
+    // not traversing the paths. Just means not accumulating Labels
+    // The goal here is to allow someone to get e.g Just parent Collections
+    // even if the object is nested by a CWS and an isParent.
     foreach($this->strawberryfieldUtility->getStrawberryfieldParentADOs($node) as $predicate => $referencedEntitys) {
 
       foreach ($referencedEntitys as $nid => $referencedEntity) {
