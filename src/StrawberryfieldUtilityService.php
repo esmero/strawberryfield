@@ -192,7 +192,10 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
           // predicate
           if (isset($flatvalues['dr:nid']) && !empty($flatvalues['dr:nid'])) {
             $entity_ids = (array) $flatvalues['dr:nid'];
-            $node_entities = array_filter($entity_ids, 'is_integer');
+            $node_entities = array_filter($entity_ids, function ($el) {
+              $el = filter_var($el, FILTER_VALIDATE_INT);
+              return $el;
+            });
             if (count($node_entities)) {
               $node_entities['nids']['dr:nid'] = $node_entities;
             }
@@ -207,7 +210,10 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
                   $entity_ids = (array) $values[$jsonkey_with_node_entity];
                   // We filter for scalar that way we don't end sending an array or object to UUid validator.
                   $entity_ids = array_filter($entity_ids, 'is_scalar');
-                  $node_entities_ids = array_filter($entity_ids, 'is_integer');
+                  $node_entities_ids = array_filter($entity_ids, function ($el) {
+                    $el = filter_var($el, FILTER_VALIDATE_INT);
+                    return $el;
+                  });
                   $node_entities_uuids = array_filter($entity_ids, [
                     '\Ramsey\Uuid\Uuid',
                     'isValid'
