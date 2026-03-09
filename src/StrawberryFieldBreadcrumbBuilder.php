@@ -219,17 +219,23 @@ class StrawberryFieldBreadcrumbBuilder implements BreadcrumbBuilderInterface {
    *   A  Node
    * @param array $trail
    *   All Trails keyed by a randon hash.
+   *   Ommitted ADOs (bc of filters) in a TRAIL have a value of FALSE instead
+   *   of the Label.
    * @param int $depth
    *  Current Depth of the recursive function
    * @param string $current_path
    *  The current Forked/flat Path (Key)
    * @param array $predicates
-   * @param array $ado_type
+   *  Indexed list of JSON keys holding ADO to ADO relationships.["ismemberof"]
+   *  Leave empty if all properties should be accumulated
+   * @param array $ado_types
+   *  Indexed list of valid ADO semantic Types. e.g ["Collection"]
+   *  Leave empty if all types of ADOs should be accumulated
    * @param \Drupal\Core\Render\BubbleableMetadata $bubbleableMetadata
    *
    * @throws \Exception
    */
-  public function recursiveParentPathsByTypeAndPredicate(EntityInterface $node, array &$trail, int $depth, string $current_path, array $predicates, array $ado_type, BubbleableMetadata $bubbleableMetadata) {
+  public function recursiveParentPathsByTypeAndPredicate(EntityInterface $node, array &$trail, int $depth, string $current_path, array $predicates, array $ado_types, BubbleableMetadata $bubbleableMetadata) {
     if ($depth >= 5) { return; }
     // Everytime we diverge/multiple parents (like in git) we need to create a
     // new Path ID/array that includes the previous one
@@ -238,38 +244,76 @@ class StrawberryFieldBreadcrumbBuilder implements BreadcrumbBuilderInterface {
     $depth++;
     $i = 0;
     $seen = [];
+    if (!empty($ado_types)) {
+      $ado_types = array_map(function ($el) {
+        $value = is_string($el) ? strtolower($el) : NULL;
+        return $value;
+      }, $ado_types);
+      $ado_types = array_filter($ado_types);
+    }
+
+    if (!empty($predicates)) {
+      $predicates = array_map(function ($el) {
+        $value = is_string($el) ? strtolower($el) : NULL;
+        return $value;
+      }, $predicates);
+      $predicates = array_filter($predicates);
+    }
     // Note: Filtering by Type && Property does not mean
     // not traversing the paths. Just means not accumulating Labels
     // The goal here is to allow someone to get e.g Just parent Collections
     // even if the object is nested by a CWS and an isParent.
     foreach($this->strawberryfieldUtility->getStrawberryfieldParentADOs($node) as $predicate => $referencedEntitys) {
-
       foreach ($referencedEntitys as $nid => $referencedEntity) {
         $access = $referencedEntity->access('view', $this->account, TRUE);
         $bubbleableMetadata->addCacheableDependency($access);
         if ($access->isAllowed()) {
           $bubbleableMetadata->addCacheableDependency($referencedEntity);
         }
-        if ($i > 0) {
+        if ($i == 1) {
+          // Any other loop
           if (!in_array($referencedEntity->id(), $seen)){
             $newpath = bin2hex(random_bytes(16));
             $oldpath = $trail[$current_path];
             $trail[$newpath] = array_slice($oldpath, 0, ($old_depth - 1), TRUE);
-            $trail[$newpath]["{$referencedEntity->id()}"] = $referencedEntity->label();
-
-            $this->recursiveParentPathsByTypeAndPredicate($referencedEntity, $trail,$depth, $newpath, $predicates, $ado_type, $bubbleableMetadata);
+            // Fill skippped paths with FALSE; Only way the "dept" can be kept and used for slicing.
+            $trail[$newpath]["{$referencedEntity->id()}"] =  $this->shouldTrackCrumb($referencedEntity, $predicate, $predicates, $ado_types) ? $referencedEntity->label() : FALSE;
             $seen[] = $referencedEntity->id();
+            $this->recursiveParentPathsByTypeAndPredicate($referencedEntity, $trail, $depth, $newpath, $predicates, $ado_types, $bubbleableMetadata);
           }
         }
         else {
-          $trail[$current_path]["{$referencedEntity->id()}"] = $referencedEntity->label();
-          $this->recursiveParentPathsByTypeAndPredicate($referencedEntity, $trail, $depth, $current_path, $predicates, $ado_type, $bubbleableMetadata);
-          $seen[]  = $referencedEntity->id();
+            $seen[] = $referencedEntity->id();
+            // Fill skippped paths with FALSE;
+            $trail[$current_path]["{$referencedEntity->id()}"] = $this->shouldTrackCrumb($referencedEntity, $predicate, $predicates, $ado_types) ? $referencedEntity->label() : FALSE;
+            $i = 1;
+          $this->recursiveParentPathsByTypeAndPredicate($referencedEntity, $trail, $depth, $current_path, $predicates, $ado_types, $bubbleableMetadata);
         }
-        $i++;
       }
     }
-
   }
 
+
+  private function shouldTrackCrumb(EntityInterface $node, $holding_predicate, $predicates, $ado_types) {
+    $should_track = TRUE;
+    $in_type = TRUE;
+    if (empty($predicates) || in_array($holding_predicate, $predicates)) {
+      // Only accumulate and mark as seen if we have no restrictions
+      if (!empty($ado_types) && $node->hasField('field_sbf_semantictype')) {
+        $types = $node->get('field_sbf_semantictype')->getValue();
+        if (is_array($types) && count($types)) {
+          $sbf_type = [];
+          foreach ($types as $type) {
+            $sbf_type[] = is_string($type['value'] ?? NULL) ? strtolower($type['value']) : NULL;
+          }
+          $in_type = array_intersect($sbf_type, $ado_types);
+          $in_type = count($in_type) ? TRUE : FALSE;
+        }
+      }
+      if (!$in_type) {
+        $should_track = FALSE;
+      }
+    }
+    return $should_track;
+  }
 }
