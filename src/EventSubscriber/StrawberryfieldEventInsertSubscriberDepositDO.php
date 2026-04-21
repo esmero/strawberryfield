@@ -195,11 +195,11 @@ class StrawberryfieldEventInsertSubscriberDepositDO extends StrawberryfieldEvent
     if (!$success) {
       $this->messenger->addError(
         t(
-          'Digital Object Serialization failed? We could not persist to Filesystem. Please contact your site admin.'
+          'Digital Object Serialization failed? We could not persist to Filesystem. Please contact your site admin and/or check your Drupal logs.'
         )
       );
       $this->loggerFactory->get('archipelago')->critical(
-        'Digital Object Serialization failed , we could not persist to Filesystem.',
+        'Digital Object Serialization failed , we could not persist to Filesystem. Check Filesystem space and permissions and ADO Storage (e.g S3) service uptime and logs.',
         ['Entity ID' => $entity->id(), 'Entity Title' => $entity->label()]
       );
     }
