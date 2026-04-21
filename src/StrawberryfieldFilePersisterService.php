@@ -325,17 +325,32 @@ class StrawberryfieldFilePersisterService {
       $current_uri,
       PATHINFO_EXTENSION
     );
-    // Check if the file may have a secondary extension
+    // Remove any spaces from the main extension
+    $file_parts['destination_extension'] = preg_replace('/\s+/', '', $file_parts['destination_extension'] ?? '');
+    // Sanitize the extension too
+    $file_parts['destination_extension'] = $this->sanitizeFileName($file_parts['destination_extension']);
 
+    // Check if the file may have a secondary extension
     $file_parts['destination_extension_secondary'] = pathinfo(
       $file_parts['destination_filename'],
       PATHINFO_EXTENSION
     );
+    // Remove any spaces from the secondary extension
+    $file_parts['destination_extension_secondary'] = preg_replace('/\s+/', '', $file_parts['destination_extension_secondary'] ?? '');
     // Deal with 2 part extension problem.
     if (!empty($file_parts['destination_extension_secondary']) &&
       strlen($file_parts['destination_extension_secondary']) <= 4 &&
       strlen($file_parts['destination_extension_secondary']) > 0
     ) {
+      // If it had a second extension we need to remove that one from the file name
+      // by requesting again the pathinfo only for tile.
+      $file_parts['destination_filename'] = pathinfo(
+        $file_parts['destination_filename'],
+        PATHINFO_FILENAME
+      );
+      // Only if it qualifies as a secondary extension we sanitize. Since if not the actual base name will be completely
+      // sanitized.
+      $file_parts['destination_extension_secondary'] = $this->sanitizeFileName($file_parts['destination_extension_secondary']);
       $file_parts['destination_extension'] = $file_parts['destination_extension_secondary'] . '.' . $file_parts['destination_extension'];
     }
 
@@ -1205,38 +1220,43 @@ class StrawberryfieldFilePersisterService {
     $success = FALSE;
     $compress = (extension_loaded('zlib') && $compress);
     $onlycompressed = ($compress && $onlycompressed);
-    if (!empty($data) && !empty($path) && !empty($filename)) {
-      $success = TRUE;
-      $uri = $path . '/' . $filename;
+    try {
+      if (!empty($data) && !empty($path) && !empty($filename)) {
+        $success = TRUE;
+        $uri = $path . '/' . $filename;
 
-      if (!$this->fileSystem->prepareDirectory(
-        $path,
-        FileSystemInterface::CREATE_DIRECTORY
-      )) {
-        $success = FALSE;
-        return $success;
-      }
-
-      if (!$onlycompressed) {
-        if (!$this->fileSystem->saveData(
-          $data,
-          $uri,
-          FileSystemInterface::EXISTS_REPLACE
+        if (!$this->fileSystem->prepareDirectory(
+          $path,
+          FileSystemInterface::CREATE_DIRECTORY
         )) {
           $success = FALSE;
-          // We have to return early if this failed.
           return $success;
         }
-      }
-      if ($compress) {
-        if (!$this->fileSystem->saveData(
-          gzencode($data, 9, FORCE_GZIP),
-          $uri . '.gz',
-          FileSystemInterface::EXISTS_REPLACE
-        )) {
-          $success = FALSE;
+
+        if (!$onlycompressed) {
+          if (!$this->fileSystem->saveData(
+            $data,
+            $uri,
+            FileSystemInterface::EXISTS_REPLACE
+          )) {
+            $success = FALSE;
+            // We have to return early if this failed.
+            return $success;
+          }
+        }
+        if ($compress) {
+          if (!$this->fileSystem->saveData(
+            gzencode($data, 9, FORCE_GZIP),
+            $uri . '.gz',
+            FileSystemInterface::EXISTS_REPLACE
+          )) {
+            $success = FALSE;
+          }
         }
       }
+    }
+    catch (\Throwable $exception) {
+      $success = FALSE;
     }
     return $success;
   }
