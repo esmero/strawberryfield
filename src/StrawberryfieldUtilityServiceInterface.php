@@ -27,6 +27,21 @@ interface StrawberryfieldUtilityServiceInterface {
   public function bearsStrawberryfield(ContentEntityInterface $entity);
 
   /**
+   * Provides Parent ADOs found in an Content entity bearing SBF
+   *
+   * This is computed directly from the JSON.
+   * Returned ADOs are grouped by the predicate they were found in.
+   * Computes Node ID (integer) and UUIDs.
+   *
+   * @param \Drupal\Core\Entity\ContentEntityInterface $entity
+   *
+   * @return array
+   *  Returns an associative array of Preloaded Nodes or an empty array if none
+   *  found.
+   */
+  public function getStrawberryfieldParentADOs(ContentEntityInterface $entity);
+
+  /**
    * Returns a list of the machine names of all existing SBF fields
    *
    * @return array
