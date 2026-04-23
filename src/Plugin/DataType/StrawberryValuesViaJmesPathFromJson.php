@@ -228,8 +228,8 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
           foreach ($edtf_value->getElements() as $element) {
             switch(get_class($element)) {
               case "EDTF\Model\SetElement\RangeSetElement":
-                $values_parsed[] = date('c', $element->getMinAsUnixTimestamp());
-                $values_parsed[] = date('c', $element->getMaxAsUnixTimestamp());
+                $values_parsed[] = date(DATE_ATOM, $element->getMinAsUnixTimestamp());
+                $values_parsed[] = date(DATE_ATOM, $element->getMaxAsUnixTimestamp());
                 break;
               default:
                 // Make sure we do not index same day twice
@@ -237,11 +237,11 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
                 $end_day = date('Y-m-d', $element->getMaxAsUnixTimestamp());
                 if ($start_day === $end_day) {
                   // if this is the same day just index one.
-                  $values_parsed[] = date('c',  $element->getMinAsUnixTimestamp());
+                  $values_parsed[] = date(DATE_ATOM,  $element->getMinAsUnixTimestamp());
                 }
                 else {
-                  $values_parsed[] = date('c', $element->getMinAsUnixTimestamp());
-                  $values_parsed[] = date('c', $element->getMaxAsUnixTimestamp());
+                  $values_parsed[] = date(DATE_ATOM, $element->getMinAsUnixTimestamp());
+                  $values_parsed[] = date(DATE_ATOM, $element->getMaxAsUnixTimestamp());
                 }
                 break;
             }
@@ -252,10 +252,10 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
           switch (get_class($edtf_value)) {
             case "EDTF\Model\Interval":
               if ($edtf_value->hasStartDate()) {
-                $values_parsed[] = date('c', $edtf_value->getMin());
+                $values_parsed[] = date(DATE_ATOM, $edtf_value->getMin());
               }
               if ($edtf_value->hasEndDate()) {
-                $values_parsed[] = date('c', $edtf_value->getMax());
+                $values_parsed[] = date(DATE_ATOM, $edtf_value->getMax());
               }
               break;
             default:
@@ -264,10 +264,10 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
               $end_day = date('Y-m-d', $edtf_value->getMax());
               if ($start_day === $end_day) {
                 // if this is the same day just index one.
-                $values_parsed[] = date('c', $edtf_value->getMin());
+                $values_parsed[] = date(DATE_ATOM, $edtf_value->getMin());
               } else {
-                $values_parsed[] = date('c', $edtf_value->getMin());
-                $values_parsed[] = date('c', $edtf_value->getMax());
+                $values_parsed[] = date(DATE_ATOM, $edtf_value->getMin());
+                $values_parsed[] = date(DATE_ATOM, $edtf_value->getMax());
               }
               break;
           }
@@ -304,8 +304,8 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
           // and each entry needs to be processed like individual elements
           foreach ($edtf_value->getElements() as $element) {
                 $new_date_range = [];
-                $new_date_range['value'] = date('c', $element->getMinAsUnixTimestamp());
-                $new_date_range['end_value'] = date('c', $element->getMaxAsUnixTimestamp());
+                $new_date_range['value'] = date(DATE_ATOM, $element->getMinAsUnixTimestamp());
+                $new_date_range['end_value'] = date(DATE_ATOM, $element->getMaxAsUnixTimestamp());
                 $values_parsed[] = $this->getTypedDataManager()->create($data_range_ref, $new_date_range)->getValue();
             }
         }
@@ -316,15 +316,15 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
               // Skip any Interval that is Open?
               if ($edtf_value->hasStartDate() && $edtf_value->hasEndDate()) {
                 $new_date_range = [];
-                $new_date_range['value'] = date('c', $edtf_value->getMin());
-                $new_date_range['end_value'] = date('c', $edtf_value->getMax());
+                $new_date_range['value'] = date(DATE_ATOM, $edtf_value->getMin());
+                $new_date_range['end_value'] = date(DATE_ATOM, $edtf_value->getMax());
                 $values_parsed[] = $this->getTypedDataManager()->create($data_range_ref, $new_date_range)->getValue();
               }
               break;
             default:
               $new_date_range = [];
-              $new_date_range['value'] = date('c', $edtf_value->getMin());
-              $new_date_range['end_value'] = date('c', $edtf_value->getMax());
+              $new_date_range['value'] = date(DATE_ATOM, $edtf_value->getMin());
+              $new_date_range['end_value'] = date(DATE_ATOM, $edtf_value->getMax());
               $values_parsed[] = $this->getTypedDataManager()->create($data_range_ref, $new_date_range)->getValue();
               break;
           }
@@ -341,8 +341,8 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
             // Single Dates/ISO8601 will generate a standard EDTF Object
             $edtf_value = $result->getEdtfValue();
             $new_date_range = [];
-            $new_date_range['value'] = date('c', $edtf_value->getMin());
-            $new_date_range['end_value'] = date('c', $edtf_value->getMax());
+            $new_date_range['value'] = date(DATE_ATOM, $edtf_value->getMin());
+            $new_date_range['end_value'] = date(DATE_ATOM, $edtf_value->getMax());
             $values_parsed[] = $this->getTypedDataManager()->create($data_range_ref, $new_date_range)->getValue();
           }
         }
@@ -363,7 +363,7 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
    */
   protected function parseStringToDate($date) {
     // Start by using a full ISO8601 date in case time zone is included
-    $d = DateTime::createFromFormat('c', $date);
+    $d = DateTime::createFromFormat(DATE_ATOM, $date);
     if (!$d) {
       // If not check if its not a timestamp
       if (!is_numeric($date)) {
@@ -374,7 +374,7 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
       }
     }
     if ($d) {
-      return $d->format('c');
+      return $d->format(DATE_ATOM);
     }
     return FALSE;
   }

@@ -579,9 +579,11 @@ class StrawberryfieldFilePersisterService {
 
     // Final iteration
     // Only do this if file was not previously processed and stored.
-    foreach ($to_process as $askey => $files) {
-      foreach ($files as $file) {
-        $uri = $file->getFileUri();
+    // Or the data was deleted by the user.
+    foreach ($to_process as $askey => $files_in_askey) {
+      foreach ($files_in_askey as $file_in_askey) {
+        /** @var \Drupal\file\FileInterface $file_in_askey */
+        $uri = $file_in_askey->getFileUri();
 
         // This can get heavy.
         // @TODO make md5 a queue worker task.
@@ -589,12 +591,12 @@ class StrawberryfieldFilePersisterService {
         // @TODO Fills up the md5 for all files and updates a single node at a time
         // @TODO evaluate Node locking while this happens.
         $md5 = md5_file($uri);
-        $filemetadata = $this->strawberryfieldFileMetadataService->getBaseFileMetadata($file, $md5, count($files), $askey, $force_reduced_techmd);
-        $uuid = $file->uuid();
+        $filemetadata = $this->strawberryfieldFileMetadataService->getBaseFileMetadata($file_in_askey, $md5, count($files_in_askey), $askey, $force_reduced_techmd);
+        $uuid = $file_in_askey->uuid();
         // again, i know!
-        $mime = $file->getMimeType();
+        $mime = $file_in_askey->getMimeType();
         // Desired destination. Passes also Clean JSON around.
-        $destinationuri = $this->getDestinationUri($file, $md5, $cleanjson, $force);
+        $destinationuri = $this->getDestinationUri($file_in_askey, $md5, $cleanjson, $force);
 
         $fileinfo = [
           'type' => ucfirst($askey),
@@ -602,11 +604,11 @@ class StrawberryfieldFilePersisterService {
           'crypHashFunc' => 'md5',
           'checksum' => $md5,
           'dr:for' => $file_source_key,
-          'dr:fid' => (int) $file->id(),
+          'dr:fid' => (int) $file_in_askey->id(),
           'dr:uuid' => $uuid,
-          'dr:filesize' => (int) $file->getSize(),
+          'dr:filesize' => (int) $file_in_askey->getSize(),
           'dr:mimetype' => $mime,
-          'name' => $file->getFilename(),
+          'name' => $file_in_askey->getFilename(),
           'tags' => [],
         ];
 

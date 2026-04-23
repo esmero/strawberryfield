@@ -14,13 +14,17 @@ use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\EntityFieldManagerInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
+use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\Core\StreamWrapper\StreamWrapperInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\Entity\ContentEntityInterface;
+use Drupal\file\Entity\File;
 use Drupal\search_api\Entity\Index;
 use Drupal\search_api\ParseMode\ParseModePluginManager;
 use Drupal\search_api\Query\QueryInterface;
 use Drupal\strawberryfield\Plugin\search_api\datasource\StrawberryfieldFlavorDatasource;
+use Drupal\Core\StreamWrapper\StreamWrapperManagerInterface;
+use SplFileObject;
 
 /**
  * Provides a SBF utility class.
@@ -91,14 +95,30 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
   protected $parseModeManager;
 
   /**
+   * The stream wrapper manager.
+   *
+   * @var \Drupal\Core\StreamWrapper\StreamWrapperManagerInterface
+   */
+  protected $streamWrapperManager;
+
+  /**
+   * The logger factory.
+   *
+   * @var \Drupal\Core\Logger\LoggerChannelFactoryInterface
+   */
+  protected $loggerFactory;
+
+  /**
    * StrawberryfieldUtilityService constructor.
    *
-   * @param  \Drupal\Core\File\FileSystemInterface  $file_system
-   * @param  \Drupal\Core\Entity\EntityTypeManagerInterface  $entity_type_manager
-   * @param  \Drupal\Core\Config\ConfigFactoryInterface  $config_factory
-   * @param  \Drupal\Core\Extension\ModuleHandlerInterface  $module_handler
-   * @param  \Drupal\Core\Entity\EntityFieldManagerInterface  $entity_field_manager
-   * @param  \Drupal\search_api\ParseMode\ParseModePluginManager  $parse_mode_manager
+   * @param \Drupal\Core\File\FileSystemInterface  $file_system
+   * @param \Drupal\Core\Entity\EntityTypeManagerInterface  $entity_type_manager
+   * @param \Drupal\Core\Config\ConfigFactoryInterface  $config_factory
+   * @param \Drupal\Core\Extension\ModuleHandlerInterface  $module_handler
+   * @param \Drupal\Core\Entity\EntityFieldManagerInterface  $entity_field_manager
+   * @param \Drupal\search_api\ParseMode\ParseModePluginManager  $parse_mode_manager
+   * @param \Drupal\Core\StreamWrapper\StreamWrapperManagerInterface $stream_wrapper_manager
+   * @param \Drupal\Core\Logger\LoggerChannelFactoryInterface $logger_factory
    *   The Search API parse Manager
    */
   public function __construct(
@@ -107,7 +127,9 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
     ConfigFactoryInterface $config_factory,
     ModuleHandlerInterface $module_handler,
     EntityFieldManagerInterface $entity_field_manager,
-    ParseModePluginManager $parse_mode_manager
+    ParseModePluginManager $parse_mode_manager,
+    StreamWrapperManagerInterface $stream_wrapper_manager,
+    LoggerChannelFactoryInterface $logger_factory,
   ) {
     $this->fileSystem = $file_system;
     $this->entityTypeManager = $entity_type_manager;
@@ -116,6 +138,8 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
     $this->entityFieldManager = $entity_field_manager;
     $this->strawberryfieldMachineNames = $this->getStrawberryfieldMachineNames();
     $this->parseModeManager = $parse_mode_manager;
+    $this->streamWrapperManager = $stream_wrapper_manager;
+    $this->loggerFactory = $logger_factory;
   }
 
   /**
@@ -574,7 +598,7 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
         $query->addConditionGroup($processor_conditions);
       }
       $query->addCondition('search_api_datasource',
-          'strawberryfield_flavor_datasource');
+        'strawberryfield_flavor_datasource');
 
       $query->setProcessingLevel(QueryInterface::PROCESSING_NONE);
       // @see strawberryfield_search_api_solr_query_alter()
@@ -586,6 +610,178 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
     }
 
     return $count;
+  }
+
+  /**
+   * @param \Drupal\file\Entity\File $file
+   * @param int $offset
+   *    Where to start to read the file, starting from 0.
+   * @param int $count
+   *    Number of results, 0 will fetch all
+   * @param bool $always_include_header
+   *    Always return header even with an offset.
+   *
+   * @param bool $escape_characters
+   *
+   * @return array|null
+   *   Returning array will be in this form:
+   *    'headers' => $rowHeaders_utf8 or [] if $always_include_header == FALSE
+   *    'data' => $table,
+   *    'totalrows' => $maxRow,
+   */
+  public function csv_read(File $file, int $offset = 0, int $count = 0, bool $always_include_header = TRUE, bool $escape_characters = TRUE, string $caller_module = 'strawberryfield') {
+
+    $wrapper = $this->streamWrapperManager->getViaUri($file->getFileUri());
+    if (!$wrapper) {
+      return NULL;
+    }
+
+    $url = $wrapper->getUri();
+    $uri = $this->streamWrapperManager->normalizeUri($url);
+    if (!is_file($uri)) {
+      $message = $this->t(
+        'CSV File referenced by @caller set for processing at @uri is no longer present. Check your composting times. Skipping',
+        [
+          '@uri' => $uri,
+          '@caller' => $caller_module,
+        ]
+      );
+      $this->loggerFactory->get($caller_module)->error($message);
+      return NULL;
+    }
+
+    $spl = new \SplFileObject($url, 'r');
+    if ($offset > 0) {
+      // We only set this flags when an offset is present.
+      // Because if not fgetcsv is already dealing with multi line CSV rows.
+      $spl->setFlags(
+        SplFileObject::READ_CSV |
+        SplFileObject::READ_AHEAD |
+        SplFileObject::SKIP_EMPTY |
+        SplFileObject::DROP_NEW_LINE
+      );
+      if (!$escape_characters) {
+        $spl->setCsvControl(',', '"', "");
+      }
+    }
+
+    if ($offset > 0 && !$always_include_header) {
+      // If header needs to be included then we offset later on
+      // PHP 8.0.16 IS STILL BUGGY with SEEK.
+      //$spl->seek($offset) does not work here.
+      for ($i = 0; $i < $offset; $i++) {
+        $spl->next();
+      }
+
+    }
+    $data = [];
+    $seek_to_offset = ($offset > 0 && $always_include_header);
+    while (!$spl->eof() && ($count == 0 || ($spl->key() < ($offset + $count)))) {
+      if (!$escape_characters) {
+        $data[] = $spl->fgetcsv( ',', '"', "");
+      }
+      else {
+        $data[] = $spl->fgetcsv();
+      }
+      if ($seek_to_offset) {
+        for ($i = 0; $i < $offset; $i++) {
+          $spl->next();
+        }
+        // PHP 8.0.16 IS STILL BUGGY with SEEK.
+        //$spl->seek($offset); doe snot work here
+        // So we do not process this again.
+        $seek_to_offset = FALSE;
+      }
+    }
+
+    $table = [];
+    $maxRow = 0;
+
+    $highestRow = count($data);
+    if ($always_include_header) {
+      $rowHeaders = $data[0] ?? [];
+      $rowHeaders_utf8 = array_map(function($value) {
+        $value = $value ?? '';
+        $value = stripslashes($value);
+        $value = function_exists('mb_convert_encoding') ? mb_convert_encoding($value, 'UTF-8', 'ISO-8859-1') : utf8_encode($value);
+        $value = strtolower($value);
+        $value = trim($value);
+        return $value;
+      }, $rowHeaders);
+      $headercount = count($rowHeaders);
+    }
+    else {
+      $rowHeaders = $rowHeaders_utf8 = [];
+      $not_a_header = $data[0] ?? [];
+      $headercount = count($not_a_header);
+    }
+
+    if (($highestRow) >= 1) {
+      // Returns Row Headers.
+
+      $maxRow = 1; // at least until here.
+      $rowindex = 0;
+      foreach ($data as $rowindex => $row) {
+        if ($rowindex == 0) {
+          // Skip header
+          continue;
+        }
+        // Ensure row is always an array.
+        $row = $row ?? [];
+        $flat = trim(implode('', $row));
+        //check for empty row...if found stop there.
+        $maxRow = $rowindex;
+        if (strlen($flat) == 0) {
+          break;
+        }
+
+        $row = $this->arrayEquallySeize(
+          $headercount,
+          $row
+        );
+        // Offsetting all rows by 1. That way we do not need to remap numeric parents
+        $table[$rowindex + 1] = $row;
+      }
+      $maxRow = $maxRow ?? $rowindex;
+    }
+
+    return  [
+      'headers' => $rowHeaders_utf8,
+      'data' => $table,
+      'totalrows' => $maxRow,
+    ];
+  }
+
+  /**
+   * Match different sized arrays.
+   *
+   * @param integer $headercount
+   *   an array length to check against.
+   * @param array $row
+   *   a CSV data row
+   *
+   * @return array
+   *  a resized to header size data row
+   */
+  public function arrayEquallySeize($headercount, $row = []):array {
+
+    $rowcount = count($row);
+    if ($headercount > $rowcount) {
+      $more = $headercount - $rowcount;
+      for ($i = 0; $i < $more; $i++) {
+        $row[] = "";
+      }
+
+    }
+    else {
+      if ($headercount < $rowcount) {
+        // more fields than headers
+        // Header wins always
+        $row = array_slice($row, 0, $headercount);
+      }
+    }
+
+    return $row;
   }
 
 }

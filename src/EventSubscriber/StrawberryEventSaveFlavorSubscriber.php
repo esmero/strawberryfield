@@ -2,6 +2,8 @@
 
 namespace Drupal\strawberryfield\EventSubscriber;
 
+use Drupal\Component\Utility\DeprecationHelper;
+use Drupal\Core\Utility\Error;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Field\EntityReferenceFieldItemListInterface;
 use Drupal\Core\KeyValueStore\KeyValueFactoryInterface;
@@ -145,7 +147,7 @@ class StrawberryEventSaveFlavorSubscriber extends StrawberryfieldEventSaveSubscr
         }
       }
       catch (SearchApiException $searchApiException) {
-        watchdog_exception('strawberryfield', $searchApiException, 'We could not untrack Strawberry Flavor Documents from Index because the Solr Query returned an exception at server level.');
+        DeprecationHelper::backwardsCompatibleCall(\Drupal::VERSION, '10.1.0', fn() => Error::logException(\Drupal::logger('strawberryfield'), $searchApiException, 'We could not untrack Strawberry Flavor Documents from Index because the Solr Query returned an exception at server level.'), fn() => watchdog_exception('strawberryfield', $searchApiException, 'We could not untrack Strawberry Flavor Documents from Index because the Solr Query returned an exception at server level.'));
       }
     }
     return $tracked_ids;
@@ -209,7 +211,7 @@ class StrawberryEventSaveFlavorSubscriber extends StrawberryfieldEventSaveSubscr
         }
       }
       catch (SearchApiException $searchApiException) {
-        watchdog_exception('strawberryfield', $searchApiException, 'We could not update tracking Strawberry Flavor Documents to Index because the Solr Query returned an exception at server level.');
+        DeprecationHelper::backwardsCompatibleCall(\Drupal::VERSION, '10.1.0', fn() => Error::logException(\Drupal::logger('strawberryfield'), $searchApiException, 'We could not update tracking Strawberry Flavor Documents to Index because the Solr Query returned an exception at server level.'), fn() => watchdog_exception('strawberryfield', $searchApiException, 'We could not update tracking Strawberry Flavor Documents to Index because the Solr Query returned an exception at server level.'));
       }
     }
 

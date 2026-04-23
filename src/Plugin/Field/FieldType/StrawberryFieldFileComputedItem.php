@@ -168,12 +168,20 @@ class StrawberryFieldFileComputedItem extends EntityReferenceItem {
       $max_filesize = min($max_filesize, Bytes::toNumber($settings['max_filesize']));
     }
 
-    // There is always a file size limit due to the PHP server limit.
-    $validators['file_validate_size'] = [$max_filesize];
+    if (version_compare(\Drupal::VERSION, '10.2', '>=')) {
+      if (!empty($settings['file_extensions'])) {
+        $validators['FileExtension']['extensions'] = $settings['file_extensions'];
+      }
+      $validators['FileSizeLimit']['fileLimit'] = $max_filesize;
+    }
+    else {
+      // There is always a file size limit due to the PHP server limit.
+      $validators['file_validate_size'] = [$max_filesize];
 
-    // Add the extension check if necessary.
-    if (!empty($settings['file_extensions'])) {
-      $validators['file_validate_extensions'] = [$settings['file_extensions']];
+      // Add the extension check if necessary.
+      if (!empty($settings['file_extensions'])) {
+        $validators['file_validate_extensions'] = [$settings['file_extensions']];
+      }
     }
 
     return $validators;
