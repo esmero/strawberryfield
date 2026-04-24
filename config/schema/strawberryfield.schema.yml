@@ -238,6 +238,10 @@ strawberryfield.hydroponics_settings:
     time_to_expire:
       type: integer
       label: 'How long Hydroponics Service should stay awake, 0 means until done with all queues'
+    freespace_limit :
+      type: integer
+      label: 'Safe freespace limit on temporary:// to suspend hydroponics. Alle except composter'
+      default: 0
     drush_path:
       type: string
       label: 'Full system path to the /vendor composer Drush installation including drush script'
