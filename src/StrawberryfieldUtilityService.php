@@ -8,6 +8,7 @@
 
 namespace Drupal\strawberryfield;
 
+use Drupal\Component\Utility\Bytes;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\File\FileSystemInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
@@ -629,8 +630,7 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
    *    'data' => $table,
    *    'totalrows' => $maxRow,
    */
-  public function csv_read(File $file, int $offset = 0, int $count = 0, bool $always_include_header = TRUE, bool $escape_characters = TRUE, string $caller_module = 'strawberryfield') {
-
+  public function csv_read(File $file, int $offset = 0, int $count = 0, bool $always_include_header = TRUE, bool $escape_characters = FALSE, string $caller_module = 'strawberryfield') {
     $wrapper = $this->streamWrapperManager->getViaUri($file->getFileUri());
     if (!$wrapper) {
       return NULL;
@@ -782,6 +782,35 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
     }
 
     return $row;
+  }
+  /**
+   * Replaces buggy Drupal's bytes::toNumber();
+   * @see https://www.drupal.org/project/drupal/issues/3352728
+   * @TODO: remove once that is merged into Drupal 11
+   * @param $size
+   *
+   * @return float|int
+   */
+  public static function bytes_string_to_number($size): float|int {
+    if ($size === '') {
+      return 0;
+    }
+    // Remove the non-unit characters from the size.
+    $unit = preg_replace('/[^bkmgtpezy]/i', '', $size);
+    // Remove the non-numeric characters from the size.
+    $size = preg_replace('/[^0-9\.]/', '', $size);
+    if (!is_numeric($size)) {
+      return 0;
+    }
+    if ($unit) {
+      // Find the position of the unit in the ordered string which is the power
+      // of magnitude to multiply a kilobyte by.
+      return round($size * pow(Bytes::KILOBYTE, stripos('bkmgtpezy', $unit[0])));
+    }
+    else {
+      // Ensure size is a proper number type.
+      return round((float) $size);
+    }
   }
 
 }
