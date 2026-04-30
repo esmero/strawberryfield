@@ -64,6 +64,9 @@ class StrawberryfieldFlavorDataDefinition extends ComplexDataDefinitionBase {
       $info['vector_384'] = ListDataDefinition::create('float')->setLabel('Vector of size 384 coming from ML')->addConstraint('Length', ['max' => 384]);
       $info['vector_512'] = ListDataDefinition::create('float')->setLabel('Vector of size 512 coming from ML')->addConstraint('Length', ['max' => 512]);
       $info['vector_768'] = ListDataDefinition::create('float')->setLabel('Vector of size 768 coming from ML')->addConstraint('Length', ['max' => 768]);
+      // New for color vector
+      $info['vector_3'] = ListDataDefinition::create('float')->setLabel('Vector of size 3 coming from Predominant Color')->addConstraint('Length', ['max' => 3]);
+      $info['vector_12'] = ListDataDefinition::create('float')->setLabel('Vector of size 12 coming from three most predominant colors and their distribution')->addConstraint('Length', ['max' => 12]);
     }
     return $this->propertyDefinitions;
   }
