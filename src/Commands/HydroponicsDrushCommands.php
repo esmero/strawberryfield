@@ -104,9 +104,16 @@ class HydroponicsDrushCommands extends DrushCommands {
             ->info("Starting to process queue @queue", [
               '@queue' => $queue
             ]);
+
+          // Run longer on composter.
+          $time_per_queue = 60;
+          if ($queue == 'sbf_compost_file') {
+            $time_per_queue = 360;
+          }
+
           $number = \Drupal::getContainer()
             ->get('strawberryfield.hydroponics')
-            ->processQueue($queue, 60);
+            ->processQueue($queue, $time_per_queue);
           \Drupal::logger('hydroponics')
             ->info("Finished processing queue @queue", [
               '@queue' => $queue

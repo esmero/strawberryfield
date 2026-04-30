@@ -115,7 +115,6 @@ class StrawberryfieldHydroponicsService {
       // an existing queue.
       $this->queueFactory->get($name)->createQueue();
       $queue_worker = $this->queueManager->createInstance($name);
-      $end = time() + $time;
       $queue = $this->queueFactory->get($name, TRUE);
       $lease_time = $time;
       // This is a very specific exception
@@ -125,6 +124,8 @@ class StrawberryfieldHydroponicsService {
       if ($name == 'sbf_compost_file') {
         clearstatcache();
       }
+      $end = time() + $time;
+
       while (time() < $end && ($item = $queue->claimItem($lease_time))) {
         try {
           $this->logger->info('--- processing one item for @queue', [
