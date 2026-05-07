@@ -644,6 +644,8 @@ XML;
           $vector_1024 = isset($processed_data->vector_1024) && is_array($processed_data->vector_1024) && count($processed_data->vector_1024) == 1024 ? $processed_data->vector_1024 : NULL;
           $vector_384 = isset($processed_data->vector_384) && is_array($processed_data->vector_384) && count($processed_data->vector_384) == 384 ? $processed_data->vector_384 : NULL;
           $vector_768 = isset($processed_data->vector_768) && is_array($processed_data->vector_768) && count($processed_data->vector_768) == 768 ? $processed_data->vector_768 : NULL;
+          $vector_3 = isset($processed_data->vector_3) && is_array($processed_data->vector_3) && count($processed_data->vector_3) == 3 ? $processed_data->vector_3 : NULL;
+          $vector_12 = isset($processed_data->vector_12) && is_array($processed_data->vector_12) && count($processed_data->vector_12) == 12 ? $processed_data->vector_12 : NULL;
           $file_uuid = $file ?  $file->uuid() : NULL;
           $target_fileid = $file ? $file->id() : NULL;
           if ($checksum) {
@@ -678,7 +680,9 @@ XML;
               'vector_512' => $vector_512,
               'vector_576' => $vector_576,
               'vector_1024' => $vector_1024,
-              'vector_768' => $vector_768
+              'vector_768' => $vector_768,
+              'vector_3' => $vector_3,
+              'vector_12' => $vector_12
             ];
             // This will then always create a new Index document, even if empty.
             // Needed if we e.g. want to use this for Book search/IIIF search

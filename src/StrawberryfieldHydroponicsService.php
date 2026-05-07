@@ -115,9 +115,17 @@ class StrawberryfieldHydroponicsService {
       // an existing queue.
       $this->queueFactory->get($name)->createQueue();
       $queue_worker = $this->queueManager->createInstance($name);
-      $end = time() + $time;
       $queue = $this->queueFactory->get($name, TRUE);
       $lease_time = $time;
+      // This is a very specific exception
+      // It would make no sense to run it inside the queue worker
+      // Strawberry Runners will touch temporary files to avoid
+      // Early removal.
+      if ($name == 'sbf_compost_file') {
+        clearstatcache();
+      }
+      $end = time() + $time;
+
       while (time() < $end && ($item = $queue->claimItem($lease_time))) {
         try {
           $this->logger->info('--- processing one item for @queue', [
