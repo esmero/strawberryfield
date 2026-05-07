@@ -2,6 +2,7 @@
 
 namespace Drupal\strawberryfield\Form;
 
+use Drupal\Component\Utility\Bytes;
 use Drupal\Core\Ajax\AjaxResponse;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
@@ -19,6 +20,8 @@ use Drupal\Core\Ajax\MessageCommand;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Drupal\strawberryfield\StrawberryfieldHydroponicsService;
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
+use Drupal\Core\Config\TypedConfigManagerInterface;
+use Drupal\strawberryfield\StrawberryfieldUtilityService;
 
 /**
  * ConfigurationForm for Queue Worker Selection to be run by Hydroponics Service.
@@ -143,6 +146,16 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
 
     $active =  $config->get('active') ? $config->get('active') : FALSE;
     $time_to_expire =  $config->get('time_to_expire') !== null ? $config->get('time_to_expire') : 720;
+    $freespace_limit = $config->get('freespace_limit') !== null ? $config->get('freespace_limit') : 21474836480;
+
+    $si_prefix = array( 'B', 'KB', 'MB', 'GB', 'TB', 'EB', 'ZB', 'YB' );
+
+    $base = 1024;
+
+    $class =  min((int)log($freespace_limit , $base) , count($si_prefix) - 1);
+
+    $freespace_limit_human = $freespace_limit != 0 ? sprintf('%1.2f' , $freespace_limit / pow($base,$class)) . ' ' . $si_prefix[$class] : 0;
+
     $drush_path = $config->get('drush_path') ?  $config->get('drush_path') : NULL;
     $home_path = $config->get('home_path') ?  $config->get('home_path') : NULL;
     $enabled_queues =  !empty($config->get('queues')) ? array_flip($config->get('queues')) : [];
@@ -168,6 +181,16 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
     $enabled_search_api_indexes = array_intersect(array_keys($valid_indexes), $enabled_search_api_indexes);
 
     $current_status = $this->hydroponicsService->checkRunning();
+    /* Give users a view of Free space in temporary */
+    $bytes = disk_free_space(\Drupal::service('file_system')->getTempDirectory());
+    $si_prefix = array( 'B', 'KB', 'MB', 'GB', 'TB', 'EB', 'ZB', 'YB' );
+    $base = 1024;
+    $class = min((int)log($bytes , $base) , count($si_prefix) - 1);
+
+    $status = $this->t('@status.<br>You have @free remaining free space on your Drupal temporary filesystem.', [
+      '@free' => sprintf('%1.2f' , $bytes / pow($base,$class)) . ' ' . $si_prefix[$class],
+      '@status'=> $current_status['message']
+      ]);
 
     $form['status'] =  [
       '#id' => 'hydroponics-status',
@@ -175,7 +198,7 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
       '#title' => 'Current Hydroponics Service Status',
       '#open' => TRUE,
       '#prefix' => '<span class="hydroponics-status"></span>',
-      '#description' =>  $current_status['message']
+      '#description' =>  $status
     ];
 
     $form['status']['refresh'] = [
@@ -216,6 +239,15 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
       '#min' => 0,
       '#required' => TRUE,
       '#default_value' => $time_to_expire,
+    ];
+
+    $form['freespace_limit'] = [
+      '#title' => 'When Freespace for <em>temporary://</em> is less or equal than this value, suspend Hydroponics Service for all queues except for <em>Archipelago Temporary File Composter Queue Worker</em>.',
+      '#description' => 'A value of 0 will ignore this safety measure. For real limites enter a value like "200 MB" (megabytes) or "20 GB" (Gigabytes). It is recommended that you set a real SAFE threashold to avoid having your server crash when running out of space. ',
+      '#type' => 'textfield',
+      '#element_validate' => [[get_class($this), 'validateMaxFilesize']],
+      '#required' => TRUE,
+      '#default_value' => $freespace_limit_human,
     ];
 
     $form['advanced'] =  [
@@ -266,8 +298,6 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
         $dynamic_search_index_states['visible'][] = 'or';
       }
     }
-
-
 
     $form['search_api_indexes'] = [
       '#title' => 'Allow Hydroponics to help with any of the following Search API Indexes',
@@ -334,6 +364,15 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
    return $form['status'];
   }
 
+  public static function validateMaxFilesize($element, FormStateInterface $form_state) {
+    // Note Bytes::toNumber is buggy since PHP 8 and Drupal 8 9 and 10 and 11
+    // See https://www.drupal.org/project/drupal/issues/3352728
+    // We use the validate method instead.
+    if (!empty($element['#value']) && !Bytes::validate($element['#value'])) {
+      $form_state->setError($element, t('The "@name" option must contain a valid value. You may either leave the text field empty (or a 0) or enter a string like "50 MB" (megabytes) or "20 GB" (gigabytes)', ['@name' => $element['#title']]));
+    }
+  }
+
   /**
    * AJAX callback.
    */
@@ -392,6 +431,7 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
         $enabled[] = $queuename;
       }
     }
+    $freespace_limit = Bytes::validate($form_state->getValue('freespace_limit')) ? (int) StrawberryfieldUtilityService::bytes_string_to_number($form_state->getValue('freespace_limit', 0)) : 0;
 
     $this->config('strawberryfield.hydroponics_settings')
       ->set('active', $global_active)
@@ -399,6 +439,7 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
       ->set('home_path', $home_path)
       ->set('queues', $enabled)
       ->set('time_to_expire', $time_to_expire)
+      ->set('freespace_limit', $freespace_limit)
       ->set('search_api_indexes', $search_indexes)
       ->set('search_api_indexes_count', $search_api_indexes_count)
       ->save();

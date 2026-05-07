@@ -44,6 +44,7 @@ class HydroponicsDrushCommands extends DrushCommands {
     });
     $active_queues = \Drupal::config('strawberryfield.hydroponics_settings')->get('queues');
     $active_indexes = \Drupal::config('strawberryfield.hydroponics_settings')->get('search_api_indexes') ?? [];
+    $freespace_limit =  \Drupal::config('strawberryfield.hydroponics_settings')->get('freespace_limit') ?? 0;
     $indexes_batch_size = \Drupal::config('strawberryfield.hydroponics_settings')->get('search_api_indexes_count') ?? 0;
     $done = [];
 
@@ -58,7 +59,7 @@ class HydroponicsDrushCommands extends DrushCommands {
           '@queues' => implode(",", $active_queues)
         ]);
     }
-     // Get which Search API Indexes we should run:
+    // Get which Search API Indexes we should run:
     $loaded_indexes = [];
     if (count($active_indexes) && $indexes_batch_size) {
       \Drupal::logger('hydroponics')
@@ -71,29 +72,63 @@ class HydroponicsDrushCommands extends DrushCommands {
     foreach($active_queues as $queue) {
       // Set number of idle cycle to wait
       $idle['queue:'.$queue] = 3;
-
-      $done['queue:'.$queue] = $loop->addPeriodicTimer(1.0, function ($timer) use ($loop, $queue, &$idle) {
-        \Drupal::logger('hydroponics')->info("Starting to process queue @queue", [
-          '@queue' => $queue
-        ]);
-
-        $number = \Drupal::getContainer()
-          ->get('strawberryfield.hydroponics')
-          ->processQueue($queue, 60);
-          \Drupal::logger('hydroponics')->info("Finished processing queue @queue", [
-          '@queue' => $queue
-        ]);
-
-        if ($number == 0) {
-          \Drupal::logger('hydroponics')->info("No items left on queue @queue", [
-            '@queue' => $queue
-          ]);
-          // decrement idle counter
-          $idle['queue:'.$queue] -= 1;
+      $done['queue:'.$queue] = $loop->addPeriodicTimer(1.0, function ($timer) use ($loop, $queue, &$idle,$freespace_limit): void {
+        $outofspace = FALSE;
+        if (($freespace_limit > 0) && $queue != 'sbf_compost_file') {
+          $bytes = disk_free_space(\Drupal::service('file_system')
+            ->getTempDirectory());
+          $si_prefix = ['B', 'KB', 'MB', 'GB', 'TB', 'EB', 'ZB', 'YB'];
+          $base = 1024;
+          $class = min((int) log($bytes, $base), count($si_prefix) - 1);
+          if ($bytes <= $freespace_limit) {
+            $outofspace = TRUE;
+            \Drupal::logger('hydroponics')
+              ->warning('You have reached your free space limit. @free remaining free space on your Drupal temporary filesystem before starting queue @queue and your space limit is @limit.', [
+                '@free' => sprintf('%1.2f', $bytes / pow($base, $class)) . ' ' . $si_prefix[$class],
+                '@limit' => sprintf('%1.2f', $freespace_limit / pow($base, $class)) . ' ' . $si_prefix[$class],
+                '@queue' => $queue
+              ]);
+          }
+          else {
+            \Drupal::logger('hydroponics')
+              ->info('@free remaining free space on your Drupal temporary filesystem before starting queue @queue and your space limit is @limit.', [
+                '@free' => sprintf('%1.2f', $bytes / pow($base, $class)) . ' ' . $si_prefix[$class],
+                '@limit' => sprintf('%1.2f', $freespace_limit / pow($base, $class)) . ' ' . $si_prefix[$class],
+                '@queue' => $queue
+              ]);
+          }
+        }
+        if (!$outofspace) {
+          \Drupal::logger('hydroponics')
+            ->info("Starting to process queue @queue", [
+              '@queue' => $queue
+            ]);
+          $number = \Drupal::getContainer()
+            ->get('strawberryfield.hydroponics')
+            ->processQueue($queue, 60);
+          \Drupal::logger('hydroponics')
+            ->info("Finished processing queue @queue", [
+              '@queue' => $queue
+            ]);
+          if ($number == 0) {
+            \Drupal::logger('hydroponics')
+              ->info("No items left on queue @queue", [
+                '@queue' => $queue
+              ]);
+            // decrement idle counter
+            $idle['queue:' . $queue] -= 1;
+          }
+          else {
+            // no empty so reset idle counter
+            $idle['queue:' . $queue] = 3;
+          }
         }
         else {
-          // no empty so reset idle counter
-          $idle['queue:'.$queue] = 3;
+          \Drupal::logger('hydroponics')
+            ->warning("Skipping to process queue @queue because you have used more temporary space that allowed by Hydroponics", [
+              '@queue' => $queue
+            ]);
+          $idle['queue:' . $queue] -= 1;
         }
       });
     }
@@ -161,8 +196,8 @@ class HydroponicsDrushCommands extends DrushCommands {
 
         $loop->cancelTimer($timer);
         $loop->stop();
-        }
       }
+    }
     );
     $time_to_expire = (int) \Drupal::config('strawberryfield.hydroponics_settings')->get('time_to_expire');
     if ($time_to_expire > 0 ) {
