@@ -463,7 +463,7 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
     if ($date->hasErrors()) {
       $node_id =  $this->getParent()->getEntity()->id();
       foreach ($date->getErrors() as $error) {
-         $args = [
+        $args = [
           '@value' => $value,
           '@error' => $error,
           '@node' => $node_id
