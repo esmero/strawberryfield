@@ -267,12 +267,13 @@ class StrawberryfieldHydroponicsService {
           $this->logger->info($message);
         }
         else {
-          $this->logger->info($this->t('--- We sent @to_index items for Search API index @index but nothing was indexed',
+          $this->logger->info($this->t('--- We sent @to_index items for Search API index @index but nothing was indexed. Will skip this cycle until a next iteration.',
             [
               '@index' => $index->label(),
               '@to_index' => $to_index,
             ]
           ));
+          return $index->getTrackerInstance()->getRemainingItemsCount();
         }
       }
       catch (\Exception $e) {
