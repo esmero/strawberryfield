@@ -99,6 +99,9 @@ services:
   logger.channel.hydroponics:
     parent: logger.channel_base
     arguments: ['hydroponics']
+  logger.channel.strawberryfield:
+    parent: logger.channel_base
+    arguments: [ 'strawberryfield' ]
   strawberryfield.hydroponics:
     class: Drupal\strawberryfield\StrawberryfieldHydroponicsService
     arguments: ['@entity_type.manager', '@config.factory', '@module_handler', '@plugin.manager.queue_worker', '@queue', '@logger.channel.hydroponics']

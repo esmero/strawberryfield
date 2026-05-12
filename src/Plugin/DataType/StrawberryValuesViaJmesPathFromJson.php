@@ -7,9 +7,11 @@
  */
 namespace Drupal\strawberryfield\Plugin\DataType;
 use DateTime;
+use Drupal\Component\Datetime\DateTimePlus;
 use Drupal\Core\TypedData\Plugin\DataType\ItemList;
 use Drupal\Core\TypedData\MapDataDefinition;
 use Drupal\Core\TypedData\DataDefinition;
+use Drupal\datetime\Plugin\Field\FieldType\DateTimeItemInterface;
 use Drupal\strawberryfield\Plugin\Field\FieldType\StrawberryFieldItem;
 use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
 use EDTF\EdtfFactory;
@@ -110,10 +112,23 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
       });
       $values = array_map('stripslashes', $values);
       if ($is_date && !$is_date_range) {
-       $values = $this->processDatesFromValues($values);
+        $values = $this->processDatesFromValues($values);
+        $values = array_filter($values, function($value) {
+          // Only filter out nulls, empties  and FALSE. Keep 0
+          return ($value !== NULL && $value !== '' &&  $value !== FALSE);
+        });
       }
       elseif ($is_date_range) {
         $values = $this->processDateRangesFromValues($values);
+        foreach ($values as &$value) {
+          //$value will be associative with
+          // value => "2025-06-01T00:00:00-04:00"
+          // end_value => "2025-06-01T23:59:59-04:00"
+          if (empty($value['value'] ?? NULL) || empty($value['end_value'] ?? NULL)) {
+            $value = NULL;
+          }
+        }
+        $values = array_filter($values);
       }
       $this->processed = array_values($values);
       $this->list = [];
@@ -228,8 +243,14 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
           foreach ($edtf_value->getElements() as $element) {
             switch(get_class($element)) {
               case "EDTF\Model\SetElement\RangeSetElement":
-                $values_parsed[] = date(DATE_ATOM, $element->getMinAsUnixTimestamp());
-                $values_parsed[] = date(DATE_ATOM, $element->getMaxAsUnixTimestamp());
+                $min = date(DATE_ATOM, $element->getMinAsUnixTimestamp());
+                $max = date(DATE_ATOM, $element->getMaxAsUnixTimestamp());
+                if ($min && $this->validateDateAsDrupal($min)) {
+                  $values_parsed[] = $min;
+                }
+                if ($max && $this->validateDateAsDrupal($max)) {
+                  $values_parsed[] = $max;
+                }
                 break;
               default:
                 // Make sure we do not index same day twice
@@ -237,11 +258,20 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
                 $end_day = date('Y-m-d', $element->getMaxAsUnixTimestamp());
                 if ($start_day === $end_day) {
                   // if this is the same day just index one.
-                  $values_parsed[] = date(DATE_ATOM,  $element->getMinAsUnixTimestamp());
+                  $sameday = date(DATE_ATOM,  $element->getMinAsUnixTimestamp());
+                  if ($sameday && $this->validateDateAsDrupal($sameday)) {
+                    $values_parsed[] = $sameday;
+                  }
                 }
                 else {
-                  $values_parsed[] = date(DATE_ATOM, $element->getMinAsUnixTimestamp());
-                  $values_parsed[] = date(DATE_ATOM, $element->getMaxAsUnixTimestamp());
+                  $min = date(DATE_ATOM, $element->getMinAsUnixTimestamp());
+                  $max = date(DATE_ATOM, $element->getMaxAsUnixTimestamp());
+                  if ($min && $this->validateDateAsDrupal($min)) {
+                    $values_parsed[] = $min;
+                  }
+                  if ($max && $this->validateDateAsDrupal($max)) {
+                    $values_parsed[] = $max;
+                  }
                 }
                 break;
             }
@@ -252,10 +282,16 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
           switch (get_class($edtf_value)) {
             case "EDTF\Model\Interval":
               if ($edtf_value->hasStartDate()) {
-                $values_parsed[] = date(DATE_ATOM, $edtf_value->getMin());
+                $min = date(DATE_ATOM, $edtf_value->getMin());
+                if ($min && $this->validateDateAsDrupal($min)) {
+                  $values_parsed[] = $min;
+                }
               }
               if ($edtf_value->hasEndDate()) {
-                $values_parsed[] = date(DATE_ATOM, $edtf_value->getMax());
+                $max = date(DATE_ATOM, $edtf_value->getMax());
+                if ($max && $this->validateDateAsDrupal($max)) {
+                  $values_parsed[] = $max;
+                }
               }
               break;
             default:
@@ -264,10 +300,19 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
               $end_day = date('Y-m-d', $edtf_value->getMax());
               if ($start_day === $end_day) {
                 // if this is the same day just index one.
-                $values_parsed[] = date(DATE_ATOM, $edtf_value->getMin());
+                $sameday = date(DATE_ATOM, $edtf_value->getMin());
+                if ($sameday && $this->validateDateAsDrupal($sameday)) {
+                  $values_parsed[] = $sameday;
+                }
               } else {
-                $values_parsed[] = date(DATE_ATOM, $edtf_value->getMin());
-                $values_parsed[] = date(DATE_ATOM, $edtf_value->getMax());
+                $min = date(DATE_ATOM, $edtf_value->getMin());
+                $max = date(DATE_ATOM, $edtf_value->getMax());
+                if ($min && $this->validateDateAsDrupal($min)) {
+                  $values_parsed[] = $min;
+                }
+                if ($max && $this->validateDateAsDrupal($max)) {
+                  $values_parsed[] = $max;
+                }
               }
               break;
           }
@@ -277,7 +322,9 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
         // If not EDTF (e.g an already ISO8601 date)
         // try with string based parsing
         $parsed_from_string = $this->parseStringToDate($value);
-        $values_parsed[] = $parsed_from_string ? $parsed_from_string: NULL;
+        if ($parsed_from_string && $this->validateDateAsDrupal($parsed_from_string)) {
+          $values_parsed[] = $parsed_from_string;
+        }
       }
     }
     $values = array_unique($values_parsed);
@@ -303,11 +350,15 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
           // means we have something like [1977, 1984/2023] or {1977, 1984/2023}
           // and each entry needs to be processed like individual elements
           foreach ($edtf_value->getElements() as $element) {
-                $new_date_range = [];
-                $new_date_range['value'] = date(DATE_ATOM, $element->getMinAsUnixTimestamp());
-                $new_date_range['end_value'] = date(DATE_ATOM, $element->getMaxAsUnixTimestamp());
-                $values_parsed[] = $this->getTypedDataManager()->create($data_range_ref, $new_date_range)->getValue();
+            $new_date_range = [];
+            $new_date_range['value'] = date(DATE_ATOM, $element->getMinAsUnixTimestamp());
+            $new_date_range['end_value'] = date(DATE_ATOM, $element->getMaxAsUnixTimestamp());
+            if ($new_date_range['value'] && $new_date_range['end_value'] && $this->validateDateAsDrupal($new_date_range['value']) && $this->validateDateAsDrupal($new_date_range['end_value'])) {
+              $values_parsed[] = $this->getTypedDataManager()
+                ->create($data_range_ref, $new_date_range)
+                ->getValue();
             }
+          }
         }
         else {
           //single entries.
@@ -318,14 +369,22 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
                 $new_date_range = [];
                 $new_date_range['value'] = date(DATE_ATOM, $edtf_value->getMin());
                 $new_date_range['end_value'] = date(DATE_ATOM, $edtf_value->getMax());
-                $values_parsed[] = $this->getTypedDataManager()->create($data_range_ref, $new_date_range)->getValue();
+                if ($new_date_range['value'] && $new_date_range['end_value'] && $this->validateDateAsDrupal($new_date_range['value']) && $this->validateDateAsDrupal($new_date_range['end_value'])) {
+                  $values_parsed[] = $this->getTypedDataManager()
+                    ->create($data_range_ref, $new_date_range)
+                    ->getValue();
+                }
               }
               break;
             default:
               $new_date_range = [];
               $new_date_range['value'] = date(DATE_ATOM, $edtf_value->getMin());
               $new_date_range['end_value'] = date(DATE_ATOM, $edtf_value->getMax());
-              $values_parsed[] = $this->getTypedDataManager()->create($data_range_ref, $new_date_range)->getValue();
+              if ($new_date_range['value'] && $new_date_range['end_value'] && $this->validateDateAsDrupal($new_date_range['value']) && $this->validateDateAsDrupal($new_date_range['end_value'])) {
+                $values_parsed[] = $this->getTypedDataManager()
+                  ->create($data_range_ref, $new_date_range)
+                  ->getValue();
+              }
               break;
           }
         }
@@ -343,7 +402,11 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
             $new_date_range = [];
             $new_date_range['value'] = date(DATE_ATOM, $edtf_value->getMin());
             $new_date_range['end_value'] = date(DATE_ATOM, $edtf_value->getMax());
-            $values_parsed[] = $this->getTypedDataManager()->create($data_range_ref, $new_date_range)->getValue();
+            if ($new_date_range['value'] && $new_date_range['end_value'] && $this->validateDateAsDrupal($new_date_range['value']) && $this->validateDateAsDrupal($new_date_range['end_value'])) {
+              $values_parsed[] = $this->getTypedDataManager()
+                ->create($data_range_ref, $new_date_range)
+                ->getValue();
+            }
           }
         }
       }
@@ -378,4 +441,40 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
     }
     return FALSE;
   }
+
+  /**
+   * Validates if the Date (even if already marked as valid PHP) is
+   * indexable by Drupal by running the same DateTimePlus casting that happens
+   * in the search API
+   *
+   * @see \Drupal\search_api\Plugin\search_api\data_type\DateDataType
+   *
+   * @param $value
+   *    A pre parsed Date String.
+   * @return bool
+   *    TRUE if valid Drupal
+   *    FALSE if not.
+   *
+   */
+  protected function validateDateAsDrupal($value): bool {
+    $timezone = new \DateTimeZone(DateTimeItemInterface::STORAGE_TIMEZONE);
+    $date = new DateTimePlus($value, $timezone);
+    // Check for invalid datetime strings.
+    if ($date->hasErrors()) {
+      $node_id =  $this->getParent()->getEntity()->id();
+      foreach ($date->getErrors() as $error) {
+        $args = [
+          '@value' => $value,
+          '@error' => $error,
+          '@node' => $node_id
+        ];
+        // @TODO: because this is a deeper itemlist, injecting the service might lead
+        // to a DB serialization issue. So for now we call the global container
+        \Drupal::service('logger.channel.strawberryfield')->warning('Keyname Provider found and error while parsing date/time value "@value" into a valid Drupal date, for ADO with Node ID: @node with error: @error. It might be a date in the distant future or past and still e.g., a valid EDTF, but sadly not indexable by Drupal. We will skip this value.', $args);
+      }
+      return FALSE;
+    }
+    return TRUE;
+  }
+
 }
