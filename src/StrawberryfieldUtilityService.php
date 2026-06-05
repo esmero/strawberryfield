@@ -735,7 +735,7 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
    *    'data' => $table,
    *    'totalrows' => $maxRow,
    */
-  public function csv_read(File $file, int $offset = 0, int $count = 0, bool $always_include_header = TRUE, bool $escape_characters = FALSE, string $caller_module = 'strawberryfield') {
+  public function csv_read(File $file, int $offset = 0, int $count = 0, bool $always_include_header = TRUE, bool $escape_characters = FALSE, string $caller_module = 'strawberryfield'): ?array {
     $wrapper = $this->streamWrapperManager->getViaUri($file->getFileUri());
     if (!$wrapper) {
       return NULL;
@@ -855,6 +855,50 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
       'data' => $table,
       'totalrows' => $maxRow,
     ];
+  }
+
+  /**
+   * Counts CSV Rows using the same escape concept as csv_read
+   *
+   * @param \Drupal\file\Entity\File $file
+   * @param bool $escape_characters
+   * @param string $caller_module
+   *
+   * @return int|NULL
+   */
+  public function csv_count(File $file, bool $escape_characters = FALSE, string $caller_module = 'strawberryfield'): ?int {
+    $wrapper = $this->streamWrapperManager->getViaUri($file->getFileUri());
+    if (!$wrapper) {
+      return NULL;
+    }
+
+    $url = $wrapper->getUri();
+    $uri = $this->streamWrapperManager->normalizeUri($url);
+    if (!is_file($uri)) {
+      $message = $this->t(
+        'CSV File referenced by @caller set for processing at @uri is no longer present. Check your composting times. Skipping',
+        [
+          '@uri' => $uri,
+          '@caller' => $caller_module,
+        ]
+      );
+      $this->loggerFactory->get($caller_module)->error($message);
+      return NULL;
+    }
+
+    $spl = new \SplFileObject($url, 'r');
+    $spl->setFlags(
+      SplFileObject::READ_CSV |
+      SplFileObject::DROP_NEW_LINE  |
+      SplFileObject::READ_AHEAD
+    );
+    if (!$escape_characters) {
+      $spl->setCsvControl(',', '"', "");
+    }
+    $spl->rewind();
+    // Count the valid rows parsed by the iterator
+    $rowCount = iterator_count($spl);
+    return $rowCount ?? 0;
   }
 
   /**
