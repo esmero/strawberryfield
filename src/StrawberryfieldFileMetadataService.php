@@ -20,6 +20,7 @@ use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\file\FileInterface;
 use Drupal\Core\Messenger\MessengerTrait;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
+use Drupal\strawberryfield\Tools\SimpleXMLtoArray;
 use Mhor\MediaInfo\Exception\UnknownTrackTypeException;
 use Mhor\MediaInfo\MediaInfo;
 
@@ -181,11 +182,12 @@ class StrawberryfieldFileMetadataService {
     // Should we check everytime?
     // Or just when saving via the form?
 
-    $exif_exec_path = trim($this->config->get('exif_exec_path'));
-    $fido_exec_path = trim($this->config->get('fido_exec_path'));
-    $identify_exec_path = trim($this->config->get('identify_exec_path'));
-    $pdfinfo_exec_path = trim($this->config->get('pdfinfo_exec_path'));
-    $mediainfo_exec_path = trim($this->config->get('mediainfo_exec_path'));
+    $exif_exec_path = trim($this->config->get('exif_exec_path') ?? '');
+    $fido_exec_path = trim($this->config->get('fido_exec_path') ?? '');
+    $identify_exec_path = trim($this->config->get('identify_exec_path') ?? '');
+    $pdfinfo_exec_path = trim($this->config->get('pdfinfo_exec_path') ?? '');
+    $mediainfo_exec_path = trim($this->config->get('mediainfo_exec_path') ?? '');
+    $bwfmetaedit_exec_path = trim($this->config->get('bwfmetaedit_exec_path') ?? '');
     $cleanup = $this->cleanUp;
 
     $uri = $file->getFileUri();
@@ -296,6 +298,22 @@ class StrawberryfieldFileMetadataService {
     }
     else {
       $this->extractMediaInfo($askey, $mediainfo_exec_path, $file, $templocation,
+        $metadata, $reduced);
+    }
+
+    if (strlen($bwfmetaedit_exec_path) == 0) {
+      $this->loggerFactory->get('strawberryfield')->warning(
+        '@fileurl was not processed using bwfmetaedit because the path is not set. <a href="@url">Please configure it here if you want that or ignore if you are running an older PHP Container that does not have that binary</a>',
+        [
+          '@fileurl' => $file->getFileUri(),
+          '@url' => Url::fromRoute(
+            'strawberryfield.file_persister_settings_form'
+          )->toString(),
+        ]
+      );
+    }
+    else {
+      $this->extractBwfmetaEdit($askey, $bwfmetaedit_exec_path, $file, $templocation,
         $metadata, $reduced);
     }
 
@@ -661,6 +679,117 @@ class StrawberryfieldFileMetadataService {
       }
     }
   }
+
+
+  /**
+   * @param string $askey
+   * @param string $exec_path
+   * @param \Drupal\file\FileInterface $file
+   * @param string $templocation
+   * @param array $metadata
+   * @param bool $reduced
+   *
+   * @throws \Exception
+   */
+  public function extractBwfmetaEdit(string $askey, string $exec_path, FileInterface $file, string $templocation, &$metadata = [], bool $reduced = FALSE) {
+    // Only run Media info if Video/Audio
+    // --MD5-Generate  --MD5-Verify --out-xml
+    if (in_array($askey, ['audio']) && in_array($metadata['flv:exif']['MIMEType'] ?? '', ['audio/wav','audio/x-wav','audio/vnd.wave'])) {
+      $templocation_for_exec = escapeshellarg($templocation);
+      $output_bwfmetaedit = [];
+      $status_bwfmetaedit = 0;
+      $result_bwfmetaedit = exec(
+        $exec_path . " --MD5-Generate  --out-xml " . $templocation_for_exec,
+        $output_bwfmetaedit,
+        $status_bwfmetaedit
+      );
+
+      if ($status_bwfmetaedit != 0) {
+        // Means Identify did not work
+        $this->loggerFactory->get('strawberryfield')->warning(
+          'Could not process bwfmetaedit on @templocation for @fileurl',
+          [
+            '@fileurl' => $file->getFileUri(),
+            '@templocation' => $templocation,
+          ]
+        );
+      }
+      else {
+        // JSON-ify Identify data
+        $identify_meta = [];
+        if (count($output_bwfmetaedit) && isset($output_bwfmetaedit[0])) {
+          $internalErrors = libxml_use_internal_errors(TRUE);
+          // remove control characters BC bwfedit sends a carraige return
+          $output_bwfmetaedit = implode('',$output_bwfmetaedit);
+          $clean_bwfmetaedit = preg_replace('/\p{Cc}/u', '', $output_bwfmetaedit ?? '');
+          $simplexml = simplexml_load_string($clean_bwfmetaedit);
+          if ($simplexml === FALSE) {
+            $this->loggerFactory->get('strawberryfield')->warning(
+              $this->t(
+                'Sorry, the output of Bwfmetaedit is not valid XML on @templocation for @fileurl',
+                [
+                  '@fileurl' => $file->getFileUri(),
+                  '@templocation' => $templocation,
+                ])
+            );
+          }
+          else {
+            try {
+              $SimpleXMLtoArray = new SimpleXMLtoArray($simplexml);
+              $xmljsonarray = $SimpleXMLtoArray->xmlToArray();
+              // If a single value is present/ all will have @value inside an array
+              // Let's flatten this, single file
+              $bwedit_metadata = $xmljsonarray['conformance_point_document']['File'][0] ?? [];
+              foreach ($bwedit_metadata as $group_property => &$records) {
+                if (is_array($records)) {
+                  foreach (($records ?? []) as $index => $record) {
+                    $generated = NULL;
+                    $stored = NULL;
+                    foreach ($record as $field => $field_values) {
+                      $flat = [];
+                      foreach ($field_values as $index_value => $single_value) {
+                        $flat[] = $single_value['@value'];
+                      }
+                      $records[$index][$field] = count($flat) == 1 ? $flat[0] : $flat;
+
+                      if ($field == 'MD5Generated') {
+                        $generated = $flat;
+                      }
+                      if ($field == 'MD5Stored') {
+                        $stored = $flat;
+                      }
+                    }
+                    if ($stored !== NULL && $generated !== $stored && $group_property == "Technical") {
+                      $records[$index]['MD5match'] = FALSE;
+                    }
+                    elseif ($stored !== NULL && $generated === $stored && $group_property == "Technical") {
+                      $records[$index]['MD5match'] = TRUE;
+                    }
+                    elseif($group_property == "Technical") {
+                      $records[$index]['MD5match'] = NULL;
+                    }
+                  }
+                }
+              }
+              unset($bwedit_metadata['@name']);
+              $metadata['flv:bwfmetaedit'] = $bwedit_metadata ?? [];
+            }
+            catch (\Throwable) {
+              $this->loggerFactory->get('strawberryfield')->warning(
+                $this->t(
+                  'Sorry, the XML output of Bwfmetaedit could not be transformed into JSON at @templocation for @fileurl',
+                  [
+                    '@fileurl' => $file->getFileUri(),
+                    '@templocation' => $templocation,
+                  ])
+              );
+            }
+          }
+        }
+      }
+    }
+  }
+
 
   /**
    * Removes an non managed file and temp generated by this module.
