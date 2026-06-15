@@ -275,6 +275,26 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
       ]
     ];
 
+    $form['bwfmetaedit_exec_path'] = [
+      '#type' => 'textfield',
+      '#title' => $this->t('Absolute path to the bwfmetaedit  binary inside your server'),
+      '#description' => $this->t('Bwfmetaedit will run against Audio files (WAV) associated to an Archipelago Digital Object to generate (if not present/extract and validate if present) per stream checksums and metadata that will be appended to the strawberryfield JSON. Bwfmetaedit is shipped on Archipelago 1.7+ PHP Containers'),
+      '#default_value' => !empty($config->get('bwfmetaedit_exec_path')) ? $config->get('bwfmetaedit_exec_path'): '/usr/bin/bwfmetaedit',
+      '#states' => [
+        'visible' => [
+          ':input[name="extractmetadata"]' => ['checked' => TRUE],
+        ],
+      ],
+      '#prefix' => '<span class=bwfmetaedit-exec-path-validation"></span>',
+      '#ajax' => [
+        'callback' => [$this, 'validateBwfmetaEdit'],
+        'effect' => 'fade',
+        'wrapper' => 'bwfmetaedit-exec-path-validation',
+        'method' => 'replace',
+        'event' => 'change'
+      ]
+    ];
+
     $form['delete_tempfiles'] = [
       '#type' => 'checkbox',
       '#title' => $this->t('Also delete Temporary Local files needed for Metadata Processing right away after File Metadata Processing'),
@@ -503,6 +523,39 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
     }
     return $response;
   }
+
+
+  /**
+   * Validate Bwfmetaedit Exec Path
+   * @param array $form
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *
+   * @return \Drupal\Core\Ajax\AjaxResponse
+   */
+  public function validateBwfmetaEdit(array $form, FormStateInterface $form_state) {
+    $response = new AjaxResponse();
+    if ($form_state->getValue('bwfmetaedit_exec_path') && is_string($form_state->getValue('bwfmetaedit_exec_path'))) {
+      $canrun = \Drupal::service('strawberryfield.utility')
+        ->verifyCommand($form_state->getValue('bwfmetaedit_exec_path'));
+      if (!$canrun) {
+        $response->addCommand(new InvokeCommand('#edit-bwfmetaedit-exec-path', 'addClass', ['error']));
+        $response->addCommand(new InvokeCommand('#edit-bwfmetaedit-exec-path', 'removeClass', ['ok']));
+        $response->addCommand(new MessageCommand('Bwfmetaedit path is not valid.', NULL, [
+          'type' => 'error',
+          'announce' => 'Bwfmetaedit path is not valid.'
+        ]));
+      }
+      else {
+        $response->addCommand(new InvokeCommand('#edit-bwfmetaedit-exec-path', 'removeClass', ['error']));
+        $response->addCommand(new InvokeCommand('#edit-bwfmetaedit-exec-path', 'addClass', ['ok']));
+        $response->addCommand(new MessageCommand('Bwfmetaedit path is valid!', NULL, [
+          'type' => 'status',
+          'announce' => 'bwfmetaedit path is valid!'
+        ]));
+      }
+    }
+    return $response;
+  }
   /**
    * @param array $form
    * @param \Drupal\Core\Form\FormStateInterface $form_state
@@ -529,32 +582,46 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
           $this->t('Please correct. fido path is not valid.')
         );
       }
-      $canrun_identify = \Drupal::service('strawberryfield.utility')->verifyCommand(
-        $form_state->getValue('identify_exec_path')
-      );
+      $canrun_identify = \Drupal::service('strawberryfield.utility')
+        ->verifyCommand(
+          $form_state->getValue('identify_exec_path')
+        );
       if (!$canrun_identify) {
         $form_state->setErrorByName(
           'identify_exec_path',
           $this->t('Please correct. Identify path is not valid.')
         );
       }
-      $canrun_pdfinfo = \Drupal::service('strawberryfield.utility')->verifyCommand(
-        $form_state->getValue('pdfinfo_exec_path')
-      );
+      $canrun_pdfinfo = \Drupal::service('strawberryfield.utility')
+        ->verifyCommand(
+          $form_state->getValue('pdfinfo_exec_path')
+        );
       if (!$canrun_pdfinfo) {
         $form_state->setErrorByName(
           'pdfinfo_exec_path',
           $this->t('Please correct. PDFInfo path is not valid.')
         );
       }
-      $canrun_mediainfo = \Drupal::service('strawberryfield.utility')->verifyCommand(
-        $form_state->getValue('mediainfo_exec_path')
-      );
+      $canrun_mediainfo = \Drupal::service('strawberryfield.utility')
+        ->verifyCommand(
+          $form_state->getValue('mediainfo_exec_path')
+        );
       if (!$canrun_mediainfo) {
         $form_state->setErrorByName(
           'mediainfo_exec_path',
           $this->t('Please correct. Mediainfo path is not valid.')
         );
+      }
+
+      if ($form_state->getValue('bwfmetaedit_exec_path') && is_string($form_state->getValue('bwfmetaedit_exec_path'))) {
+        $canrun_bwfmetaedit = \Drupal::service('strawberryfield.utility')
+          ->verifyCommand($form_state->getValue('bwfmetaedit_exec_path'));
+        if (!$canrun_bwfmetaedit) {
+          $form_state->setErrorByName(
+            'bwfmetaedit_exec_path',
+            $this->t('Please correct. bwfmetaedit path is not valid. Leave empty if you are running an older PHP Container that does not have the binary included.')
+          );
+        }
       }
     }
 
@@ -601,6 +668,7 @@ class FilePersisterServiceSettingsForm extends ConfigFormBase {
       ->set('identify_exec_path', trim($form_state->getValue('identify_exec_path')))
       ->set('pdfinfo_exec_path', trim($form_state->getValue('pdfinfo_exec_path')))
       ->set('mediainfo_exec_path', trim($form_state->getValue('mediainfo_exec_path')))
+      ->set('bwfmetaedit_exec_path', trim($form_state->getValue('bwfmetaedit_exec_path')))
       ->set('delete_tempfiles', (bool) $form_state->getValue('delete_tempfiles'))
       ->set('manyfiles', (int) $form_state->getValue('manyfiles'))
       ->save();
