@@ -252,6 +252,16 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
                   $values_parsed[] = $max;
                 }
                 break;
+              case "EDTF\Model\SetElement\OpenSetElement":
+                //use the only the certain data. Open Sets boundaries/digitally have unclear boundaries.
+                $min = date(DATE_ATOM, $element->getDate()->getMin());
+                if ($min && $this->validateDateAsDrupal($min)) {
+                  $values_parsed[] = $min;
+                }
+                $max = date(DATE_ATOM, $element->getDate()->getMax());
+                if ($max && $this->validateDateAsDrupal($max)) {
+                  $values_parsed[] = $max;
+                }
               default:
                 // Make sure we do not index same day twice
                 $start_day = date('Y-m-d', $element->getMinAsUnixTimestamp());
@@ -292,6 +302,17 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
                 if ($max && $this->validateDateAsDrupal($max)) {
                   $values_parsed[] = $max;
                 }
+              }
+              break;
+            case "EDTF\Model\SetElement\OpenSetElement":
+              //use the only the certain data. Open Sets boundaries/digitally have unclear boundaries.
+              $min = date(DATE_ATOM, $edtf_value->getDate()->getMin());
+              if ($min && $this->validateDateAsDrupal($min)) {
+                $values_parsed[] = $min;
+              }
+              $max = date(DATE_ATOM, $edtf_value->getDate()->getMax());
+              if ($max && $this->validateDateAsDrupal($max)) {
+                $values_parsed[] = $max;
               }
               break;
             default:
@@ -351,9 +372,20 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
           // and each entry needs to be processed like individual elements
           foreach ($edtf_value->getElements() as $element) {
             $new_date_range = [];
-            $new_date_range['value'] = date(DATE_ATOM, $element->getMinAsUnixTimestamp());
-            $new_date_range['end_value'] = date(DATE_ATOM, $element->getMaxAsUnixTimestamp());
-            if ($new_date_range['value'] && $new_date_range['end_value'] && $this->validateDateAsDrupal($new_date_range['value']) && $this->validateDateAsDrupal($new_date_range['end_value'])) {
+            if (get_class($element) == "EDTF\Model\SetElement\OpenSetElement" ) {
+              //use the only the certain data. Open Sets boundaries/digitally have unclear boundaries.
+              $new_date_range['value'] = date(DATE_ATOM, $element->getDate()->getMin());
+              $new_date_range['end_value'] = date(DATE_ATOM, $element->getDate()->getMax());
+            }
+            else {
+              $new_date_range['value'] = date(DATE_ATOM, $element->getMinAsUnixTimestamp());
+              $new_date_range['end_value'] = date(DATE_ATOM, $element->getMaxAsUnixTimestamp());
+            }
+            if ($new_date_range['value'] &&
+              $new_date_range['end_value'] &&
+              $this->validateDateAsDrupal($new_date_range['value']) &&
+              $this->validateDateAsDrupal($new_date_range['end_value']
+              )) {
               $values_parsed[] = $this->getTypedDataManager()
                 ->create($data_range_ref, $new_date_range)
                 ->getValue();
@@ -369,18 +401,38 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
                 $new_date_range = [];
                 $new_date_range['value'] = date(DATE_ATOM, $edtf_value->getMin());
                 $new_date_range['end_value'] = date(DATE_ATOM, $edtf_value->getMax());
-                if ($new_date_range['value'] && $new_date_range['end_value'] && $this->validateDateAsDrupal($new_date_range['value']) && $this->validateDateAsDrupal($new_date_range['end_value'])) {
+                if ($new_date_range['value'] && $new_date_range['end_value'] &&
+                  $this->validateDateAsDrupal($new_date_range['value']) &&
+                  $this->validateDateAsDrupal($new_date_range['end_value'])) {
                   $values_parsed[] = $this->getTypedDataManager()
                     ->create($data_range_ref, $new_date_range)
                     ->getValue();
                 }
               }
               break;
+            case "EDTF\Model\SetElement\OpenSetElement":
+              //use the only the certain data. Open Sets boundaries/digitally have unclear boundaries.
+              $new_date_range['value'] = date(DATE_ATOM, $element->getDate()->getMin());
+              $new_date_range['end_value'] = date(DATE_ATOM, $element->getDate()->getMax());
+              if ($new_date_range['value'] &&
+                $new_date_range['end_value'] &&
+                $this->validateDateAsDrupal($new_date_range['value']) &&
+                $this->validateDateAsDrupal($new_date_range['end_value']
+                )) {
+                $values_parsed[] = $this->getTypedDataManager()
+                  ->create($data_range_ref, $new_date_range)
+                  ->getValue();
+              }
+              break;
             default:
               $new_date_range = [];
               $new_date_range['value'] = date(DATE_ATOM, $edtf_value->getMin());
               $new_date_range['end_value'] = date(DATE_ATOM, $edtf_value->getMax());
-              if ($new_date_range['value'] && $new_date_range['end_value'] && $this->validateDateAsDrupal($new_date_range['value']) && $this->validateDateAsDrupal($new_date_range['end_value'])) {
+              if ($new_date_range['value'] &&
+                $new_date_range['end_value'] &&
+                $this->validateDateAsDrupal($new_date_range['value']) &&
+                $this->validateDateAsDrupal($new_date_range['end_value']
+                )) {
                 $values_parsed[] = $this->getTypedDataManager()
                   ->create($data_range_ref, $new_date_range)
                   ->getValue();
