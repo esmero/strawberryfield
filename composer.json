@@ -13,7 +13,7 @@
         }
     ],
     "require": {
-        "php": ">=8.1",
+        "php": ">=8.3",
         "ext-json": "*",
         "drupal/core": "^11",
         "ml/json-ld": "~1.1",
@@ -27,7 +27,7 @@
         "mhor/php-mediainfo": "~5.4"
     },
     "conflict": {
-        "drupal/core":"<10.3"
+        "drupal/core":"<11.4"
     },
     "minimum-stability": "dev",
     "prefer-stable": true,
