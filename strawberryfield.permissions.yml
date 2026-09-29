@@ -13,3 +13,7 @@
 'display strawberry messages':
  title: 'Display Strawberryfield generetaded Event Messages during Digital Object operations'
  description: 'Shows UI/UX messages like file persistence, Vocabulary generation, etc that happen during Event driven processing. This may be annoying for not admin users so this permission may only be given to Admin users if needed.'
+'access hydroponics administration':
+  title: 'Administer hydroponics settings'
+  description: 'Gives the user access to modify Hydroponics settings.'
+  warning: 'Warning: Give to trusted roles only; this permission has security implications. Any Role with "access administration pages" permission will also be granted access'
