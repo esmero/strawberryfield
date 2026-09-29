@@ -34,7 +34,7 @@ strawberryfield.hydroponics_settings_form:
     _form: '\Drupal\strawberryfield\Form\HydroponicsSettingsForm'
     _title: 'Background Queue Processing Manager'
   requirements:
-    _permission: 'access administration pages'
+    _permission: 'access administration pages+access hydroponics administration'
   options:
     _admin_route: TRUE
 
