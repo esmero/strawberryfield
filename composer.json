@@ -27,7 +27,8 @@
         "mhor/php-mediainfo": "~5.4"
     },
     "conflict": {
-        "drupal/core":"<10.3"
+        "drupal/core":"<10.3",
+        "drupal/search_api":">1.41"
     },
     "minimum-stability": "dev",
     "prefer-stable": true,
