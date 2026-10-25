@@ -192,7 +192,7 @@ class StrawberryFieldBreadcrumbBuilder implements BreadcrumbBuilderInterface {
     $qualified = [];
     $hits = [];
     // Now let's sort the array from low to high
-    $count_array_flat = array_map('count', $trail_flat);
+    $count_array_flat = array_map(count(...), $trail_flat);
     array_multisort($count_array_flat, SORT_ASC, $trail_flat);
     foreach ($trail_flat as $key => $trail) {
       if (count($trail) != $max_count) {

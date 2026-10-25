@@ -60,25 +60,6 @@ class CompostQueueWorker extends QueueWorkerBase implements ContainerFactoryPlug
   protected $messenger;
 
   /**
-   * The StreamWrapper Manager
-   *
-   * @var \Drupal\Core\StreamWrapper\StreamWrapperManagerInterface
-   */
-  protected StreamWrapperManagerInterface $streamWrapperManager;
-
-  /**
-   * The File System Service.
-   *
-   * @var \Drupal\Core\File\FileSystemInterface
-   */
-  protected FileSystemInterface $fileSystem;
-
-  /**
-   * @var \Drupal\Core\Extension\ModuleHandlerInterface
-   */
-  protected ModuleHandlerInterface $moduleHandler;
-
-  /**
    * @var \Drupal\Core\Config\ImmutableConfig
    */
   private ImmutableConfig $config;
@@ -93,9 +74,9 @@ class CompostQueueWorker extends QueueWorkerBase implements ContainerFactoryPlug
    * @param \Drupal\Core\Logger\LoggerChannelFactoryInterface        $logger_factory
    * @param \Drupal\strawberryfield\StrawberryfieldUtilityService    $strawberryfield_utility_service
    * @param \Drupal\Core\Messenger\MessengerInterface                $messenger
-   * @param \Drupal\Core\File\FileSystemInterface                    $file_system
-   * @param \Drupal\Core\StreamWrapper\StreamWrapperManagerInterface $stream_wrapper_manager
-   * @param \Drupal\Core\Extension\ModuleHandlerInterface            $module_handler
+   * @param \Drupal\Core\File\FileSystemInterface $fileSystem
+   * @param \Drupal\Core\StreamWrapper\StreamWrapperManagerInterface $streamWrapperManager
+   * @param \Drupal\Core\Extension\ModuleHandlerInterface $moduleHandler
    */
   public function __construct(
     array $configuration,
@@ -105,9 +86,15 @@ class CompostQueueWorker extends QueueWorkerBase implements ContainerFactoryPlug
     LoggerChannelFactoryInterface $logger_factory,
     StrawberryfieldUtilityService $strawberryfield_utility_service,
     MessengerInterface $messenger,
-    FileSystemInterface $file_system,
-    StreamWrapperManagerInterface $stream_wrapper_manager,
-    ModuleHandlerInterface $module_handler,
+    /**
+     * The File System Service.
+     */
+    protected FileSystemInterface $fileSystem,
+    /**
+     * The StreamWrapper Manager
+     */
+    protected StreamWrapperManagerInterface $streamWrapperManager,
+    protected ModuleHandlerInterface $moduleHandler,
     ConfigFactoryInterface $config_factory
   ) {
     parent::__construct($configuration, $plugin_id, $plugin_definition);
@@ -115,9 +102,6 @@ class CompostQueueWorker extends QueueWorkerBase implements ContainerFactoryPlug
     $this->loggerFactory = $logger_factory;
     $this->strawberryfieldUtility = $strawberryfield_utility_service;
     $this->messenger = $messenger;
-    $this->fileSystem = $file_system;
-    $this->streamWrapperManager = $stream_wrapper_manager;
-    $this->moduleHandler = $module_handler;
     $this->config = $config_factory->get('strawberryfield.storage_settings');
   }
 
@@ -169,9 +153,7 @@ class CompostQueueWorker extends QueueWorkerBase implements ContainerFactoryPlug
     if (!function_exists('str_starts_with')) {
       function str_starts_with($haystack, $needle) {
         return (string) $needle !== ''
-          && strncmp(
-            $haystack, $needle, strlen($needle)
-          ) === 0;
+          && str_starts_with($haystack, $needle);
       }
     }
     if (!function_exists('str_ends_with')) {
@@ -234,7 +216,7 @@ class CompostQueueWorker extends QueueWorkerBase implements ContainerFactoryPlug
       }
     }
 
-    $base_name = $this->fileSystem->basename($uri);
+    $base_name = basename($uri);
     error_log($base_name);
     // Bypass prefix check if enabled and in a safe place already
     $bypass_dot = ($this->config->get('compost_dot_files') && $safe);
@@ -319,7 +301,7 @@ class CompostQueueWorker extends QueueWorkerBase implements ContainerFactoryPlug
       }
     }
     else {
-      if (class_exists('\Drupal\Core\Queue\DelayedRequeueException')) {
+      if (class_exists(\Drupal\Core\Queue\DelayedRequeueException::class)) {
         throw new DelayedRequeueException(
           0, 'Not yet the time to compost'
         );

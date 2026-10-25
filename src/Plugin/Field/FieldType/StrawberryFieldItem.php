@@ -68,16 +68,16 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
     */
    public static function schema(FieldStorageDefinitionInterface $field_definition)
    {
-     return array(
-       'columns' => array(
-         'value' => array(
+     return [
+       'columns' => [
+         'value' => [
            'type' => 'json',
            'pgsql_type' => 'json',
            'mysql_type' => 'json',
            'not null' => FALSE,
-         ),
-       ),
-     );
+         ],
+       ],
+     ];
    }
 
    /**
@@ -105,7 +105,7 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
        ->setLabel('JSON keys defined in this field')
        ->setComputed(TRUE)
        ->setClass(
-         '\Drupal\strawberryfield\Plugin\DataType\StrawberryKeysFromJson'
+         \Drupal\strawberryfield\Plugin\DataType\StrawberryKeysFromJson::class
        )
        ->setInternal(FALSE)
        ->setSetting('filter_empties', TRUE)
@@ -117,7 +117,7 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
        ->setLabel('JSON keys defined in this field')
        ->setComputed(TRUE)
        ->setClass(
-         '\Drupal\strawberryfield\Plugin\DataType\StrawberryKeysFromJson'
+         \Drupal\strawberryfield\Plugin\DataType\StrawberryKeysFromJson::class
        )
        ->setInternal(TRUE)
        ->setSetting('filter_empties', FALSE)
@@ -143,9 +143,9 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
            $plugin_instance = \Drupal::service('strawberryfield.keyname_manager')->createInstance($plugin_config_entity->getPluginid(),$configuration_options);
            $plugin_definition = $plugin_instance->getPluginDefinition();
            // Allows plugins to define its own processing class for the JSON values.
-           $processor_class = isset($plugin_definition['processor_class'])? $plugin_definition['processor_class'] : '\Drupal\strawberryfield\Plugin\DataType\StrawberryValuesFromJson';
+           $processor_class = $plugin_definition['processor_class'] ?? \Drupal\strawberryfield\Plugin\DataType\StrawberryValuesFromJson::class;
            // Allows plugins to define its own item type for each item in the ListDataDefinition for the JSON values.
-           $item_type = isset($plugin_definition['item_type'])? $plugin_definition['item_type'] : 'string';
+           $item_type = $plugin_definition['item_type'] ?? 'string';
            if (!isset($keynamelist[$processor_class])) {
              // make sure we have a processing class key even if we still have no keys
              $keynamelist[$processor_class] = [];

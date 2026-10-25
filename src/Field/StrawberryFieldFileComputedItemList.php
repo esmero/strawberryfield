@@ -28,7 +28,7 @@ class StrawberryFieldFileComputedItemList extends FileFieldItemList {
           /** @var \Drupal\strawberryfield\Plugin\Field\FieldType\StrawberryFieldItem $itemfield */
           $flatvalues = (array) $itemfield->provideFlatten();
           if (isset($flatvalues['dr:fid']) && is_array($flatvalues['dr:fid']) && !empty($flatvalues['dr:fid'])) {
-            $file_entities = array_filter($flatvalues['dr:fid'], 'is_int');
+            $file_entities = array_filter($flatvalues['dr:fid'], is_int(...));
             foreach ($file_entities as $delta => $id) {
               $this->list[$delta] = $this->createItem($delta, $id);
             }

@@ -31,9 +31,9 @@ class StrawberryfieldKeyNameProviderManager extends DefaultPluginManager{
       'Plugin/StrawberryfieldKeyNameProvider',
       $namespaces,
       $module_handler,
-      'Drupal\strawberryfield\Plugin\StrawberryfieldKeyNameProviderInterface',
-      'Drupal\strawberryfield\Attribute\StrawberryfieldKeyNameProvider',
-      'Drupal\strawberryfield\Annotation\StrawberryfieldKeyNameProvider',
+      \Drupal\strawberryfield\Plugin\StrawberryfieldKeyNameProviderInterface::class,
+      \Drupal\strawberryfield\Attribute\StrawberryfieldKeyNameProvider::class,
+      \Drupal\strawberryfield\Annotation\StrawberryfieldKeyNameProvider::class,
     );
 
     $this->alterInfo('strawberryfield_strawberryfieldkeynameprovider_info');

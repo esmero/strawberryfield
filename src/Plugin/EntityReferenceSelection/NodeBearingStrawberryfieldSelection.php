@@ -37,7 +37,7 @@ class NodeBearingStrawberryfieldSelection extends NodeSelection {
     $strawberryfields = [];
     $strawberryfields = \Drupal::service('entity_field.manager')->getFieldMapByFieldType('strawberryfield_field');
 
-    $filter_settings = isset($strawberryfields['node']) ? $strawberryfields['node']: [];
+    $filter_settings = $strawberryfields['node'] ?? [];
     foreach ($filter_settings as $field_name => $value) {
       $query->condition($field_name, 'NULL', 'IS NOT NULL');
     }

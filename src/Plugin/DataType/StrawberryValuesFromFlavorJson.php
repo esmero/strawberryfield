@@ -153,7 +153,7 @@ JSON;
           $files = \Drupal::entityTypeManager()->getStorage('file')->loadByProperties(['uuid' => $servicearray['dr:uuid']]);
           $file = $files ? current($files) : null;
         }
-        catch (PluginException $exception) {
+        catch (PluginException) {
           \Drupal::logger('strawberryfield flavour')->error('Wrong Flavor %needle definition in Entity ID %entityid, JSON Schema validation failed ', ['%needle' =>$needle ,'%entityid'  => $entityid]);
           $file = null;
         }
@@ -198,7 +198,7 @@ JSON;
    */
   public function get($index) {
     $this->ensureComputedValue();
-    return isset($this->computed[$index]) ? $this->computed[$index] : NULL;
+    return $this->computed[$index] ?? NULL;
   }
   /**
    * {@inheritdoc}

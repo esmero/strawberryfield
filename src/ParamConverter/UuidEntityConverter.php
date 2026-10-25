@@ -94,10 +94,7 @@ class UuidEntityConverter extends EntityConverter {
     $is_ado = (isset($route_parameters['resource_type']['type']) && $route_parameters['resource_type']['type'] == 'ado') ? TRUE : FALSE;
 
     return (
-      !empty($definition['type']) && strpos(
-        $definition['type'],
-        'entity:node'
-      ) === 0 && $is_ado
+      !empty($definition['type']) && str_starts_with($definition['type'], 'entity:node') && $is_ado
     );
   }
 

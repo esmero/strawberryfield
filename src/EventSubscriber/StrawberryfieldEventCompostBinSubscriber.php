@@ -24,13 +24,6 @@ class StrawberryfieldEventCompostBinSubscriber implements EventSubscriberInterfa
   protected static $priority = 700;
 
   /**
-   * The messenger.
-   *
-   * @var \Drupal\Core\Messenger\MessengerInterface
-   */
-  protected MessengerInterface $messenger;
-
-  /**
    * StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator constructor.
    *
    * @param \Drupal\Core\StringTranslation\TranslationInterface $string_translation
@@ -38,10 +31,12 @@ class StrawberryfieldEventCompostBinSubscriber implements EventSubscriberInterfa
    */
   public function __construct(
     TranslationInterface $string_translation,
-    MessengerInterface $messenger
+    /**
+     * The messenger.
+     */
+    protected MessengerInterface $messenger
   ) {
     $this->stringTranslation = $string_translation;
-    $this->messenger = $messenger;
   }
   /**
    * {@inheritdoc}
@@ -69,7 +64,7 @@ class StrawberryfieldEventCompostBinSubscriber implements EventSubscriberInterfa
       ->createItem($data)) {
       $this->messenger->addError($this->t('We could not keep track of (enqueue) temporary file @file and will not be able to remove it later. Please check your logs and contact your admin to deal with it manually.', ['@file' => $data->uri]));
     }
-    $current_class = get_called_class();
+    $current_class = static::class;
     // Silly but i'm a destructor!
     unset($data);
     $event->setProcessedBy($current_class, TRUE);

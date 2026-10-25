@@ -322,7 +322,7 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
         // We call array_merge() using call_user_func_array() to prevent having to
         // use it in a loop because it is a resource greedy construction.
         // @see https://github.com/kalessil/phpinspectionsea/blob/master/docs/performance.md#slow-array-function-used-in-loop
-        $text = call_user_func_array('array_merge', array_values($item));
+        $text = call_user_func_array(array_merge(...), array_values($item));
         if ($this->configuration['excerpt_clean']) {
           $text = $this->sortAndDedupe($text);
         }
@@ -346,7 +346,7 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
           // first implode all existing keys, makes comparing easier.
           $joined_keys = strtolower(implode(" ", $keys));
           foreach($highlighted_keys as $index => $highlighted_key) {
-            if (strpos($joined_keys, strtolower($highlighted_key)) !== FALSE) {
+            if (str_contains($joined_keys, strtolower($highlighted_key))) {
               unset($highlighted_keys[$index]);
             }
           }
@@ -379,7 +379,7 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
             $item_keys_with_links[$key] = $rendered_url->toString()->getGeneratedLink();
           }
         }
-        catch (\Exception $e) {
+        catch (\Exception) {
           $this->getLogger('strawberryfield')->warning('Error happened trying to load an entity to generate a link highlight', []);
         }
 
@@ -411,9 +411,7 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
   protected function sortAndDedupe(array $text) {
     $text = array_unique($text);
     uasort(
-      $text, function ($a, $b) {
-      return strlen($b) - strlen($a);
-    }
+      $text, fn($a, $b) => strlen($b) - strlen($a)
     );
     return $text;
   }
@@ -572,9 +570,7 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
 
         // Remember where we last found $key, in case we are coming through a
         // second time.
-        if (!isset($look_start[$key])) {
-          $look_start[$key] = 0;
-        }
+        $look_start[$key] ??= 0;
 
         // See if we can find $key after where we found it the last time. Since
         // we are requiring a match on a word boundary, make sure $text starts
@@ -742,9 +738,7 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
 
         // Remember where we last found $key, in case we are coming through a
         // second time.
-        if (!isset($look_start[$key])) {
-          $look_start[$key] = 0;
-        }
+        $look_start[$key] ??= 0;
 
         // See if we can find $key after where we found it the last time. Since
         // we are requiring a match on a word boundary, make sure $text starts
@@ -898,7 +892,7 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
       return implode('', $texts);
     }
     $key_strings = array_keys($keys);
-    $key_strings = implode('|', array_map('preg_quote', $key_strings, array_fill(0, count($key_strings), '/')));
+    $key_strings = implode('|', array_map(preg_quote(...), $key_strings, array_fill(0, count($key_strings), '/')));
     // If "Highlight partial matches" is disabled, we only want to highlight
     // matches that are complete words. Otherwise, we want all of them.
     $boundary = !$this->configuration['highlight_partial'] ? static::$boundary : '';
@@ -1140,9 +1134,7 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
       }
       $backend_highlights = array_unique(array_merge(...$backend_highlights));
       $backend_highlights = !empty($backend_highlights) ? $backend_highlights : ['*'];
-      $backend_highlights = array_filter($backend_highlights, function($v) {
-        return preg_match('/^t.?[sm]_/', $v) || preg_match('/^s[sm]_/', $v);
-      });
+      $backend_highlights = array_filter($backend_highlights, fn($v) => preg_match('/^t.?[sm]_/', $v) || preg_match('/^s[sm]_/', $v));
       $query->setOption(
         'sbf_highlight_fields', $backend_highlights
       );

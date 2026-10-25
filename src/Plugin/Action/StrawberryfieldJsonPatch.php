@@ -40,82 +40,82 @@ class StrawberryfieldJsonPatch extends ConfigurableActionBase implements Depende
    *
    * JSON SCHEMA for a JSON Patch Operation @see https://github.com/fge/sample-json-schemas/blob/master/json-patch/json-patch.json
    */
-  const acceptedjsonschema = <<<'JSON'
-{
-    "title": "JSON Patch",
-    "description": "A JSON Schema describing a JSON Patch",
-    "$schema": "http://json-schema.org/draft-04/schema#",
-    "notes": [
-        "Only required members are accounted for, other members are ignored"
-    ],
-    "type": "array",
-    "items": {
-        "description": "one JSON Patch operation",
-        "allOf": [
-            {
-                "description": "Members common to all operations",
-                "type": "object",
-                "required": [ "op", "path" ],
-                "properties": {
-                    "path": { "$ref": "#/definitions/jsonPointer" }
-                }
-            },
-            { "$ref": "#/definitions/oneOperation" }
-        ]
-    },
-    "definitions": {
-        "jsonPointer": {
-            "type": "string",
-            "pattern": "^(/[^/~]*(~[01][^/~]*)*)*$"
-        },
-        "add": {
-            "description": "add operation. Value can be any JSON value.",
-            "properties": { "op": { "enum": [ "add" ] } },
-            "required": [ "value" ]
-        },
-        "remove": {
-            "description": "remove operation. Only a path is specified.",
-            "properties": { "op": { "enum": [ "remove" ] } }
-        },
-        "replace": {
-            "description": "replace operation. Value can be any JSON value.",
-            "properties": { "op": { "enum": [ "replace" ] } },
-            "required": [ "value" ]
-        },
-        "move": {
-            "description": "move operation. \"from\" is a JSON Pointer.",
-            "properties": {
-                "op": { "enum": [ "move" ] },
-                "from": { "$ref": "#/definitions/jsonPointer" }
-            },
-            "required": [ "from" ]
-        },
-        "copy": {
-            "description": "copy operation. \"from\" is a JSON Pointer.",
-            "properties": {
-                "op": { "enum": [ "copy" ] },
-                "from": { "$ref": "#/definitions/jsonPointer" }
-            },
-            "required": [ "from" ]
-        },
-        "test": {
-            "description": "test operation. Value can be any JSON value.",
-            "properties": { "op": { "enum": [ "test" ] } },
-            "required": [ "value" ]
-        },
-        "oneOperation": {
-            "oneOf": [
-                { "$ref": "#/definitions/add" },
-                { "$ref": "#/definitions/remove" },
-                { "$ref": "#/definitions/replace" },
-                { "$ref": "#/definitions/move" },
-                { "$ref": "#/definitions/copy" },
-                { "$ref": "#/definitions/test" }
-            ]
-        }
-    }
-}
-JSON;
+  const acceptedjsonschema = <<<'JSON_WRAP'
+  {
+      "title": "JSON Patch",
+      "description": "A JSON Schema describing a JSON Patch",
+      "$schema": "http://json-schema.org/draft-04/schema#",
+      "notes": [
+          "Only required members are accounted for, other members are ignored"
+      ],
+      "type": "array",
+      "items": {
+          "description": "one JSON Patch operation",
+          "allOf": [
+              {
+                  "description": "Members common to all operations",
+                  "type": "object",
+                  "required": [ "op", "path" ],
+                  "properties": {
+                      "path": { "$ref": "#/definitions/jsonPointer" }
+                  }
+              },
+              { "$ref": "#/definitions/oneOperation" }
+          ]
+      },
+      "definitions": {
+          "jsonPointer": {
+              "type": "string",
+              "pattern": "^(/[^/~]*(~[01][^/~]*)*)*$"
+          },
+          "add": {
+              "description": "add operation. Value can be any JSON value.",
+              "properties": { "op": { "enum": [ "add" ] } },
+              "required": [ "value" ]
+          },
+          "remove": {
+              "description": "remove operation. Only a path is specified.",
+              "properties": { "op": { "enum": [ "remove" ] } }
+          },
+          "replace": {
+              "description": "replace operation. Value can be any JSON value.",
+              "properties": { "op": { "enum": [ "replace" ] } },
+              "required": [ "value" ]
+          },
+          "move": {
+              "description": "move operation. \"from\" is a JSON Pointer.",
+              "properties": {
+                  "op": { "enum": [ "move" ] },
+                  "from": { "$ref": "#/definitions/jsonPointer" }
+              },
+              "required": [ "from" ]
+          },
+          "copy": {
+              "description": "copy operation. \"from\" is a JSON Pointer.",
+              "properties": {
+                  "op": { "enum": [ "copy" ] },
+                  "from": { "$ref": "#/definitions/jsonPointer" }
+              },
+              "required": [ "from" ]
+          },
+          "test": {
+              "description": "test operation. Value can be any JSON value.",
+              "properties": { "op": { "enum": [ "test" ] } },
+              "required": [ "value" ]
+          },
+          "oneOperation": {
+              "oneOf": [
+                  { "$ref": "#/definitions/add" },
+                  { "$ref": "#/definitions/remove" },
+                  { "$ref": "#/definitions/replace" },
+                  { "$ref": "#/definitions/move" },
+                  { "$ref": "#/definitions/copy" },
+                  { "$ref": "#/definitions/test" }
+              ]
+          }
+      }
+  }
+  JSON_WRAP;
   /**
    * The entity type manager.
    *

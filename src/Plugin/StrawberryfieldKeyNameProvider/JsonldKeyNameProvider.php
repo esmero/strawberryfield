@@ -112,7 +112,7 @@ class JsonldKeyNameProvider extends StrawberryfieldKeyNameProviderBase {
     }
     //user extra provided keys, if any.
     $extrakeys = explode(",",$this->getConfiguration()['keys']);
-    $extrakeys = array_map('trim', $extrakeys);
+    $extrakeys = array_map(trim(...), $extrakeys);
     $extrakeys = !empty($extrakeys) ? array_fill_keys($extrakeys,'stub'): [];
     $jsonld_reservedkeys = [
       '@context',
@@ -200,7 +200,7 @@ class JsonldKeyNameProvider extends StrawberryfieldKeyNameProviderBase {
         );
     }
 
-    $cleandata = array_filter($data, 'is_string',ARRAY_FILTER_USE_KEY);
+    $cleandata = array_filter($data, is_string(...),ARRAY_FILTER_USE_KEY);
 
     return $cleandata;
   }
@@ -215,12 +215,12 @@ class JsonldKeyNameProvider extends StrawberryfieldKeyNameProviderBase {
     $maindata = $this->getRemoteJsonData($primaryURL);
     if (!empty($maindata)) {
 
-      $maindata = isset($maindata['@context']) ? $maindata['@context'] : $maindata;
+      $maindata = $maindata['@context'] ?? $maindata;
       $filterURL = $this->getConfiguration()['filterurl'];
 
       // We won't filter things out there, ::extractKeys will deal with that.
       $filderdatapre = $this->getRemoteJsonData($filterURL);
-      $filterData = $filderdatapre ? $filderdatapre : [];
+      $filterData = $filderdatapre ?: [];
 
       $keys = $this->extractKeys($maindata, $filterData);
 
@@ -361,7 +361,7 @@ class JsonldKeyNameProvider extends StrawberryfieldKeyNameProviderBase {
     } else {
       // Means no filter. Contexts like schema can have 2000+ keys!
       // remove prefixes, only leave keys that declare an @id
-      $keystoreturn = array_filter($original, 'is_array');
+      $keystoreturn = array_filter($original, is_array(...));
 
     }
     return $keystoreturn;

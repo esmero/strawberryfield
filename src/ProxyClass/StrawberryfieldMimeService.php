@@ -21,13 +21,6 @@ namespace Drupal\strawberryfield\ProxyClass {
     use DependencySerializationTrait;
 
     /**
-     * The id of the original proxied service.
-     *
-     * @var string
-     */
-    protected $drupalProxyOriginalServiceId;
-
-    /**
      * The real proxied service, after it was lazy loaded.
      *
      * @var \Drupal\strawberryfield\StrawberryfieldMimeService
@@ -46,13 +39,15 @@ namespace Drupal\strawberryfield\ProxyClass {
      *
      * @param \Symfony\Component\DependencyInjection\ContainerInterface $container
      *   The container.
-     * @param string $drupal_proxy_original_service_id
+     * @param string $drupalProxyOriginalServiceId
      *   The service ID of the original service.
      */
-    public function __construct(ContainerInterface $container, $drupal_proxy_original_service_id)
+    public function __construct(ContainerInterface $container, /**
+     * The id of the original proxied service.
+     */
+    protected $drupalProxyOriginalServiceId)
     {
       $this->container = $container;
-      $this->drupalProxyOriginalServiceId = $drupal_proxy_original_service_id;
     }
 
     /**

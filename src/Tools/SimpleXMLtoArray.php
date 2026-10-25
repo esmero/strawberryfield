@@ -25,32 +25,22 @@ class SimpleXMLtoArray {
     'keepPrefix' => TRUE // Don't user prefixes for elements. As simple as that.
   ];
 
-  /**
-   * @var SimpleXMLElement
-   */
-  private $subject;
-
   public function __construct(
-    SimpleXMLElement $element,
+    private readonly SimpleXMLElement $subject,
     $options = []
   ) {
     $this->options = array_merge($options, $this->options);
-    $this->subject = $element;
 
   }
 
   public function xmlToArray(SimpleXMLElement $element = null) {
 
-    if ($element === null) {
-      $element = $this->subject;
-    }
+    $element ??= $this->subject;
 
     //$namespaces = $element->getDocNamespaces();
     $namespaces =  $element->getNamespaces();
     $namespaces = array_unique($namespaces);
-    if (!isset($namespaces[''] )) {
-      $namespaces['']  = null;
-    }
+    $namespaces[''] ??= null;
 
 
     //get attributes from all namespaces
@@ -80,7 +70,7 @@ class SimpleXMLtoArray {
         //recurse into child nodes
         $childArray = $this->xmlToArray($childXml);
         // We can not use each() anymore, deprecated since PHP 7.2
-        list($childTagName, $childProperties) = [ key($childArray), current($childArray) ];
+        [$childTagName, $childProperties] = [ key($childArray), current($childArray) ];
         next($childArray);
         //replace characters in tag name
         if ($this->options['keySearch']) $childTagName =

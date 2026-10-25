@@ -68,7 +68,7 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
       $jmespaths_split = preg_split($pattern, $jmespaths);
       $jmespath_array = [];
       if ($jmespaths_split && is_array($jmespaths_split) && count($jmespaths_split) > 0 ) {
-        $jmespath_array = array_map('trim', $jmespaths_split);
+        $jmespath_array = array_map(trim(...), $jmespaths_split);
       }
       else {
         // Regular expression for splitting failed. Return silently.
@@ -106,17 +106,15 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
           $v = trim($v);
         }
       }
-      $values = array_filter($jmespath_result_to_expose, function($value) {
-        // Only filter out nulls and empties. Keep FALSE/and 0
-        return ($value !== NULL && $value !== '');
-      });
-      $values = array_map('stripslashes', $values);
+      $values = array_filter($jmespath_result_to_expose, 
+          // Only filter out nulls and empties. Keep FALSE/and 0
+          fn($value) => $value !== NULL && $value !== '');
+      $values = array_map(stripslashes(...), $values);
       if ($is_date && !$is_date_range) {
         $values = $this->processDatesFromValues($values);
-        $values = array_filter($values, function($value) {
-          // Only filter out nulls, empties  and FALSE. Keep 0
-          return ($value !== NULL && $value !== '' &&  $value !== FALSE);
-        });
+        $values = array_filter($values, 
+            // Only filter out nulls, empties  and FALSE. Keep 0
+            fn($value) => $value !== NULL && $value !== '' &&  $value !== FALSE);
       }
       elseif ($is_date_range) {
         $values = $this->processDateRangesFromValues($values);
@@ -237,12 +235,12 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
       if ($result->isValid()) {
         $edtf_value = $result->getEdtfValue();
         // @todo remove once EDTF fixes their invalid Constructor for EDTF\Model\Interval that should per interface never allow NULL for start nor end date
-        if (get_class($edtf_value) == "EDTF\Model\Set") {
+        if ($edtf_value::class == \EDTF\Model\Set::class) {
           //means we have something like [1977, 1984/2023] or {1977, 1984/2023}
           // and each entry needs to be processed like individual elements
           foreach ($edtf_value->getElements() as $element) {
-            switch(get_class($element)) {
-              case "EDTF\Model\SetElement\RangeSetElement":
+            switch($element::class) {
+              case \EDTF\Model\SetElement\RangeSetElement::class:
                 $min = date(DATE_ATOM, $element->getMinAsUnixTimestamp());
                 $max = date(DATE_ATOM, $element->getMaxAsUnixTimestamp());
                 if ($min && $this->validateDateAsDrupal($min)) {
@@ -252,7 +250,7 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
                   $values_parsed[] = $max;
                 }
                 break;
-              case "EDTF\Model\SetElement\OpenSetElement":
+              case \EDTF\Model\SetElement\OpenSetElement::class:
                 //use the only the certain data. Open Sets boundaries/digitally have unclear boundaries.
                 $min = date(DATE_ATOM, $element->getDate()->getMin());
                 if ($min && $this->validateDateAsDrupal($min)) {
@@ -289,8 +287,8 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
         }
         else {
           //single entries.
-          switch (get_class($edtf_value)) {
-            case "EDTF\Model\Interval":
+          switch ($edtf_value::class) {
+            case \EDTF\Model\Interval::class:
               if ($edtf_value->hasStartDate()) {
                 $min = date(DATE_ATOM, $edtf_value->getMin());
                 if ($min && $this->validateDateAsDrupal($min)) {
@@ -304,7 +302,7 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
                 }
               }
               break;
-            case "EDTF\Model\SetElement\OpenSetElement":
+            case \EDTF\Model\SetElement\OpenSetElement::class:
               //use the only the certain data. Open Sets boundaries/digitally have unclear boundaries.
               $min = date(DATE_ATOM, $edtf_value->getDate()->getMin());
               if ($min && $this->validateDateAsDrupal($min)) {
@@ -367,12 +365,12 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
       if ($result->isValid()) {
         $edtf_value = $result->getEdtfValue();
         // @todo remove once EDTF fixes their invalid Constructor for EDTF\Model\Interval that should per interface never allow NULL for start nor end date
-        if (get_class($edtf_value) == "EDTF\Model\Set") {
+        if ($edtf_value::class == \EDTF\Model\Set::class) {
           // means we have something like [1977, 1984/2023] or {1977, 1984/2023}
           // and each entry needs to be processed like individual elements
           foreach ($edtf_value->getElements() as $element) {
             $new_date_range = [];
-            if (get_class($element) == "EDTF\Model\SetElement\OpenSetElement" ) {
+            if ($element::class == \EDTF\Model\SetElement\OpenSetElement::class ) {
               //use the only the certain data. Open Sets boundaries/digitally have unclear boundaries.
               $new_date_range['value'] = date(DATE_ATOM, $element->getDate()->getMin());
               $new_date_range['end_value'] = date(DATE_ATOM, $element->getDate()->getMax());
@@ -394,8 +392,8 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
         }
         else {
           //single entries.
-          switch (get_class($edtf_value)) {
-            case "EDTF\Model\Interval":
+          switch ($edtf_value::class) {
+            case \EDTF\Model\Interval::class:
               // Skip any Interval that is Open?
               if ($edtf_value->hasStartDate() && $edtf_value->hasEndDate()) {
                 $new_date_range = [];
@@ -410,7 +408,7 @@ class StrawberryValuesViaJmesPathFromJson extends ItemList {
                 }
               }
               break;
-            case "EDTF\Model\SetElement\OpenSetElement":
+            case \EDTF\Model\SetElement\OpenSetElement::class:
               //use the only the certain data. Open Sets boundaries/digitally have unclear boundaries.
               $new_date_range['value'] = date(DATE_ATOM, $element->getDate()->getMin());
               $new_date_range['end_value'] = date(DATE_ATOM, $element->getDate()->getMax());

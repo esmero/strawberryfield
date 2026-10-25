@@ -210,13 +210,13 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
                 if (isset($values[$jsonkey_with_node_entity]) && !empty($values[$jsonkey_with_node_entity])) {
                   $entity_ids = (array) $values[$jsonkey_with_node_entity];
                   // We filter for scalar that way we don't end sending an array or object to UUid validator.
-                  $entity_ids = array_filter($entity_ids, 'is_scalar');
+                  $entity_ids = array_filter($entity_ids, is_scalar(...));
                   $node_entities_ids = array_filter($entity_ids, function ($el) {
                     $el = filter_var($el, FILTER_VALIDATE_INT);
                     return $el;
                   });
                   $node_entities_uuids = array_filter($entity_ids, [
-                    '\Ramsey\Uuid\Uuid',
+                    \Ramsey\Uuid\Uuid::class,
                     'isValid'
                   ]);
                   $node_entities['nids'][$jsonkey_with_node_entity] = array_merge($node_entities['nids'][$jsonkey_with_node_entity] ?? [], $node_entities_ids);
@@ -363,9 +363,9 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
    */
   public function getStrawberryfieldSolrFields(Index $index_entity) {
     $solr_fields = $index_entity->get('field_settings');
-    $property_path_is_sbf = array();
+    $property_path_is_sbf = [];
 
-    $sbf_solr_fields = array();
+    $sbf_solr_fields = [];
 
     foreach ($solr_fields as $id => $field) {
       $property_path = explode(":", $field['property_path']);
@@ -373,10 +373,8 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
       $field_name = $property_path[0];
       // check if this $field_name exists as an sbf field name, and store result in $property_path_is_sbf
       // check if key already exists, as there will be repeats among solr fields
-      if (!isset($property_path_is_sbf[$field_name])) {
-        $property_path_is_sbf[$field_name] = in_array($field_name,
-          $this->strawberryfieldMachineNames);
-      }
+      $property_path_is_sbf[$field_name] ??= in_array($field_name,
+        $this->strawberryfieldMachineNames);
       $has_sbf_property_path = $property_path_is_sbf[$field_name];
       $has_node_datasource = array_key_exists('datasource_id',
         $field) ? $field['datasource_id'] === "entity:node" : FALSE;
@@ -393,7 +391,7 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
    * {@inheritdoc}
    */
   public function verifyCommand($execpath): bool {
-    $iswindows = strpos(PHP_OS, 'WIN') === 0;
+    $iswindows = str_starts_with(PHP_OS, 'WIN');
     $canexecute = FALSE;
     $execpath = trim(escapeshellcmd($execpath));
     $test = $iswindows ? 'where' : 'command -v';
@@ -412,8 +410,8 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
       return 0;
     }
     $base = log($size, 1024);
-    $suffixes = array('', 'k', 'M', 'G', 'T');
-    return round(pow(1024, $base - floor($base)),
+    $suffixes = ['', 'k', 'M', 'G', 'T'];
+    return round(1024 ** ($base - floor($base)),
         $precision) . $suffixes[floor($base)];
   }
 
@@ -425,7 +423,7 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
     $site_path = explode('/', $site_path);
     $site_name = $site_path[1];
     $execpath = $execpath . ' --uri=' . $site_name;
-    $iswindows = strpos(PHP_OS, 'WIN') === 0;
+    $iswindows = str_starts_with(PHP_OS, 'WIN');
     $canexecute = FALSE;
     $execpath = trim(escapeshellcmd($execpath));
     $test = $iswindows ? 'where' : 'command -v';
@@ -437,7 +435,7 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
       }
       $output = shell_exec($execpath);
       if ($output) {
-        if (strpos($output, 'Drush Commandline Tool') === 0) {
+        if (str_starts_with($output, 'Drush Commandline Tool')) {
           $canexecute = TRUE;
         }
       }
@@ -806,7 +804,7 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
     if ($always_include_header) {
       $rowHeaders = $data[0] ?? [];
       $rowHeaders_utf8 = array_map(function($value) {
-        $value = $value ?? '';
+        $value ??= '';
         $value = stripslashes($value);
         $value = function_exists('mb_convert_encoding') ? mb_convert_encoding($value, 'UTF-8', 'ISO-8859-1') : utf8_encode($value);
         $value = strtolower($value);
@@ -832,7 +830,7 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
           continue;
         }
         // Ensure row is always an array.
-        $row = $row ?? [];
+        $row ??= [];
         $flat = trim(implode('', $row));
         //check for empty row...if found stop there.
         $maxRow = $rowindex;
@@ -847,7 +845,7 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
         // Offsetting all rows by 1. That way we do not need to remap numeric parents
         $table[$rowindex + 1] = $row;
       }
-      $maxRow = $maxRow ?? $rowindex;
+      $maxRow ??= $rowindex;
     }
 
     return  [
@@ -954,7 +952,7 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
     if ($unit) {
       // Find the position of the unit in the ordered string which is the power
       // of magnitude to multiply a kilobyte by.
-      return round($size * pow(Bytes::KILOBYTE, stripos('bkmgtpezy', $unit[0])));
+      return round($size * Bytes::KILOBYTE ** stripos('bkmgtpezy', $unit[0]));
     }
     else {
       // Ensure size is a proper number type.

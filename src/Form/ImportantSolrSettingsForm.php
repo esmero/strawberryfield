@@ -324,7 +324,7 @@ class ImportantSolrSettingsForm extends ConfigFormBase {
       // If not #validated, dynamically populated dropdowns don't work.
       '#validated' => TRUE,
       '#required' => TRUE,
-      '#submit' => [[$this, 'field_submit']],
+      '#submit' => [$this->field_submit(...)],
       '#executes_submit_callback' => TRUE,
       '#ajax' => [
         'callback' => '::onIndexSelect',
@@ -402,7 +402,7 @@ class ImportantSolrSettingsForm extends ConfigFormBase {
   /**
    * Submission handler for condition changes in
    */
-  function field_submit(array &$form, FormStateInterface $form_state) {
+  public function field_submit(array &$form, FormStateInterface $form_state) {
     // We want to unset values here.
     // That way, e.g in case people select an index, then a field
     // And then a new index, solr_field_select gets always a chance to be

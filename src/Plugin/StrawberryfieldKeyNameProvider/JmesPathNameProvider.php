@@ -103,7 +103,7 @@ class JmesPathNameProvider extends StrawberryfieldKeyNameProviderBase {
       '#title' => $this->t('Exposed <em>Strawberry field</em> property name'),
       '#machine_name' => [
         'label' => '<br/>' . $this->t('Exposed Strawberry Field Property'),
-        'exists' => [$this, 'exists'],
+        'exists' => $this->exists(...),
         'source' => $exposed_key_parents,
       ],
       '#default_value' => $this->getConfiguration()['exposed_key'],

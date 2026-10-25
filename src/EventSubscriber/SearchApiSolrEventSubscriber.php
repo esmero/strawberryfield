@@ -15,8 +15,6 @@ use Solarium\Component\ComponentAwareQueryInterface;
 use Drupal\strawberryfield\StrawberryfieldSearchAPIUtilityServiceInterface;
 
 class SearchApiSolrEventSubscriber implements EventSubscriberInterface {
-  private StrawberryfieldSearchAPIUtilityServiceInterface $search_api_state;
-
   /**
    * @inheritDoc
    */
@@ -35,8 +33,8 @@ class SearchApiSolrEventSubscriber implements EventSubscriberInterface {
    *
    * @param StrawberryfieldSearchAPIUtilityServiceInterface $search_api_state
    */
-  public function __construct(StrawberryfieldSearchAPIUtilityServiceInterface $search_api_state) {
-    $this->search_api_state = $search_api_state;
+  public function __construct(private readonly StrawberryfieldSearchAPIUtilityServiceInterface $search_api_state)
+  {
   }
 
   /**

@@ -15,38 +15,30 @@ use Symfony\Contracts\EventDispatcher\Event;
 class StrawberryfieldFlavourCrudEvent extends Event {
 
   /**
-   * The Source Entity.
-   *
-   * @var \Drupal\Core\Entity\EntityInterface
-   */
-  private $entity;
-
-  /**
-   * The SBF fields.
-   *
-   * @var \Drupal\Core\Field\FieldItemListInterface;
-   */
-  private $fields;
-
-  /**
-   * The event type.
-   *
-   * @var \Drupal\strawberryfield\StrawberryfieldEventType
-   */
-  private $eventType;
-
-  /**
    * Construct a new entity event.
    *
-   * @param string $event_type
+   * @param string $eventType
    *   The event type.
    * @param \Drupal\Core\Entity\EntityInterface $entity
    *   The entity which caused the event.
    */
-  public function __construct($event_type, EntityInterface $entity, FieldItemListInterface $fields) {
-    $this->entity = $entity;
-    $this->eventType = $event_type;
-    $this->fields = $fields;
+  public function __construct(
+      /**
+       * The event type.
+       */
+      private $eventType,
+      /**
+       * The Source Entity.
+       */
+      private readonly EntityInterface $entity,
+      /**
+       * The SBF fields.
+       *
+       * @var \Drupal\Core\Field\FieldItemListInterface;
+       */
+      private readonly FieldItemListInterface $fields
+  )
+  {
   }
 
   /**

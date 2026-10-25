@@ -69,7 +69,7 @@ class StrawberryFlavorContentAccess extends ProcessorPluginBase {
     $processor->setLogger($container->get('logger.channel.search_api'));
     $processor->setDatabase($container->get('database'));
     $processor->setCurrentUser($container->get('current_user'));
-    $processor->setNodeGrantsHelper($container->get('Drupal\node\NodeGrantsHelper'));
+    $processor->setNodeGrantsHelper($container->get(\Drupal\node\NodeGrantsHelper::class));
 
     return $processor;
   }
@@ -173,10 +173,8 @@ class StrawberryFlavorContentAccess extends ProcessorPluginBase {
   public function addFieldValues(ItemInterface $item) {
     static $anonymous_user;
 
-    if (!isset($anonymous_user)) {
-      // Load the anonymous user.
-      $anonymous_user = new AnonymousUserSession();
-    }
+    // Load the anonymous user.
+    $anonymous_user ??= new AnonymousUserSession();
 
     // Only run for node and comment items.
     $entity_type_id = $item->getDatasource()->getEntityTypeId();

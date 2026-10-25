@@ -159,7 +159,7 @@ class StrawberryFlavorAggregate extends ProcessorPluginBase {
                 ',', $configuration['processor_ids'] ?? ''
               );
               $processor_ids = array_filter(
-                array_map('trim', $processor_ids)
+                array_map(trim(...), $processor_ids)
               );
               foreach ($processor_ids as $processor_id) {
                 $flavors = $this->flavorsfromSolrIndex(
