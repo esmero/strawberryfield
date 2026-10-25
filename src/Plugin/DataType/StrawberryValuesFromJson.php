@@ -76,10 +76,9 @@ class StrawberryValuesFromJson extends ItemList {
           }
         }
         // This is an array, don't double nest to make the normalizer happy.
-        $values = array_filter($flattened[$needle], function($value) {
-          // Only filter out nulls and empties. Keep FALSE/and 0
-          return ($value !== NULL && $value !== '');
-        });
+        $values = array_filter($flattened[$needle], 
+            // Only filter out nulls and empties. Keep FALSE/and 0
+            fn($value) => $value !== NULL && $value !== '');
       }
       elseif (isset($flattened[$needle])) {
         $flattened[$needle] = is_string($flattened[$needle]) ? trim($flattened[$needle]) : $flattened[$needle];
@@ -127,7 +126,7 @@ class StrawberryValuesFromJson extends ItemList {
       throw new \InvalidArgumentException('Unable to get a value with a non-numeric delta in a list.');
     }
     $this->ensureComputedValue();
-    return isset($this->list[$index]) ? $this->list[$index] : NULL;
+    return $this->list[$index] ?? NULL;
   }
   /**
    * {@inheritdoc}

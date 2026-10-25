@@ -7,8 +7,11 @@ use Drupal\Core\Database\Connection;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\Session\AnonymousUserSession;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\TypedData\ComplexDataInterface;
+use Drupal\node\NodeGrantsHelper;
 use Drupal\node\NodeInterface;
+use Drupal\search_api\Attribute\SearchApiProcessor;
 use Drupal\search_api\Datasource\DatasourceInterface;
 use \Drupal\strawberryfield\Plugin\DataType\StrawberryfieldFlavorData;
 use Drupal\search_api\IndexInterface;
@@ -23,18 +26,17 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * Adds content access checks for nodes and comments.
- *
- * @SearchApiProcessor(
- *   id = "sbf_content_access",
- *   label = @Translation("Content access with Strawberry Flavor data sources awareness"),
- *   description = @Translation("Adds content access checks for nodes, comments and strawberryflavors like HOCR and WebArchive Indexes. This replaces built in Content Access Processor and should not be used together."),
- *   stages = {
- *     "add_properties" = 0,
- *     "pre_index_save" = -10,
- *     "preprocess_query" = -30,
- *   },
- * )
  */
+#[SearchApiProcessor(
+  id: 'sbf_content_access',
+  label: new TranslatableMarkup('Content access with Strawberry Flavor data sources awareness'),
+  description: new TranslatableMarkup('Adds content access checks for nodes, comments and strawberryflavors like HOCR and WebArchive Indexes. This replaces built in Content Access Processor and should not be used together.'),
+  stages: [
+    'add_properties' => 0,
+    'pre_index_save' => -10,
+    'preprocess_query' => -30
+  ]
+)]
 class StrawberryFlavorContentAccess extends ProcessorPluginBase {
 
   use LoggerTrait;
@@ -54,6 +56,11 @@ class StrawberryFlavorContentAccess extends ProcessorPluginBase {
   protected $currentUser;
 
   /**
+   * The node grants helper service.
+   */
+  protected NodeGrantsHelper $nodeGrantsHelper;
+
+  /**
    * {@inheritdoc}
    */
   public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
@@ -63,6 +70,7 @@ class StrawberryFlavorContentAccess extends ProcessorPluginBase {
     $processor->setLogger($container->get('logger.channel.search_api'));
     $processor->setDatabase($container->get('database'));
     $processor->setCurrentUser($container->get('current_user'));
+    $processor->setNodeGrantsHelper($container->get(\Drupal\node\NodeGrantsHelper::class));
 
     return $processor;
   }
@@ -114,6 +122,20 @@ class StrawberryFlavorContentAccess extends ProcessorPluginBase {
   }
 
   /**
+   * Sets the NodeGrantHelper.
+   *
+   * @param NodeGrantsHelper $NodeGrantsHelper
+   *   The current user.
+   *
+   * @return $this
+   */
+  public function setNodeGrantsHelper(NodeGrantsHelper $NodeGrantsHelper) {
+    $this->nodeGrantsHelper = $NodeGrantsHelper;
+    return $this;
+  }
+
+
+  /**
    * {@inheritdoc}
    */
   public static function supportsIndex(IndexInterface $index) {
@@ -152,10 +174,8 @@ class StrawberryFlavorContentAccess extends ProcessorPluginBase {
   public function addFieldValues(ItemInterface $item) {
     static $anonymous_user;
 
-    if (!isset($anonymous_user)) {
-      // Load the anonymous user.
-      $anonymous_user = new AnonymousUserSession();
-    }
+    // Load the anonymous user.
+    $anonymous_user ??= new AnonymousUserSession();
 
     // Only run for node and comment items.
     $entity_type_id = $item->getDatasource()->getEntityTypeId();
@@ -384,7 +404,7 @@ class StrawberryFlavorContentAccess extends ProcessorPluginBase {
     }
     $node_grants_field_id = $node_grants_field->getFieldIdentifier();
     $grants_conditions = $query->createConditionGroup('OR', ['content_access_grants']);
-    $grants = node_access_grants('view', $account);
+    $grants = $this->nodeGrantsHelper->nodeAccessGrants('view', $account);
     foreach ($grants as $realm => $gids) {
       foreach ($gids as $gid) {
         $grants_conditions->addCondition($node_grants_field_id, "node_access_$realm:$gid");

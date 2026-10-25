@@ -166,7 +166,7 @@ class ActivityStream
             throw new InvalidArgumentException("AS Actor properties passed to { $function } are invalid");
         }
 
-        $actor = array();
+        $actor = [];
         $actor['actor'] = ['type' => $asType];
         $actor['actor'] += $properties;
 
@@ -189,7 +189,7 @@ class ActivityStream
             throw new InvalidArgumentException("AS Object properties passed to { $function } are invalid");
         }
 
-        $obj = array();
+        $obj = [];
         $obj['object'] = ["type" => $asType];
         $obj['object'] = $obj['object'] + $properties;
 

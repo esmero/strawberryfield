@@ -3,6 +3,8 @@
 namespace Drupal\strawberryfield\Plugin\search_api\processor;
 
 use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\search_api\Attribute\SearchApiProcessor;
 use Drupal\search_api\LoggerTrait;
 use Drupal\search_api\Processor\ProcessorPluginBase;
 use Drupal\search_api\Query\QueryInterface;
@@ -10,18 +12,17 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * Aggregates Strawberry Flavors to its parent/top ADO.
- *
- * @SearchApiProcessor(
- *   id = "sbf_reduce_return",
- *   label = @Translation("Strawberry Reduce Returned Fields Processor"),
- *   description = @Translation("Reduces the amount of returned fields for Queries driven by Views by still maintaining highlights. Will also avoid completely returning any Strawberry Flavor Aggregator type of field."),
- *   stages = {
- *     "preprocess_query" = -30,
- *   },
- *   locked = false,
- *   hidden = false,
- * )
  */
+#[SearchApiProcessor(
+  id: 'sbf_reduce_return',
+  label: new TranslatableMarkup('Strawberry Reduce Returned Fields Processor'),
+  description: new TranslatableMarkup('Reduces the amount of returned fields for Queries driven by Views by still maintaining highlights. Will also avoid completely returning any Strawberry Flavor Aggregator type of field.'),
+  stages: [
+    'preprocess_query' => -30
+  ],
+  locked: false,
+  hidden: false
+)]
 class StrawberryReduceReturn extends ProcessorPluginBase {
 
   use LoggerTrait;

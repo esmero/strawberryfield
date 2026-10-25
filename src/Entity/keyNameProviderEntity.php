@@ -3,49 +3,46 @@
 namespace Drupal\strawberryfield\Entity;
 
 use Drupal\Core\Config\Entity\ConfigEntityBase;
+use Drupal\Core\Entity\Attribute\ConfigEntityType;
+use Drupal\Core\Entity\EntityViewBuilder;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\strawberryfield\Form\keyNameProviderEntityDeleteForm;
+use Drupal\strawberryfield\Form\keyNameProviderEntityForm;
+use Drupal\strawberryfield\keyNameProviderEntityHtmlRouteProvider;
+use Drupal\strawberryfield\keyNameProviderEntityListBuilder;
 
 /**
  * Defines the Strawberry Key Name Providers entity.
- *
- * @ConfigEntityType(
- *   id = "strawberry_keynameprovider",
- *   label = @Translation("Strawberry Key Name Providers"),
- *   handlers = {
- *     "view_builder" = "Drupal\Core\Entity\EntityViewBuilder",
- *     "list_builder" = "Drupal\strawberryfield\keyNameProviderEntityListBuilder",
- *     "form" = {
- *       "add" = "Drupal\strawberryfield\Form\keyNameProviderEntityForm",
- *       "edit" = "Drupal\strawberryfield\Form\keyNameProviderEntityForm",
- *       "delete" = "Drupal\strawberryfield\Form\keyNameProviderEntityDeleteForm"
- *     },
- *     "route_provider" = {
- *       "html" = "Drupal\strawberryfield\keyNameProviderEntityHtmlRouteProvider",
- *     },
- *   },
- *   config_prefix = "strawberry_keynameprovider",
- *   admin_permission = "administer site configuration",
- *   entity_keys = {
- *     "id" = "id",
- *     "label" = "label",
- *     "uuid" = "uuid"
- *   },
- *   links = {
- *     "canonical" = "/admin/structure/strawberry_keynameprovider/{strawberry_keynameprovider}",
- *     "add-form" = "/admin/structure/strawberry_keynameprovider/add",
- *     "edit-form" = "/admin/structure/strawberry_keynameprovider/{strawberry_keynameprovider}/edit",
- *     "delete-form" = "/admin/structure/strawberry_keynameprovider/{strawberry_keynameprovider}/delete",
- *     "collection" = "/admin/structure/strawberry_keynameprovider"
- *   },
- *   config_export = {
- *     "id",
- *     "label",
- *     "uuid",
- *     "pluginid",
- *     "pluginconfig",
- *     "active"
- *   }
- * )
  */
+#[ConfigEntityType(
+  id: 'strawberry_keynameprovider',
+  label: new TranslatableMarkup('Strawberry Key Name Providers'),
+  config_prefix: 'strawberry_keynameprovider',
+  entity_keys: [
+    'id' => 'id',
+    'label' => 'label',
+    'uuid' => 'uuid'
+  ],
+  handlers: [
+    'view_builder' => EntityViewBuilder::class,
+    'list_builder' => keyNameProviderEntityListBuilder::class,
+    'form' => [
+      'add' => keyNameProviderEntityForm::class,
+      'edit' => keyNameProviderEntityForm::class,
+      'delete' => keyNameProviderEntityDeleteForm::class],
+      'route_provider' => [
+        'html' => keyNameProviderEntityHtmlRouteProvider::class
+      ]
+  ],
+  links: [
+    'canonical' => '/admin/structure/strawberry_keynameprovider/{strawberry_keynameprovider}',
+    'add-form' => '/admin/structure/strawberry_keynameprovider/add',
+    'edit-form' => '/admin/structure/strawberry_keynameprovider/{strawberry_keynameprovider}/edit',
+    'delete-form' => '/admin/structure/strawberry_keynameprovider/{strawberry_keynameprovider}/delete',
+    'collection' => '/admin/structure/strawberry_keynameprovider'
+  ],
+  admin_permission: 'administer site configuration',
+  config_export: ['id', 'label', 'uuid', 'pluginid', 'pluginconfig', 'active'])]
 class keyNameProviderEntity extends ConfigEntityBase implements keyNameProviderEntityInterface {
 
   /**

@@ -43,7 +43,7 @@ class StrawberryFlavorAggregatedItemProperty extends ConfigurablePropertyBase {
 
     $processor_ids = explode(',',$configuration['processor_ids'] ?? '');
     $processor_ids = array_filter(
-      array_map('trim', $processor_ids)
+      array_map(trim(...), $processor_ids)
     );
 
     $configuration['processor_ids'] = implode(",", $processor_ids);

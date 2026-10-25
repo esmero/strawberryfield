@@ -50,9 +50,7 @@ class CustomNodeEditController extends ControllerBase {
    */
   public function getActiveNodeFormModes(NodeInterface $node) {
     $formModes = $this->entityDisplayRepository->getFormModeOptionsByBundle('node', $node->bundle());
-    return array_filter($formModes, function ($mode) {
-      return $this->currentUser()->hasPermission("use node.{$mode} form mode");
-    }, ARRAY_FILTER_USE_KEY);
+    return array_filter($formModes, fn($mode) => $this->currentUser()->hasPermission("use node.{$mode} form mode"), ARRAY_FILTER_USE_KEY);
   }
 
   /**

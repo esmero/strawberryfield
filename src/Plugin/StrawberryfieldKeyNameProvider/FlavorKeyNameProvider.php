@@ -9,6 +9,9 @@
 namespace Drupal\strawberryfield\Plugin\StrawberryfieldKeyNameProvider;
 
 use Drupal\Core\Annotation\Translation;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\strawberryfield\Attribute\StrawberryfieldKeyNameProvider;
+use Drupal\strawberryfield\Plugin\DataType\StrawberryValuesFromFlavorJson;
 use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
 use Drupal\strawberryfield\Plugin\StrawberryfieldKeyNameProviderBase;
 use Drupal\Core\Form\FormStateInterface;
@@ -20,14 +23,13 @@ use Drupal\Core\Cache\CacheBackendInterface;
 /**
  *
  * Flavor Strawberry Field Key Name Provider
- *
- * @StrawberryfieldKeyNameProvider(
- *    id = "flavor",
- *    label = @Translation("Flavor/Embedded JSON Service Strawberry Field Key Name Provider"),
- *    processor_class = "\Drupal\strawberryfield\Plugin\DataType\StrawberryValuesFromFlavorJson",
- *    item_type = "map"
- * )
  */
+#[StrawberryfieldKeyNameProvider(
+  id: 'flavor',
+  label: new TranslatableMarkup('Flavor/Embedded JSON Service Strawberry Field Key Name Provider'),
+  processor_class: StrawberryValuesFromFlavorJson::class,
+  item_type: 'map'
+)]
 class FlavorKeyNameProvider extends StrawberryfieldKeyNameProviderBase {
 
   public function calculateDependencies() {

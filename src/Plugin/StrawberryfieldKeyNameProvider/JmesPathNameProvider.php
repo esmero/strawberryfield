@@ -9,6 +9,9 @@
 namespace Drupal\strawberryfield\Plugin\StrawberryfieldKeyNameProvider;
 
 use Drupal\Core\Annotation\Translation;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\strawberryfield\Attribute\StrawberryfieldKeyNameProvider;
+use Drupal\strawberryfield\Plugin\DataType\StrawberryValuesViaJmesPathFromJson;
 use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
 use Drupal\strawberryfield\Plugin\StrawberryfieldKeyNameProviderBase;
 use Drupal\Core\Form\FormStateInterface;
@@ -20,14 +23,13 @@ use Drupal\Core\Cache\CacheBackendInterface;
 /**
  *
  * Flavor Strawberry Field Key Name Provider
- *
- * @StrawberryfieldKeyNameProvider(
- *    id = "jmespath",
- *    label = @Translation("JmesPath Strawberry Field Key Name Provider"),
- *    processor_class = "\Drupal\strawberryfield\Plugin\DataType\StrawberryValuesViaJmesPathFromJson",
- *    item_type = "string"
- * )
  */
+#[StrawberryfieldKeyNameProvider(
+  id: 'jmespath',
+  label: new TranslatableMarkup('JmesPath Strawberry Field Key Name Provider'),
+  processor_class: StrawberryValuesViaJmesPathFromJson::class,
+  item_type: 'string'
+)]
 class JmesPathNameProvider extends StrawberryfieldKeyNameProviderBase {
 
   public function calculateDependencies() {

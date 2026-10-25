@@ -9,7 +9,10 @@
 namespace Drupal\strawberryfield\Plugin\StrawberryfieldKeyNameProvider;
 
 use Drupal\Core\Annotation\Translation;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\strawberryfield\Attribute\StrawberryfieldKeyNameProvider;
 use Drupal\strawberryfield\EventSubscriber\StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator;
+use Drupal\strawberryfield\Plugin\DataType\StrawberryEntitiesViaJmesPathFromJson;
 use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
 use Drupal\strawberryfield\Plugin\StrawberryfieldKeyNameProviderBase;
 use Drupal\Core\Form\FormStateInterface;
@@ -21,15 +24,13 @@ use Drupal\Core\Cache\CacheBackendInterface;
 /**
  *
  * Flavor Strawberry Field Key Name Provider
- *
- * @StrawberryfieldKeyNameProvider(
- *    id = "entityjmespath",
- *    label = @Translation("Entity Reference JmesPath Strawberry Field Key Name Provider"),
- *    processor_class = "\Drupal\strawberryfield\Plugin\DataType\StrawberryEntitiesViaJmesPathFromJson",
- *    item_type = "entity_reference"
- *
- * )
  */
+#[StrawberryfieldKeyNameProvider(
+  id: 'entityjmespath',
+  label: new TranslatableMarkup('Entity Reference JmesPath Strawberry Field Key Name Provider'),
+  processor_class: StrawberryEntitiesViaJmesPathFromJson::class,
+  item_type: 'entity_reference'
+)]
 class EntityJmesPathNameProvider extends JmesPathNameProvider {
 
   /**

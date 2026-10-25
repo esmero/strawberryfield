@@ -5,12 +5,14 @@ namespace Drupal\strawberryfield\Plugin\Action;
 use Drupal\Component\Diff\Diff;
 use Drupal\Component\Diff\DiffFormatter;
 use Drupal\Core\Access\AccessResult;
+use Drupal\Core\Action\Attribute\Action;
 use Drupal\Core\Action\Plugin\Action\EntityActionBase;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Action\ConfigurableActionBase;
 use Drupal\Component\Plugin\DependentPluginInterface;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\TempStore\PrivateTempStoreFactory;
 use Drupal\strawberryfield\StrawberryfieldUtilityService;
 use Psr\Log\LoggerInterface;
@@ -23,15 +25,14 @@ use Swaggest\JsonDiff\JsonDiff;
 
 /**
  * Provides an action that can Modify Entity attached SBFs via JSON Patch.
- *
- * @Action(
- *   id = "entity:jsonpatch_action",
- *   action_label = @Translation("JSON Patch an ADO"),
- *   label = @Translation("JSON Patch an ADO"),
- *   category = @Translation("Metadata"),
- *   type = "node"
- * )
  */
+#[Action(
+  id: 'entity:jsonpatch_action',
+  label: new TranslatableMarkup('JSON Patch an ADO'),
+  action_label: new TranslatableMarkup('JSON Patch an ADO'),
+  category: new TranslatableMarkup('Metadata'),
+  type: 'node'
+)]
 class StrawberryfieldJsonPatch extends ConfigurableActionBase implements DependentPluginInterface, ContainerFactoryPluginInterface {
 
   /**
@@ -40,82 +41,82 @@ class StrawberryfieldJsonPatch extends ConfigurableActionBase implements Depende
    *
    * JSON SCHEMA for a JSON Patch Operation @see https://github.com/fge/sample-json-schemas/blob/master/json-patch/json-patch.json
    */
-  const acceptedjsonschema = <<<'JSON'
-{
-    "title": "JSON Patch",
-    "description": "A JSON Schema describing a JSON Patch",
-    "$schema": "http://json-schema.org/draft-04/schema#",
-    "notes": [
-        "Only required members are accounted for, other members are ignored"
-    ],
-    "type": "array",
-    "items": {
-        "description": "one JSON Patch operation",
-        "allOf": [
-            {
-                "description": "Members common to all operations",
-                "type": "object",
-                "required": [ "op", "path" ],
-                "properties": {
-                    "path": { "$ref": "#/definitions/jsonPointer" }
-                }
-            },
-            { "$ref": "#/definitions/oneOperation" }
-        ]
-    },
-    "definitions": {
-        "jsonPointer": {
-            "type": "string",
-            "pattern": "^(/[^/~]*(~[01][^/~]*)*)*$"
-        },
-        "add": {
-            "description": "add operation. Value can be any JSON value.",
-            "properties": { "op": { "enum": [ "add" ] } },
-            "required": [ "value" ]
-        },
-        "remove": {
-            "description": "remove operation. Only a path is specified.",
-            "properties": { "op": { "enum": [ "remove" ] } }
-        },
-        "replace": {
-            "description": "replace operation. Value can be any JSON value.",
-            "properties": { "op": { "enum": [ "replace" ] } },
-            "required": [ "value" ]
-        },
-        "move": {
-            "description": "move operation. \"from\" is a JSON Pointer.",
-            "properties": {
-                "op": { "enum": [ "move" ] },
-                "from": { "$ref": "#/definitions/jsonPointer" }
-            },
-            "required": [ "from" ]
-        },
-        "copy": {
-            "description": "copy operation. \"from\" is a JSON Pointer.",
-            "properties": {
-                "op": { "enum": [ "copy" ] },
-                "from": { "$ref": "#/definitions/jsonPointer" }
-            },
-            "required": [ "from" ]
-        },
-        "test": {
-            "description": "test operation. Value can be any JSON value.",
-            "properties": { "op": { "enum": [ "test" ] } },
-            "required": [ "value" ]
-        },
-        "oneOperation": {
-            "oneOf": [
-                { "$ref": "#/definitions/add" },
-                { "$ref": "#/definitions/remove" },
-                { "$ref": "#/definitions/replace" },
-                { "$ref": "#/definitions/move" },
-                { "$ref": "#/definitions/copy" },
-                { "$ref": "#/definitions/test" }
-            ]
-        }
-    }
-}
-JSON;
+  const acceptedjsonschema = <<<'JSON_WRAP'
+  {
+      "title": "JSON Patch",
+      "description": "A JSON Schema describing a JSON Patch",
+      "$schema": "http://json-schema.org/draft-04/schema#",
+      "notes": [
+          "Only required members are accounted for, other members are ignored"
+      ],
+      "type": "array",
+      "items": {
+          "description": "one JSON Patch operation",
+          "allOf": [
+              {
+                  "description": "Members common to all operations",
+                  "type": "object",
+                  "required": [ "op", "path" ],
+                  "properties": {
+                      "path": { "$ref": "#/definitions/jsonPointer" }
+                  }
+              },
+              { "$ref": "#/definitions/oneOperation" }
+          ]
+      },
+      "definitions": {
+          "jsonPointer": {
+              "type": "string",
+              "pattern": "^(/[^/~]*(~[01][^/~]*)*)*$"
+          },
+          "add": {
+              "description": "add operation. Value can be any JSON value.",
+              "properties": { "op": { "enum": [ "add" ] } },
+              "required": [ "value" ]
+          },
+          "remove": {
+              "description": "remove operation. Only a path is specified.",
+              "properties": { "op": { "enum": [ "remove" ] } }
+          },
+          "replace": {
+              "description": "replace operation. Value can be any JSON value.",
+              "properties": { "op": { "enum": [ "replace" ] } },
+              "required": [ "value" ]
+          },
+          "move": {
+              "description": "move operation. \"from\" is a JSON Pointer.",
+              "properties": {
+                  "op": { "enum": [ "move" ] },
+                  "from": { "$ref": "#/definitions/jsonPointer" }
+              },
+              "required": [ "from" ]
+          },
+          "copy": {
+              "description": "copy operation. \"from\" is a JSON Pointer.",
+              "properties": {
+                  "op": { "enum": [ "copy" ] },
+                  "from": { "$ref": "#/definitions/jsonPointer" }
+              },
+              "required": [ "from" ]
+          },
+          "test": {
+              "description": "test operation. Value can be any JSON value.",
+              "properties": { "op": { "enum": [ "test" ] } },
+              "required": [ "value" ]
+          },
+          "oneOperation": {
+              "oneOf": [
+                  { "$ref": "#/definitions/add" },
+                  { "$ref": "#/definitions/remove" },
+                  { "$ref": "#/definitions/replace" },
+                  { "$ref": "#/definitions/move" },
+                  { "$ref": "#/definitions/copy" },
+                  { "$ref": "#/definitions/test" }
+              ]
+          }
+      }
+  }
+  JSON_WRAP;
   /**
    * The entity type manager.
    *
@@ -229,8 +230,8 @@ JSON;
             /** @var $itemfield \Drupal\strawberryfield\Plugin\Field\FieldType\StrawberryFieldItem */
             $fullvalues = $itemfield->provideDecoded(FALSE);
             $fullvaluesoriginal = clone $fullvalues;
-            $patch = JsonPatch::import($this->patchArray);
             try {
+              $patch = JsonPatch::import($this->patchArray);
               $patch->apply($fullvalues, TRUE);
               if (!$field[$delta]->setMainValueFromArray((array) $fullvalues)) {
                 $this->messenger()->addError(
@@ -263,7 +264,7 @@ JSON;
                 $result = $message;
               }
               $patched = TRUE;
-            } catch (JsonDiffException $exception) {
+            } catch (JsonDiffException|\Exception $exception) {
               $patched = FALSE;
               $message = $this->t(
                 'Patch could not be applied for @entity with @error',

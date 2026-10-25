@@ -13,48 +13,36 @@ use Symfony\Contracts\EventDispatcher\Event;
 class StrawberryfieldCrudEvent extends Event {
 
   /**
-   * The Entity.
-   *
-   * @var \Drupal\Core\Entity\EntityInterface
-   */
-  private $entity;
-
-  /**
-   * The SBF field machine names.
-   *
-   * @array;
-   */
-  private $fields;
-
-  /**
-   * The event type.
-   *
-   * @var \Drupal\strawberryfield\StrawberryfieldEventType
-   */
-  private $eventType;
-
-
-  /**
-   * Which Subscribers processed this Event
-   *
-   * @var array
-   *
-   */
-  private $processedby = [];
-
-  /**
    * Construct a new entity event.
    *
-   * @param string $event_type
+   * @param string $eventType
    *   The event type.
    * @param \Drupal\Core\Entity\EntityInterface $entity
    *   The entity which caused the event.
    */
-  public function __construct($event_type, EntityInterface $entity, array $sbfFields, array $processedby = []) {
-    $this->entity = $entity;
-    $this->eventType = $event_type;
-    $this->fields =  $sbfFields;
-    $this->processedby = $processedby;
+  public function __construct(
+      /**
+       * The event type.
+       */
+      private $eventType,
+      /**
+       * The Entity.
+       */
+      private readonly EntityInterface $entity,
+      /**
+       * The SBF field machine names.
+       *
+       * @array;
+       */
+      private readonly array $fields,
+      /**
+       * Which Subscribers processed this Event
+       *
+       *
+       */
+      private array $processedby = []
+  )
+  {
   }
 
   /**

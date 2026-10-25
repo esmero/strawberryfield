@@ -18,15 +18,15 @@ class OcflHelper
     //@see https://ocfl.io/draft/implementation-notes/#bib-Pairtree
     public static function pairtreeEncode($identifier) {
         $encode_regex = "/[\"*+,<=>?\\\^|]|[^\x21-\x7e]/";
-        $escaped_string = preg_replace_callback($encode_regex, 'self::strtohex', $identifier);
-        $escaped_string = str_replace(array('/',':','.'), array('=','+',','),$escaped_string);
+        $escaped_string = preg_replace_callback($encode_regex, self::strtohex(...), $identifier);
+        $escaped_string = str_replace(['/',':','.'], ['=','+',','],$escaped_string);
         return $escaped_string;
     }
 
     public static function pairtreeDecode($identifier) {
         $decode_regex = "/\\^(..)/";
-        $decoded_string = str_replace(array('=','+',','), array('/',':','.'), $identifier);
-        $decoded_string = preg_replace_callback($decode_regex, 'self::hextostr', $decoded_string);
+        $decoded_string = str_replace(['=','+',','], ['/',':','.'], $identifier);
+        $decoded_string = preg_replace_callback($decode_regex, self::hextostr(...), $decoded_string);
         return $decoded_string;
     }
 

@@ -114,7 +114,7 @@ class StrawberryfieldEventInsertSubscriberDepositDO extends StrawberryfieldEvent
    */
   public function onEntityInsert(StrawberryfieldCrudEvent $event) {
     /* @var $entity \Drupal\Core\Entity\ContentEntityInterface */
-    $current_class = get_called_class();
+    $current_class = static::class;
     $entity = $event->getEntity();
     $sbf_fields = $event->getFields();
     // Strawberryfield data

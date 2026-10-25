@@ -7,7 +7,9 @@ use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityDisplayRepositoryInterface;
 use Drupal\Core\Field\EntityReferenceFieldItemListInterface;
 use Drupal\Core\Session\AccountInterface;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\TypedData\ComplexDataInterface;
+use Drupal\search_api\Attribute\SearchApiDatasource;
 use Drupal\search_api\Datasource\DatasourcePluginBase;
 use Drupal\search_api\LoggerTrait;
 use Drupal\search_api\Plugin\search_api\datasource\ContentEntity;
@@ -22,12 +24,11 @@ use Drupal\strawberryfield\StrawberryfieldSearchAPIUtilityServiceInterface;
 
 /**
  * Represents a datasource which exposes flavors.
- *
- * @SearchApiDatasource(
- *   id = "strawberryfield_flavor_datasource",
- *   label = @Translation("Strawberryfield Flavor Datasource")
- * )
  */
+#[SearchApiDatasource(
+  id: 'strawberryfield_flavor_datasource',
+  label: new TranslatableMarkup('Strawberryfield Flavor Datasource')
+)]
 class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements StrawberryfieldFlavorDatasourceInterface {
 
   use PluginFormTrait;
@@ -362,7 +363,7 @@ XML;
       foreach (
         $entity_ids_splitted[$entity_id] as $item_id => $splitted_id_for_node
       ) {
-        $fid_uuid = isset($splitted_id_for_node[3]) ? $splitted_id_for_node[3] : NULL;
+        $fid_uuid = $splitted_id_for_node[3] ?? NULL;
         if ($fid_uuid && $fid_uuid!= 'ado') {
           $files = $this->entityTypeManager->getStorage('file')->loadByProperties(
             [
@@ -424,7 +425,7 @@ XML;
     $function = $configuration['bundles']['default'] ? 'array_diff_key' : 'array_intersect_key';
     $entity_bundles = $function($entity_bundles, $selected_bundles);
     foreach ($entity_bundles as $bundle_id => $bundle_info) {
-      $bundles[$bundle_id] = isset($bundle_info['label']) ? $bundle_info['label'] : $bundle_id;
+      $bundles[$bundle_id] = $bundle_info['label'] ?? $bundle_id;
     }
     return $bundles ?: [$this->getEntityTypeId() => $this->label()];
   }
@@ -587,11 +588,11 @@ XML;
         $sequence_id = $sequence_parts[0] ?? 1;
         $internal_sequence_id = $sequence_parts[1] ?? $sequence_id;
 
-        $fid_uuid = isset($splitted_id_for_node[3]) ? $splitted_id_for_node[3] : NULL;
+        $fid_uuid = $splitted_id_for_node[3] ?? NULL;
         // for Metadata only Processors we won't have a file. We will use the stub "ado" instead
 
-        $plugin_id = isset($splitted_id_for_node[4]) ? $splitted_id_for_node[4] : NULL;
-        $translation_id = isset($splitted_id_for_node[2]) ? $splitted_id_for_node[2] : NULL;
+        $plugin_id = $splitted_id_for_node[4] ?? NULL;
+        $translation_id = $splitted_id_for_node[2] ?? NULL;
         // probably we will want to add the module/class namespace for the plugin id?
         if ($fid_uuid && $fid_uuid != 'ado') {
           $files = $this->entityTypeManager->getStorage('file')->loadByProperties(
@@ -633,12 +634,12 @@ XML;
           $sequence_total = isset($processed_data->sequence_total) ? (string) $processed_data->sequence_total : $sequence_id;
           $sequence_id = isset($processed_data->sequence_id) ? (int) $processed_data->sequence_id : $sequence_id;
           $internal_sequence_id = isset($processed_data->internal_sequence_id) ? (int) $processed_data->internal_sequence_id : $internal_sequence_id;
-          $config_processor_id = isset($processed_data->config_processor_id) ? $processed_data->config_processor_id : '';
-          $nlplang = isset($processed_data->nlplang) ? $processed_data->nlplang : [];
-          $processlang = isset($processed_data->processlang) ? $processed_data->processlang : [];
+          $config_processor_id = $processed_data->config_processor_id ?? '';
+          $nlplang = $processed_data->nlplang ?? [];
+          $processlang = $processed_data->processlang ?? [];
 
           // For ML generated data. We will pre-validate
-          $service_md5 =  isset($processed_data->service_md5) ? $processed_data->service_md5 : '';
+          $service_md5 =  $processed_data->service_md5 ?? '';
           $vector_576 = isset($processed_data->vector_576) && is_array($processed_data->vector_576) && count($processed_data->vector_576) == 576 ? $processed_data->vector_576 : NULL;
           $vector_512 = isset($processed_data->vector_512) && is_array($processed_data->vector_512) && count($processed_data->vector_512) == 512 ? $processed_data->vector_512 : NULL;
           $vector_1024 = isset($processed_data->vector_1024) && is_array($processed_data->vector_1024) && count($processed_data->vector_1024) == 1024 ? $processed_data->vector_1024 : NULL;
@@ -703,7 +704,7 @@ XML;
                 $doc->formatOutput = true;
                 $fulltext = $doc->savexml();
               }
-              catch (\Exception $e) {
+              catch (\Exception) {
               }
               $data['fulltext'] = trim($fulltext);
             }
@@ -847,7 +848,7 @@ XML;
         );
       }
       return $build;
-    } catch (\Exception $e) {
+    } catch (\Exception) {
       // The most common reason for this would be a
       // \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException in
       // getViewBuilder(), because the entity type definition doesn't specify a

@@ -2,31 +2,33 @@
 namespace Drupal\strawberryfield\Plugin\Field\FieldType;
 
 use Drupal\Core\Entity\TypedData\EntityDataDefinition;
+use Drupal\Core\Field\Attribute\FieldType;
 use Drupal\Core\Field\FieldItemBase;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Field\FieldDefinitionInterface;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\TypedData\DataDefinition;
 use Drupal\Core\TypedData\DataReferenceDefinition;
 use Drupal\Core\TypedData\MapDataDefinition;
 use Drupal\strawberryfield\Entity\keyNameProviderEntity;
 use Drupal\Component\Utility\Random;
 use Drupal\Core\TypedData\ListDataDefinition;
+use Drupal\strawberryfield\Field\StrawberryFieldItemList;
 use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
 
 /**
- * Provides a field type of strawberryfield.
- *
- * @FieldType(
- *   id = "strawberryfield_field",
- *   label = @Translation("Strawberry Field"),
- *   module = "strawberryfield",
- *   default_formatter = "strawberry_default_formatter",
- *   default_widget = "strawberry_textarea",
- *   constraints = {"valid_strawberry_json" = {}},
- *   list_class = "\Drupal\strawberryfield\Field\StrawberryFieldItemList",
- *   category = "GLAM Metadata",
- * )
- */
+  * Provides a field type of strawberryfield.
+  */
+ #[FieldType(
+   id: 'strawberryfield_field',
+   label: new TranslatableMarkup('Strawberry Field'),
+   category: 'GLAM Metadata',
+   default_widget: 'strawberry_textarea',
+   default_formatter: 'strawberry_default_formatter',
+   list_class: StrawberryFieldItemList::class,
+   constraints: ['valid_strawberry_json' => []],
+   module: 'strawberryfield'
+ )]
  class StrawberryFieldItem extends FieldItemBase  {
 
    /**
@@ -68,16 +70,16 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
     */
    public static function schema(FieldStorageDefinitionInterface $field_definition)
    {
-     return array(
-       'columns' => array(
-         'value' => array(
+     return [
+       'columns' => [
+         'value' => [
            'type' => 'json',
            'pgsql_type' => 'json',
            'mysql_type' => 'json',
            'not null' => FALSE,
-         ),
-       ),
-     );
+         ],
+       ],
+     ];
    }
 
    /**
@@ -105,7 +107,7 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
        ->setLabel('JSON keys defined in this field')
        ->setComputed(TRUE)
        ->setClass(
-         '\Drupal\strawberryfield\Plugin\DataType\StrawberryKeysFromJson'
+         \Drupal\strawberryfield\Plugin\DataType\StrawberryKeysFromJson::class
        )
        ->setInternal(FALSE)
        ->setSetting('filter_empties', TRUE)
@@ -117,7 +119,7 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
        ->setLabel('JSON keys defined in this field')
        ->setComputed(TRUE)
        ->setClass(
-         '\Drupal\strawberryfield\Plugin\DataType\StrawberryKeysFromJson'
+         \Drupal\strawberryfield\Plugin\DataType\StrawberryKeysFromJson::class
        )
        ->setInternal(TRUE)
        ->setSetting('filter_empties', FALSE)
@@ -143,9 +145,9 @@ use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
            $plugin_instance = \Drupal::service('strawberryfield.keyname_manager')->createInstance($plugin_config_entity->getPluginid(),$configuration_options);
            $plugin_definition = $plugin_instance->getPluginDefinition();
            // Allows plugins to define its own processing class for the JSON values.
-           $processor_class = isset($plugin_definition['processor_class'])? $plugin_definition['processor_class'] : '\Drupal\strawberryfield\Plugin\DataType\StrawberryValuesFromJson';
+           $processor_class = $plugin_definition['processor_class'] ?? \Drupal\strawberryfield\Plugin\DataType\StrawberryValuesFromJson::class;
            // Allows plugins to define its own item type for each item in the ListDataDefinition for the JSON values.
-           $item_type = isset($plugin_definition['item_type'])? $plugin_definition['item_type'] : 'string';
+           $item_type = $plugin_definition['item_type'] ?? 'string';
            if (!isset($keynamelist[$processor_class])) {
              // make sure we have a processing class key even if we still have no keys
              $keynamelist[$processor_class] = [];

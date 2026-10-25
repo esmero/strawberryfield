@@ -9,6 +9,9 @@
 namespace Drupal\strawberryfield\Plugin\StrawberryfieldKeyNameProvider;
 
 use Drupal\Core\Annotation\Translation;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\strawberryfield\Attribute\StrawberryfieldKeyNameProvider;
+use Drupal\strawberryfield\Plugin\DataType\StrawberryValuesFromJson;
 use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
 use Drupal\strawberryfield\Plugin\StrawberryfieldKeyNameProviderBase;
 use Drupal\Core\Form\FormStateInterface;
@@ -21,14 +24,13 @@ use Drupal\Core\File\FileSystemInterface;
 /**
  *
  * JSON-LD Strawberry Field Key Name Provider
- *
- * @StrawberryfieldKeyNameProvider(
- *    id = "jsonld",
- *    label = @Translation("JSONLD Strawberry Field Key Name Provider"),
- *    processor_class = "\Drupal\strawberryfield\Plugin\DataType\StrawberryValuesFromJson",
- *    item_type = "string"
- * )
  */
+#[StrawberryfieldKeyNameProvider(
+  id: 'jsonld',
+  label: new TranslatableMarkup('JSONLD Strawberry Field Key Name Provider'),
+  processor_class: StrawberryValuesFromJson::class,
+  item_type: 'string'
+)]
 class JsonldKeyNameProvider extends StrawberryfieldKeyNameProviderBase {
 
   public function calculateDependencies() {
@@ -112,7 +114,7 @@ class JsonldKeyNameProvider extends StrawberryfieldKeyNameProviderBase {
     }
     //user extra provided keys, if any.
     $extrakeys = explode(",",$this->getConfiguration()['keys']);
-    $extrakeys = array_map('trim', $extrakeys);
+    $extrakeys = array_map(trim(...), $extrakeys);
     $extrakeys = !empty($extrakeys) ? array_fill_keys($extrakeys,'stub'): [];
     $jsonld_reservedkeys = [
       '@context',
@@ -200,7 +202,7 @@ class JsonldKeyNameProvider extends StrawberryfieldKeyNameProviderBase {
         );
     }
 
-    $cleandata = array_filter($data, 'is_string',ARRAY_FILTER_USE_KEY);
+    $cleandata = array_filter($data, is_string(...),ARRAY_FILTER_USE_KEY);
 
     return $cleandata;
   }
@@ -215,12 +217,12 @@ class JsonldKeyNameProvider extends StrawberryfieldKeyNameProviderBase {
     $maindata = $this->getRemoteJsonData($primaryURL);
     if (!empty($maindata)) {
 
-      $maindata = isset($maindata['@context']) ? $maindata['@context'] : $maindata;
+      $maindata = $maindata['@context'] ?? $maindata;
       $filterURL = $this->getConfiguration()['filterurl'];
 
       // We won't filter things out there, ::extractKeys will deal with that.
       $filderdatapre = $this->getRemoteJsonData($filterURL);
-      $filterData = $filderdatapre ? $filderdatapre : [];
+      $filterData = $filderdatapre ?: [];
 
       $keys = $this->extractKeys($maindata, $filterData);
 
@@ -361,7 +363,7 @@ class JsonldKeyNameProvider extends StrawberryfieldKeyNameProviderBase {
     } else {
       // Means no filter. Contexts like schema can have 2000+ keys!
       // remove prefixes, only leave keys that declare an @id
-      $keystoreturn = array_filter($original, 'is_array');
+      $keystoreturn = array_filter($original, is_array(...));
 
     }
     return $keystoreturn;
