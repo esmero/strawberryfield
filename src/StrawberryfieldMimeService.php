@@ -49,7 +49,7 @@ class StrawberryfieldMimeService extends ExtensionMimeTypeGuesser {
     }
 
     $extension = '';
-    $file_parts = explode('.', \Drupal::service('file_system')->basename($path));
+    $file_parts = explode('.', basename($path));
 
     // Remove the first part: a full filename should not match an extension.
     array_shift($file_parts);
