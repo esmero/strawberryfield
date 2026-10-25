@@ -8,21 +8,21 @@
 
 namespace Drupal\strawberryfield\Plugin\Field\FieldWidget;
 
+use Drupal\Core\Field\Attribute\FieldWidget;
 use Drupal\Core\Field\Plugin\Field\FieldWidget\StringTextareaWidget;
 use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Messenger\MessengerTrait;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
+
 /**
  * Plugin implementation of the 'strawberry_textarea' widget.
- *
- * @FieldWidget(
- *   id = "strawberry_textarea",
- *   label = @Translation("Text area  for Strawberry field editing"),
- *   field_types = {
- *     "strawberryfield_field"
- *   }
- * )
  */
+#[FieldWidget(
+  id: 'strawberry_textarea',
+  label: new TranslatableMarkup('Text area  for Strawberry field editing'),
+  field_types: ['strawberryfield_field']
+)]
 class StrawberryDefaultWidget extends StringTextareaWidget {
 
   use MessengerTrait;

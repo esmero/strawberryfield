@@ -5,12 +5,14 @@ namespace Drupal\strawberryfield\Plugin\Action;
 use Drupal\Component\Diff\Diff;
 use Drupal\Component\Diff\DiffFormatter;
 use Drupal\Core\Access\AccessResult;
+use Drupal\Core\Action\Attribute\Action;
 use Drupal\Core\Action\Plugin\Action\EntityActionBase;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Action\ConfigurableActionBase;
 use Drupal\Component\Plugin\DependentPluginInterface;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\TempStore\PrivateTempStoreFactory;
 use Drupal\strawberryfield\StrawberryfieldUtilityService;
 use Psr\Log\LoggerInterface;
@@ -23,15 +25,14 @@ use Swaggest\JsonDiff\JsonDiff;
 
 /**
  * Provides an action that can Modify Entity attached SBFs via JSON Patch.
- *
- * @Action(
- *   id = "entity:jsonpatch_action",
- *   action_label = @Translation("JSON Patch an ADO"),
- *   label = @Translation("JSON Patch an ADO"),
- *   category = @Translation("Metadata"),
- *   type = "node"
- * )
  */
+#[Action(
+  id: 'entity:jsonpatch_action',
+  label: new TranslatableMarkup('JSON Patch an ADO'),
+  action_label: new TranslatableMarkup('JSON Patch an ADO'),
+  category: new TranslatableMarkup('Metadata'),
+  type: 'node'
+)]
 class StrawberryfieldJsonPatch extends ConfigurableActionBase implements DependentPluginInterface, ContainerFactoryPluginInterface {
 
   /**
@@ -229,8 +230,8 @@ class StrawberryfieldJsonPatch extends ConfigurableActionBase implements Depende
             /** @var $itemfield \Drupal\strawberryfield\Plugin\Field\FieldType\StrawberryFieldItem */
             $fullvalues = $itemfield->provideDecoded(FALSE);
             $fullvaluesoriginal = clone $fullvalues;
-            $patch = JsonPatch::import($this->patchArray);
             try {
+              $patch = JsonPatch::import($this->patchArray);
               $patch->apply($fullvalues, TRUE);
               if (!$field[$delta]->setMainValueFromArray((array) $fullvalues)) {
                 $this->messenger()->addError(
@@ -263,7 +264,7 @@ class StrawberryfieldJsonPatch extends ConfigurableActionBase implements Depende
                 $result = $message;
               }
               $patched = TRUE;
-            } catch (JsonDiffException $exception) {
+            } catch (JsonDiffException|\Exception $exception) {
               $patched = FALSE;
               $message = $this->t(
                 'Patch could not be applied for @entity with @error',

@@ -2,6 +2,7 @@
 
 namespace Drupal\strawberryfield\Plugin\QueueWorker;
 
+use Drupal\Core\Queue\Attribute\QueueWorker;
 use Drupal\Core\Queue\DelayedRequeueException;
 use Drupal\Core\Config\ImmutableConfig;
 use Drupal\Core\Datetime\DrupalDateTime;
@@ -15,18 +16,18 @@ use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Drupal\Core\Queue\QueueWorkerBase;
 use Drupal\Core\Queue\RequeueException;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\strawberryfield\StrawberryfieldUtilityService;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Drupal\Core\File\FileSystemInterface;
 use Drupal\Core\StreamWrapper\StreamWrapperManagerInterface;
 /**
  * Deal with Temporary File cleanup/composting.
- *
- * @QueueWorker(
- *   id = "sbf_compost_file",
- *   title = @Translation("Archipelago Temporary File Composter Queue Worker")
- * )
  */
+#[QueueWorker(
+  id: 'sbf_compost_file',
+  title: new TranslatableMarkup('Archipelago Temporary File Composter Queue Worker')
+)]
 class CompostQueueWorker extends QueueWorkerBase implements ContainerFactoryPluginInterface {
 
   use StringTranslationTrait;

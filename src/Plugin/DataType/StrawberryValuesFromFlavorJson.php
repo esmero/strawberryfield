@@ -144,7 +144,7 @@ JSON;
           );
           $schema->in((Object) $servicearray);
         }
-        catch (JsonSchemaException $exception) {
+        catch (JsonSchemaException) {
           //@TODO Give is error message a link to the NODE
           \Drupal::logger('strawberryfield flavour')->error('Wrong Flavor %needle definition in Entity ID %entityid, JSON Schema validation failed ', ['%needle' =>$needle ,'%entityid'  => $entityid]);
         }

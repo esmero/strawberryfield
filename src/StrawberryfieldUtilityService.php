@@ -25,7 +25,6 @@ use Drupal\search_api\ParseMode\ParseModePluginManager;
 use Drupal\search_api\Query\QueryInterface;
 use Drupal\strawberryfield\Plugin\search_api\datasource\StrawberryfieldFlavorDatasource;
 use Drupal\Core\StreamWrapper\StreamWrapperManagerInterface;
-use Ramsey\Uuid\Uuid;
 use SplFileObject;
 
 /**

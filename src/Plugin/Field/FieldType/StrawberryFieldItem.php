@@ -2,31 +2,33 @@
 namespace Drupal\strawberryfield\Plugin\Field\FieldType;
 
 use Drupal\Core\Entity\TypedData\EntityDataDefinition;
+use Drupal\Core\Field\Attribute\FieldType;
 use Drupal\Core\Field\FieldItemBase;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Field\FieldDefinitionInterface;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\TypedData\DataDefinition;
 use Drupal\Core\TypedData\DataReferenceDefinition;
 use Drupal\Core\TypedData\MapDataDefinition;
 use Drupal\strawberryfield\Entity\keyNameProviderEntity;
 use Drupal\Component\Utility\Random;
 use Drupal\Core\TypedData\ListDataDefinition;
+use Drupal\strawberryfield\Field\StrawberryFieldItemList;
 use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
 
 /**
- * Provides a field type of strawberryfield.
- *
- * @FieldType(
- *   id = "strawberryfield_field",
- *   label = @Translation("Strawberry Field"),
- *   module = "strawberryfield",
- *   default_formatter = "strawberry_default_formatter",
- *   default_widget = "strawberry_textarea",
- *   constraints = {"valid_strawberry_json" = {}},
- *   list_class = "\Drupal\strawberryfield\Field\StrawberryFieldItemList",
- *   category = "GLAM Metadata",
- * )
- */
+  * Provides a field type of strawberryfield.
+  */
+ #[FieldType(
+   id: 'strawberryfield_field',
+   label: new TranslatableMarkup('Strawberry Field'),
+   category: 'GLAM Metadata',
+   default_widget: 'strawberry_textarea',
+   default_formatter: 'strawberry_default_formatter',
+   list_class: StrawberryFieldItemList::class,
+   constraints: ['valid_strawberry_json' => []],
+   module: 'strawberryfield'
+ )]
  class StrawberryFieldItem extends FieldItemBase  {
 
    /**

@@ -11,7 +11,8 @@ namespace Drupal\strawberryfield\Plugin;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Cache\CacheBackendInterface;
 use Drupal\Core\Plugin\DefaultPluginManager;
-
+use Drupal\strawberryfield\Annotation\StrawberryfieldKeyNameProvider as StrawberryfieldKeyNameProviderAnnotation;
+use Drupal\strawberryfield\Attribute\StrawberryfieldKeyNameProvider;
 
 /**
  * Provides the Strawberryfield KeyName Provider Plugin  Manager.
@@ -31,9 +32,9 @@ class StrawberryfieldKeyNameProviderManager extends DefaultPluginManager{
       'Plugin/StrawberryfieldKeyNameProvider',
       $namespaces,
       $module_handler,
-      \Drupal\strawberryfield\Plugin\StrawberryfieldKeyNameProviderInterface::class,
-      \Drupal\strawberryfield\Attribute\StrawberryfieldKeyNameProvider::class,
-      \Drupal\strawberryfield\Annotation\StrawberryfieldKeyNameProvider::class,
+      StrawberryfieldKeyNameProviderInterface::class,
+      StrawberryfieldKeyNameProvider::class,
+      StrawberryfieldKeyNameProviderAnnotation::class,
     );
 
     $this->alterInfo('strawberryfield_strawberryfieldkeynameprovider_info');

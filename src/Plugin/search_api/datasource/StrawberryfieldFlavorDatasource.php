@@ -7,7 +7,9 @@ use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityDisplayRepositoryInterface;
 use Drupal\Core\Field\EntityReferenceFieldItemListInterface;
 use Drupal\Core\Session\AccountInterface;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\TypedData\ComplexDataInterface;
+use Drupal\search_api\Attribute\SearchApiDatasource;
 use Drupal\search_api\Datasource\DatasourcePluginBase;
 use Drupal\search_api\LoggerTrait;
 use Drupal\search_api\Plugin\search_api\datasource\ContentEntity;
@@ -22,12 +24,11 @@ use Drupal\strawberryfield\StrawberryfieldSearchAPIUtilityServiceInterface;
 
 /**
  * Represents a datasource which exposes flavors.
- *
- * @SearchApiDatasource(
- *   id = "strawberryfield_flavor_datasource",
- *   label = @Translation("Strawberryfield Flavor Datasource")
- * )
  */
+#[SearchApiDatasource(
+  id: 'strawberryfield_flavor_datasource',
+  label: new TranslatableMarkup('Strawberryfield Flavor Datasource')
+)]
 class StrawberryfieldFlavorDatasource extends DatasourcePluginBase implements StrawberryfieldFlavorDatasourceInterface {
 
   use PluginFormTrait;

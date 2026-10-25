@@ -7,9 +7,11 @@ use Drupal\Core\Database\Connection;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\Session\AnonymousUserSession;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\TypedData\ComplexDataInterface;
 use Drupal\node\NodeGrantsHelper;
 use Drupal\node\NodeInterface;
+use Drupal\search_api\Attribute\SearchApiProcessor;
 use Drupal\search_api\Datasource\DatasourceInterface;
 use \Drupal\strawberryfield\Plugin\DataType\StrawberryfieldFlavorData;
 use Drupal\search_api\IndexInterface;
@@ -24,18 +26,17 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * Adds content access checks for nodes and comments.
- *
- * @SearchApiProcessor(
- *   id = "sbf_content_access",
- *   label = @Translation("Content access with Strawberry Flavor data sources awareness"),
- *   description = @Translation("Adds content access checks for nodes, comments and strawberryflavors like HOCR and WebArchive Indexes. This replaces built in Content Access Processor and should not be used together."),
- *   stages = {
- *     "add_properties" = 0,
- *     "pre_index_save" = -10,
- *     "preprocess_query" = -30,
- *   },
- * )
  */
+#[SearchApiProcessor(
+  id: 'sbf_content_access',
+  label: new TranslatableMarkup('Content access with Strawberry Flavor data sources awareness'),
+  description: new TranslatableMarkup('Adds content access checks for nodes, comments and strawberryflavors like HOCR and WebArchive Indexes. This replaces built in Content Access Processor and should not be used together.'),
+  stages: [
+    'add_properties' => 0,
+    'pre_index_save' => -10,
+    'preprocess_query' => -30
+  ]
+)]
 class StrawberryFlavorContentAccess extends ProcessorPluginBase {
 
   use LoggerTrait;

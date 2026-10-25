@@ -7,19 +7,20 @@
  */
 
 namespace Drupal\strawberryfield\Plugin\EntityReferenceSelection;
+use Drupal\Core\Entity\Attribute\EntityReferenceSelection;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\node\Plugin\EntityReferenceSelection\NodeSelection;
 
 /**
  * Node with SBF plugin implementation of the Entity Reference Selection plugin.
- *
- * @EntityReferenceSelection(
- *   id = "default:nodewithstrawberry",
- *   label = @Translation("Node with StrawberryField selection"),
- *   entity_types = {"node"},
- *   group = "default",
- *   weight = 3
- * )
  */
+#[EntityReferenceSelection(
+  id: 'default:nodewithstrawberry',
+  label: new TranslatableMarkup('Node with StrawberryField selection'),
+  entity_types: ['node'],
+  group: 'default',
+  weight: 3)
+]
 class NodeBearingStrawberryfieldSelection extends NodeSelection {
 
   /**
@@ -32,9 +33,6 @@ class NodeBearingStrawberryfieldSelection extends NodeSelection {
     if (!isset($handler_settings['filter'])) {
       return $query;
     }
-    // So who is using a Strawberry Field?
-    // @TODO inject the field manager
-    $strawberryfields = [];
     $strawberryfields = \Drupal::service('entity_field.manager')->getFieldMapByFieldType('strawberryfield_field');
 
     $filter_settings = $strawberryfields['node'] ?? [];

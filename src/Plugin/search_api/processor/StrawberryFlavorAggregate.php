@@ -5,7 +5,9 @@ namespace Drupal\strawberryfield\Plugin\search_api\processor;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Session\AccountSwitcherInterface;
 use Drupal\Core\Session\UserSession;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\node\NodeInterface;
+use Drupal\search_api\Attribute\SearchApiProcessor;
 use Drupal\search_api\Datasource\DatasourceInterface;
 use Drupal\search_api\Plugin\search_api\data_type\value\TextValue;
 use Drupal\search_api\Item\ItemInterface;
@@ -19,18 +21,17 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * Aggregates Strawberry Flavors to its parent/top ADO.
- *
- * @SearchApiProcessor(
- *   id = "sbf_flavor_aggregated_item",
- *   label = @Translation("Strawberry Flavor Aggregator"),
- *   description = @Translation("Aggregates Strawberry Flavors (Child Documents) into a field that can be attached to an ADO"),
- *   stages = {
- *     "add_properties" = 0,
- *   },
- *   locked = true,
- *   hidden = true,
- * )
  */
+#[SearchApiProcessor(
+  id: 'sbf_flavor_aggregated_item',
+  label: new TranslatableMarkup('Strawberry Flavor Aggregator'),
+  description: new TranslatableMarkup('Aggregates Strawberry Flavors (Child Documents) into a field that can be attached to an ADO'),
+  stages: [
+    'add_properties' => 0
+  ],
+  locked: true,
+  hidden: true
+)]
 class StrawberryFlavorAggregate extends ProcessorPluginBase {
 
   use LoggerTrait;

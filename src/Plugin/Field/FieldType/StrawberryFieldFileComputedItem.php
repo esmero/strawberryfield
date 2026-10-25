@@ -6,29 +6,30 @@ use Drupal\Component\Utility\Environment;
 use Drupal\Component\Utility\Bytes;
 use Drupal\Component\Render\PlainTextOutput;
 use Drupal\Component\Utility\Random;
+use Drupal\Core\Field\Attribute\FieldType;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Field\Plugin\Field\FieldType\EntityReferenceItem;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\StreamWrapper\StreamWrapperInterface;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\TypedData\DataDefinition;
 use Drupal\Core\Render\BubbleableMetadata;
 use Drupal\Core\File\FileSystemInterface;
 
 /**
  * Plugin implementation of a virtual 'file' field type.
- *
- * @FieldType(
- *   id = "strawberryfieldfile_field",
- *   label = @Translation("Virtual Strawberry Field"),
- *   description = @Translation("This field accepts the ID of a file as an integer value and writes it into a Strawberry Field."),
- *   category = @Translation("Reference"),
- *   default_widget = "file_generic",
- *   default_formatter = "file_default",
- *   list_class = "\Drupal\strawberryfield\Plugin\Field\FieldType\StrawberryFieldFileComputedItemList",
- *   constraints = {"ReferenceAccess" = {}, "FileValidation" = {}}
- * )
  */
+#[FieldType(
+  id: 'strawberryfieldfile_field',
+  label: new TranslatableMarkup('Virtual Strawberry Field'),
+  description: new TranslatableMarkup('This field accepts the ID of a file as an integer value and writes it into a Strawberry Field.'),
+  category: new TranslatableMarkup('Reference'),
+  default_widget: 'file_generic',
+  default_formatter: 'file_default',
+  list_class: '\Drupal\strawberryfield\Plugin\Field\FieldType\StrawberryFieldFileComputedItemList',
+  constraints: ['ReferenceAccess' => [], 'FileValidation' => []]
+)]
 class StrawberryFieldFileComputedItem extends EntityReferenceItem {
   // @see \Drupal\file\Plugin\Field\FieldType\FileItem
 

@@ -9,6 +9,9 @@
 namespace Drupal\strawberryfield\Plugin\StrawberryfieldKeyNameProvider;
 
 use Drupal\Core\Annotation\Translation;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\strawberryfield\Attribute\StrawberryfieldKeyNameProvider;
+use Drupal\strawberryfield\Plugin\DataType\StrawberryValuesFromJson;
 use Drupal\strawberryfield\Tools\StrawberryfieldJsonHelper;
 use Drupal\strawberryfield\Plugin\StrawberryfieldKeyNameProviderBase;
 use Drupal\Core\Form\FormStateInterface;
@@ -21,14 +24,13 @@ use Drupal\Core\File\FileSystemInterface;
 /**
  *
  * JSON-LD Strawberry Field Key Name Provider
- *
- * @StrawberryfieldKeyNameProvider(
- *    id = "jsonld",
- *    label = @Translation("JSONLD Strawberry Field Key Name Provider"),
- *    processor_class = "\Drupal\strawberryfield\Plugin\DataType\StrawberryValuesFromJson",
- *    item_type = "string"
- * )
  */
+#[StrawberryfieldKeyNameProvider(
+  id: 'jsonld',
+  label: new TranslatableMarkup('JSONLD Strawberry Field Key Name Provider'),
+  processor_class: StrawberryValuesFromJson::class,
+  item_type: 'string'
+)]
 class JsonldKeyNameProvider extends StrawberryfieldKeyNameProviderBase {
 
   public function calculateDependencies() {

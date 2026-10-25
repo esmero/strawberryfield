@@ -3,6 +3,8 @@
 namespace Drupal\strawberryfield\Plugin\search_api\processor;
 
 use Drupal\Core\Link;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\search_api\Attribute\SearchApiProcessor;
 use Drupal\search_api_solr\SolrBackendInterface;
 use Drupal\Component\Utility\Html;
 use Drupal\Core\Form\FormStateInterface;
@@ -18,18 +20,17 @@ use Drupal\search_api\Utility\Utility;
  * Adds a highlighted excerpt to results and highlights returned fields.
  *
  * This processor won't run for queries with the "basic" processing level set.
- *
- * @SearchApiProcessor(
- *   id = "sbf_highlight",
- *   label = @Translation("Advanced Backend Highlight"),
- *   description = @Translation("Adds a highlighted excerpt to results and highlights returned fields using only Backend instead of frontend re-rendering."),
- *   stages = {
- *     "pre_index_save" = 0,
- *     "postprocess_query" = 0,
- *     "preprocess_query" = -20,
- *   }
- * )
  */
+#[SearchApiProcessor(
+  id: 'sbf_highlight',
+  label: new TranslatableMarkup('Advanced Backend Highlight'),
+  description: new TranslatableMarkup('Adds a highlighted excerpt to results and highlights returned fields using only Backend instead of frontend re-rendering.'),
+  stages: [
+    'pre_index_save' => 0,
+    'postprocess_query' => 0,
+    'preprocess_query' => -20
+  ]
+)]
 class StrawberryFieldHighlight extends Highlight implements PluginFormInterface {
 
   /**
