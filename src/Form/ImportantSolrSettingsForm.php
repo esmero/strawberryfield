@@ -324,7 +324,7 @@ class ImportantSolrSettingsForm extends ConfigFormBase {
       // If not #validated, dynamically populated dropdowns don't work.
       '#validated' => TRUE,
       '#required' => TRUE,
-      '#submit' => [$this->field_submit(...)],
+      '#submit' => [[$this, 'field_submit']],
       '#executes_submit_callback' => TRUE,
       '#ajax' => [
         'callback' => '::onIndexSelect',
