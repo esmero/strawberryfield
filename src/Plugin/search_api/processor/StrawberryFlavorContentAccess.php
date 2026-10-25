@@ -8,6 +8,7 @@ use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\Session\AnonymousUserSession;
 use Drupal\Core\TypedData\ComplexDataInterface;
+use Drupal\node\NodeGrantsHelper;
 use Drupal\node\NodeInterface;
 use Drupal\search_api\Datasource\DatasourceInterface;
 use \Drupal\strawberryfield\Plugin\DataType\StrawberryfieldFlavorData;
@@ -54,6 +55,11 @@ class StrawberryFlavorContentAccess extends ProcessorPluginBase {
   protected $currentUser;
 
   /**
+   * The node grants helper service.
+   */
+  protected NodeGrantsHelper $nodeGrantsHelper;
+
+  /**
    * {@inheritdoc}
    */
   public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
@@ -63,6 +69,7 @@ class StrawberryFlavorContentAccess extends ProcessorPluginBase {
     $processor->setLogger($container->get('logger.channel.search_api'));
     $processor->setDatabase($container->get('database'));
     $processor->setCurrentUser($container->get('current_user'));
+    $processor->setNodeGrantsHelper($container->get('Drupal\node\NodeGrantsHelper'));
 
     return $processor;
   }
@@ -112,6 +119,20 @@ class StrawberryFlavorContentAccess extends ProcessorPluginBase {
     $this->currentUser = $current_user;
     return $this;
   }
+
+  /**
+   * Sets the NodeGrantHelper.
+   *
+   * @param NodeGrantsHelper $NodeGrantsHelper
+   *   The current user.
+   *
+   * @return $this
+   */
+  public function setNodeGrantsHelper(NodeGrantsHelper $NodeGrantsHelper) {
+    $this->nodeGrantsHelper = $NodeGrantsHelper;
+    return $this;
+  }
+
 
   /**
    * {@inheritdoc}
@@ -384,7 +405,7 @@ class StrawberryFlavorContentAccess extends ProcessorPluginBase {
     }
     $node_grants_field_id = $node_grants_field->getFieldIdentifier();
     $grants_conditions = $query->createConditionGroup('OR', ['content_access_grants']);
-    $grants = node_access_grants('view', $account);
+    $grants = $this->nodeGrantsHelper->nodeAccessGrants('view', $account);
     foreach ($grants as $realm => $gids) {
       foreach ($gids as $gid) {
         $grants_conditions->addCondition($node_grants_field_id, "node_access_$realm:$gid");
