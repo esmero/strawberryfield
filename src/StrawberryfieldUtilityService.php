@@ -790,7 +790,7 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
           $spl->next();
         }
         // PHP 8.0.16 IS STILL BUGGY with SEEK.
-        //$spl->seek($offset); doe snot work here
+        //$spl->seek($offset); does not work here
         // So we do not process this again.
         $seek_to_offset = FALSE;
       }
@@ -802,10 +802,15 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
     $highestRow = count($data);
     if ($always_include_header) {
       $rowHeaders = $data[0] ?? [];
+      // Deal with BOM here
+      if (!empty($rowHeaders[0])) {
+        $rowHeaders[0] = $this->removeCsvUtfBBom($rowHeaders[0] ?? '');
+      }
+
       $rowHeaders_utf8 = array_map(function($value) {
         $value ??= '';
         $value = stripslashes($value);
-        $value = function_exists('mb_convert_encoding') ? mb_convert_encoding($value, 'UTF-8', 'ISO-8859-1') : utf8_encode($value);
+        $value = function_exists('mb_convert_encoding') ? mb_convert_encoding($value, 'UTF-8', 'ISO-8859-1') : iconv('ISO-8859-1', 'UTF-8', $value);
         $value = strtolower($value);
         $value = trim($value);
         return $value;
@@ -813,7 +818,7 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
       $headercount = count($rowHeaders);
     }
     else {
-      $rowHeaders = $rowHeaders_utf8 = [];
+      $rowHeaders_utf8 = [];
       $not_a_header = $data[0] ?? [];
       $headercount = count($not_a_header);
     }
@@ -957,6 +962,29 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
       // Ensure size is a proper number type.
       return round((float) $size);
     }
+  }
+
+  /**
+   * MS Excel, when using UTF=8 CSV export will add a BOM
+   *
+   * @param string $string
+   *
+   * @return array|string|string[]|null
+   */
+  public function  removeCsvUtfBBom(string $string) {
+    $bomUtf8 = pack('H*', 'EFBBBF');
+    /* Other BOMS for the future
+      UTF-8	EF BB BF --> THIS IS OURS
+      UTF-16 (BE)	FE FF
+      UTF-16 (LE)	FF FE
+      UTF-32 (BE)	00 00 FE FF
+      UTF-32 (LE)	FF FE 00 00
+    */
+    $string = preg_replace("/^$bomUtf8/", '', $string);
+    // NOTE these are invisible characters, so debugging/error logging them will not
+    // work.
+
+    return $string;
   }
 
 }
