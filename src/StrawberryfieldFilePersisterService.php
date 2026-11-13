@@ -24,7 +24,6 @@ use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Component\Transliteration\TransliterationInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\StreamWrapper\StreamWrapperManagerInterface;
-use Drupal\Core\Archiver\ArchiverManager;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\file\FileInterface;
 use Drupal\Core\Messenger\MessengerTrait;
@@ -82,13 +81,6 @@ class StrawberryfieldFilePersisterService {
    * @var \Drupal\Core\StreamWrapper\StreamWrapperManagerInterface
    */
   protected $streamWrapperManager;
-
-  /**
-   * The archiver manager.
-   *
-   * @var \Drupal\Core\Archiver\ArchiverManager
-   */
-  protected $archiverManager;
 
   /**
    * The Storage Destination Scheme.
@@ -181,7 +173,6 @@ class StrawberryfieldFilePersisterService {
    * @param \Drupal\file\FileUsage\FileUsageInterface                   $file_usage
    * @param \Drupal\Core\Entity\EntityTypeManagerInterface              $entity_type_manager
    * @param \Drupal\Core\StreamWrapper\StreamWrapperManagerInterface    $stream_wrapper_manager
-   * @param \Drupal\Core\Archiver\ArchiverManager                       $archiver_manager
    * @param \Drupal\Core\Config\ConfigFactoryInterface                  $config_factory
    * @param \Drupal\Core\Session\AccountInterface                       $current_user
    * @param \Drupal\Core\Language\LanguageManagerInterface              $language_manager
@@ -197,7 +188,6 @@ class StrawberryfieldFilePersisterService {
     FileUsageInterface $file_usage,
     EntityTypeManagerInterface $entity_type_manager,
     StreamWrapperManagerInterface $stream_wrapper_manager,
-    ArchiverManager $archiver_manager,
     ConfigFactoryInterface $config_factory,
     AccountInterface $current_user,
     LanguageManagerInterface $language_manager,
@@ -212,7 +202,6 @@ class StrawberryfieldFilePersisterService {
     $this->fileUsage = $file_usage;
     $this->entityTypeManager = $entity_type_manager;
     $this->streamWrapperManager = $stream_wrapper_manager;
-    $this->archiverManager = $archiver_manager;
     $this->strawberryfieldFileMetadataService = $strawberryfield_file_metadata_service;
     //@TODO evaluate creating a ServiceFactory instead of reading this on construct.
     $this->config = $config_factory->get(
