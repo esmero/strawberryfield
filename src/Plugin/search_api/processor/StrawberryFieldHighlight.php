@@ -494,7 +494,7 @@ class StrawberryFieldHighlight extends Highlight implements PluginFormInterface 
    *   item ID, field ID and then numeric indices. The later field names using
    *   'sbf_aggregated_items' path.
    */
-  protected function getFulltextFields(array $result_items, array $fulltext_fields = NULL, $load = TRUE) {
+  protected function getFulltextFields(array $result_items, ?array $fulltext_fields = NULL, $load = TRUE) {
     // All the index's fulltext fields, grouped by datasource.
     // @TODO also treat anything from strawberryFlavorDataSource as the aggregated?
     $fields_by_datasource = [];

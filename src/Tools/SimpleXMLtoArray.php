@@ -33,7 +33,7 @@ class SimpleXMLtoArray {
 
   }
 
-  public function xmlToArray(SimpleXMLElement $element = null) {
+  public function xmlToArray(?SimpleXMLElement $element = null) {
 
     $element ??= $this->subject;
 

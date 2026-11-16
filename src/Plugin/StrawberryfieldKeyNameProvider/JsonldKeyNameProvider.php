@@ -98,7 +98,7 @@ class JsonldKeyNameProvider extends StrawberryfieldKeyNameProviderBase {
   /**
    * {@inheritdoc}
    */
-  public function provideKeyNames(string $config_entity_id = NULL) {
+  public function provideKeyNames(?string $config_entity_id = NULL) {
 
     // In case an empty config_entity_id is passed here try to fetch from
     // local config.
@@ -162,7 +162,7 @@ class JsonldKeyNameProvider extends StrawberryfieldKeyNameProviderBase {
    *
    * @return array|null
    */
-  protected function getCacheTheKeys(string $config_entity_id = NULL, $bypasscache = false) {
+  protected function getCacheTheKeys(?string $config_entity_id = NULL, $bypasscache = false) {
     // This is expensive, reason why we process and store in cache
 
     $data = NULL;

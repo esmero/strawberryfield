@@ -121,7 +121,7 @@ class StrawberryDefaultFormatter extends FormatterBase {
    * @return \Drupal\Core\Session\AccountInterface
    *   Returns the current account object.
    */
-  protected function prepareUser(AccountInterface $account = NULL) {
+  protected function prepareUser(?AccountInterface $account = NULL) {
     if (!$account) {
       $account = \Drupal::currentUser();
     }

@@ -241,7 +241,7 @@ XML;
   /**
    * {@inheritdoc}
    */
-  public function getItemAccessResult(ComplexDataInterface $item, AccountInterface $account = NULL) {
+  public function getItemAccessResult(ComplexDataInterface $item, ?AccountInterface $account = NULL) {
     $entity = $this->getEntity($item);
     if ($entity) {
       return $this->getEntityTypeManager()
@@ -295,7 +295,7 @@ XML;
   /**
    * {@inheritdoc}
    */
-  public function getPartialItemIds($page = NULL, array $bundles = NULL, array $languages = NULL) {
+  public function getPartialItemIds($page = NULL, ?array $bundles = NULL, ?array $languages = NULL) {
 
     if (isset($page)) {
       $page_size = $this->getConfigValue('tracking_page_size');
@@ -541,7 +541,7 @@ XML;
 
   public function getAffectedItemsForEntityChange(EntityInterface $entity,
     array $foreign_entity_relationship_map,
-    EntityInterface $original_entity = NULL
+    ?EntityInterface $original_entity = NULL
   ): array {
     return parent::getAffectedItemsForEntityChange(
       $entity, $foreign_entity_relationship_map, $original_entity

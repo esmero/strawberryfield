@@ -868,7 +868,7 @@ class StrawberryfieldFilePersisterService {
                     // basically if the File was already in the perfect spot why attempt it again?
                     if ($destination_uri != $current_uri) {
                       $event_type = StrawberryfieldEventType::TEMP_FILE_CREATION;
-                      $current_timestamp = (new DrupalDateTime())->getTimestamp();
+                      $current_timestamp = new DrupalDateTime()->getTimestamp();
                       $event = new StrawberryfieldFileEvent($event_type, 'strawberryfield', $current_uri, $current_timestamp);
                       // This will allow any temp file on ADO save to be managed
                       // IN a queue by \Drupal\strawberryfield\EventSubscriber\StrawberryfieldEventCompostBinSubscriber
@@ -1295,7 +1295,7 @@ class StrawberryfieldFilePersisterService {
    * @return bool
    *    TRUE if exists. IF checksum passed and exists and does not match, FALSE.
    */
-  public function fileS3Exists(string $uri, string $checksum = NULL) {
+  public function fileS3Exists(string $uri, ?string $checksum = NULL) {
 
     $exists = FALSE;
     // Soft dependency, if S3FS module is not enabled we return silently.

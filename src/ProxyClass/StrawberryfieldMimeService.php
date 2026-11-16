@@ -93,7 +93,7 @@ namespace Drupal\strawberryfield\ProxyClass {
     /**
      * {@inheritdoc}
      */
-    public function setMapping(array $mapping = NULL): void
+    public function setMapping(?array $mapping = NULL): void
     {
       $this->lazyLoadItself()->setMapping($mapping);
     }

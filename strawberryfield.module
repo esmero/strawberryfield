@@ -308,7 +308,7 @@ function strawberryfield_entity_bundle_field_info(EntityTypeInterface $entity_ty
 /**
  * Implements hook_entity_field_access().
  */
-function strawberryfield_entity_field_access($operation, FieldDefinitionInterface $field_definition, AccountInterface $account, FieldItemListInterface $items = NULL) {
+function strawberryfield_entity_field_access($operation, FieldDefinitionInterface $field_definition, AccountInterface $account, ?FieldItemListInterface $items = NULL) {
   if ($field_definition->getName() == 'field_file_drop') {
     return AccessResult::allowedIfHasPermission($account, 'upload to Digital Object file dropbox field');
   }

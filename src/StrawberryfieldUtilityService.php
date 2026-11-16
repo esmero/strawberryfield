@@ -449,7 +449,7 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
     EntityInterface $entity,
     string $processor,
     array $indexes = [],
-    string $checksum = NULL
+    ?string $checksum = NULL
   ): int {
     $count = 0;
 
@@ -520,7 +520,7 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
     EntityInterface $entity,
     string $processor,
     array $indexes = [],
-    string $checksum = NULL
+    ?string $checksum = NULL
   ): int {
     $count = 0;
 
@@ -783,7 +783,7 @@ class StrawberryfieldUtilityService implements StrawberryfieldUtilityServiceInte
         $data[] = $spl->fgetcsv( ',', '"', "");
       }
       else {
-        $data[] = $spl->fgetcsv();
+        $data[] = $spl->fgetcsv(escape: '\\');
       }
       if ($seek_to_offset) {
         for ($i = 0; $i < $offset; $i++) {

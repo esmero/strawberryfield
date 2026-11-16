@@ -119,7 +119,7 @@ class JmesPathNameProvider extends StrawberryfieldKeyNameProviderBase {
   /**
    * {@inheritdoc}
    */
-  public function provideKeyNames(string $config_entity_id = NULL) {
+  public function provideKeyNames(?string $config_entity_id = NULL) {
     // We always return an array  property => jsonkey
     // Both values are required
     $key = $this->getConfiguration()['exposed_key'] && $this->getConfiguration()['source_key'] ?

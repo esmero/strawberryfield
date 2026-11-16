@@ -282,7 +282,7 @@ class CompostQueueWorker extends QueueWorkerBase implements ContainerFactoryPlug
 
     $composting_time = ($file_timestamp + (int) ($this->config->get(
           'compost_maximum_age'
-        ) ?? 21600) <= (new DrupalDateTime())->getTimestamp());
+        ) ?? 21600) <= new DrupalDateTime()->getTimestamp());
 
     if ($composting_time) {
       // Deal with possibly some Drupal 8 until release 1.1.0
