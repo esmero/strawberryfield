@@ -2,17 +2,19 @@
 
 namespace Drupal\strawberryfield\Plugin\DataType;
 
+use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\Core\TypedData\Attribute\DataType;
 use Drupal\Core\TypedData\Plugin\DataType\Map;
+use Drupal\strawberryfield\TypedData\StrawberryfieldFlavorDataDefinition;
 
 /**
  * Defines the "StrawberryfieldFlavorData" data type.
- *
- * @DataType(
- *  id = "strawberryfield_flavor_data",
- *  label = @Translation("Strawberryfield Flavor Data"),
- *  definition_class = "\Drupal\strawberryfield\TypedData\StrawberryfieldFlavorDataDefinition",
- * )
  */
+#[DataType(
+  id: 'strawberryfield_flavor_data',
+  label: new TranslatableMarkup('Strawberryfield Flavor Data'),
+  definition_class: StrawberryfieldFlavorDataDefinition::class
+)]
 class StrawberryfieldFlavorData extends Map {
 
   /**

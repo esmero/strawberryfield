@@ -27,10 +27,8 @@ final class StrawberryfieldEventType {
    * @see strawberryfield_node_presave()
    * @see \Drupal\strawberryfield\Event\StrawberryfieldCrudEvent
    * @see \Drupal\strawberryfield\EventSubscriber\StrawberryfieldEventPresaveSubscriberVocabCreator
-   *
-   * @var string
    */
-  const PRESAVE = 'sbf.node.presave';
+  const string PRESAVE = 'sbf.node.presave';
 
   /**
    * Name of the event fired when inserting a new node with a SBF attached.
@@ -44,10 +42,8 @@ final class StrawberryfieldEventType {
    *
    * @see strawberryfield_node_insert()
    * @see \Drupal\strawberryfield\Event\StrawberryfieldCrudEvent
-   *
-   * @var string
    */
-  const INSERT = 'sbf.node.insert';
+  const string INSERT = 'sbf.node.insert';
 
   /**
    * Name of the event fired when updating a node with a SBF attached.
@@ -63,10 +59,8 @@ final class StrawberryfieldEventType {
    *
    * @see strawberryfield_node_presave()
    * @see \Drupal\strawberryfield\Event\StrawberryfieldCrudEvent
-   *
-   * @var string
    */
-  const SAVE = 'sbf.node.save';
+  const string SAVE = 'sbf.node.save';
 
   /**
    * Name of the event fired when revisioning a node with a SBF attached.
@@ -82,10 +76,8 @@ final class StrawberryfieldEventType {
    *
    * @see strawberryfield_node_revision_create()
    * @see \Drupal\strawberryfield\Event\StrawberryfieldCrudEvent
-   *
-   * @var string
    */
-  const NEW_REVISION = 'sbf.node.newrevision';
+  const string NEW_REVISION = 'sbf.node.newrevision';
 
   /**
    * Name of the event fired when a node revision with SBF attached is deleted.
@@ -99,10 +91,8 @@ final class StrawberryfieldEventType {
    *
    * @see strawberryfield_node_revision_delete()
    * @see \Drupal\strawberryfield\Event\StrawberryfieldCrudEvent
-   *
-   * @var string
    */
-  const DELETE_REVISION = 'sbf.node.deleterevision';
+  const string DELETE_REVISION = 'sbf.node.deleterevision';
 
   /**
    * Name of the event fired when a node with SBF attached is deleted..
@@ -116,10 +106,8 @@ final class StrawberryfieldEventType {
    *
    * @see strawberryfield_node_delete()
    * @see \Drupal\strawberryfield\Event\StrawberryfieldCrudEvent
-   *
-   * @var string
    */
-  const DELETE = 'sbf.node.delete';
+  const string DELETE = 'sbf.node.delete';
 
   /**
    * Name of the event fired when a SBF JSON needs to be processed.
@@ -133,10 +121,8 @@ final class StrawberryfieldEventType {
    * @Event
    *
    * @see \Drupal\strawberryfield\Event\StrawberryfieldJsonProcessEvent
-   *
-   * @var string
    */
-  const JSONPROCESS = 'sbf.json.process';
+  const string JSONPROCESS = 'sbf.json.process';
 
   /**
    * Name of the event fired when invoking SBF JSON "Seasoners".
@@ -147,10 +133,8 @@ final class StrawberryfieldEventType {
    * \Drupal\strawberryfield\StrawberryfieldServiceEvent instance.
    *
    * @Event
-   *
-   * @var string
    */
-  const INVOKE_SERVICE = 'sbf.json.invokeservice';
+  const string INVOKE_SERVICE = 'sbf.json.invokeservice';
 
   /**
    * Name of the event fired when inserting a SBF JSON Flavour.
@@ -163,10 +147,8 @@ final class StrawberryfieldEventType {
    * @Event
    *
    * @see \Drupal\strawberryfield\Event\StrawberryfieldFlavourCrudEvent
-   *
-   * @var string
    */
-  const INSERT_FLAVOUR = 'sbf.flavour.insert';
+  const string INSERT_FLAVOUR = 'sbf.flavour.insert';
 
   /**
    * Name of the event fired when deleting a SBF JSON Flavour.
@@ -179,10 +161,8 @@ final class StrawberryfieldEventType {
    * @Event
    *
    * @see \Drupal\strawberryfield\Event\StrawberryfieldFlavourCrudEvent
-   *
-   * @var string
    */
-  const DELETE_FLAVOUR = 'sbf.flavour.delete';
+  const string DELETE_FLAVOUR = 'sbf.flavour.delete';
 
 
   /**
@@ -194,8 +174,6 @@ final class StrawberryfieldEventType {
    * @Event
    *
    * @see \Drupal\strawberryfield\Event\StrawberryfieldFileEvent
-   *
-   * @var string
    */
-  const TEMP_FILE_CREATION = 'sbf.file.tmp';
+  const string TEMP_FILE_CREATION = 'sbf.file.tmp';
 }

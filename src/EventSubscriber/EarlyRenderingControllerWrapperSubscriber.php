@@ -14,27 +14,22 @@ use Drupal\Core\Render\RenderContext;
 
 class EarlyRenderingControllerWrapperSubscriber extends OriginalEarlyRenderingControllerWrapperSubscriber {
 
-  protected $originalService;
-
-  public function __construct($originalService) {
-    $this->originalService = $originalService;
+  public function __construct(protected $originalService) {
     parent::__construct($this->originalService->argumentResolver, $this->originalService->renderer);
   }
 
   protected function wrapControllerExecutionInRenderContext($controller, array $arguments) {
     $class = NULL;
     if (is_array($controller) && !empty($controller[0]) && is_object($controller[0])) {
-      $class = get_class($controller[0]);
+      $class = $controller[0]::class;
     }
     elseif (is_object($controller)) {
-      $class = get_class($controller);
+      $class = $controller::class;
     }
 
-    if ($class === "Drupal\jsonapi\Controller\EntityResource"){
+    if ($class === \Drupal\jsonapi\Controller\EntityResource::class){
       $context = new RenderContext();
-      $response = $this->renderer->executeInRenderContext($context, function () use ($controller, $arguments) {
-        return call_user_func_array($controller, $arguments);
-      });
+      $response = $this->renderer->executeInRenderContext($context, fn() => call_user_func_array($controller, $arguments));
       if (!$context->isEmpty() && $response instanceof CacheableResponseInterface) {
         $response->addCacheableDependency($context->pop());
       }

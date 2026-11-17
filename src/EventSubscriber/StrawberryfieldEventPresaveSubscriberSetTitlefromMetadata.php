@@ -117,7 +117,7 @@ class StrawberryfieldEventPresaveSubscriberSetTitlefromMetadata extends Strawber
                 $title = NULL;
               }
             }
-            catch (\Exception $exception)  {
+            catch (\Exception)  {
               $this->loggerFactory->get('strawberryfield')->error($this->t('Error Setting Entity Title for Node ID @node via "ap:tasks"."ap:entitytitle": invalid JMESPath expression <em>@jmespath', [
                 '@node' => $entity->id(),
                 '@jmespath' => $jmespath_for_label,
@@ -173,7 +173,7 @@ class StrawberryfieldEventPresaveSubscriberSetTitlefromMetadata extends Strawber
         $entity->setTitle($title);
       }
     }
-    $current_class = get_called_class();
+    $current_class = static::class;
     $event->setProcessedBy($current_class, TRUE);
   }
 }

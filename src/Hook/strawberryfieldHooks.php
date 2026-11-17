@@ -145,7 +145,7 @@ class strawberryfieldHooks {
                 }
               }
             }
-            if (isset($ado_type[1]) && strpos($ado_type[1], ":") !== FALSE) {
+            if (isset($ado_type[1]) && str_contains($ado_type[1], ":")) {
               $breadcrump_by_ado_type_token = [$ado_type[1] => $original];
               $replacements += $token_service->generate('array', $breadcrump_by_ado_type_token, ['array' => $array_for_token], $options, $bubbleable_metadata);
             }
@@ -157,7 +157,7 @@ class strawberryfieldHooks {
               }
             }
           }
-          catch (\Throwable $e) {
+          catch (\Throwable) {
             \Drupal::logger('strawberryfield')->error(
               'ADO with UUID @uuid failed parsing Token @token <br><ul>@events</ul>',
               [
@@ -192,7 +192,7 @@ class strawberryfieldHooks {
                 }
               }
             }
-            if (isset($rel[1]) && strpos($rel[1], ":") !== FALSE) {
+            if (isset($rel[1]) && str_contains($rel[1], ":")) {
               $breadcrump_by_rel_token = [$rel[1] => $original];
               $replacements += $token_service->generate('array', $breadcrump_by_rel_token, ['array' => $array_for_token], $options, $bubbleable_metadata);
             }
@@ -204,7 +204,7 @@ class strawberryfieldHooks {
               }
             }
           }
-          catch (\Throwable $e) {
+          catch (\Throwable) {
             \Drupal::logger('strawberryfield')->error(
               'ADO with UUID @uuid failed parsing Token @token <br><ul>@events</ul>',
               [

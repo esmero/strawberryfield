@@ -85,16 +85,16 @@ class HydroponicsDrushCommands extends DrushCommands {
             $outofspace = TRUE;
             \Drupal::logger('hydroponics')
               ->warning('You have reached your free space limit. @free remaining free space on your Drupal temporary filesystem before starting queue @queue and your space limit is @limit.', [
-                '@free' => sprintf('%1.2f', $bytes / pow($base, $class)) . ' ' . $si_prefix[$class],
-                '@limit' => sprintf('%1.2f', $freespace_limit / pow($base, $class)) . ' ' . $si_prefix[$class],
+                '@free' => sprintf('%1.2f', $bytes / $base ** $class) . ' ' . $si_prefix[$class],
+                '@limit' => sprintf('%1.2f', $freespace_limit / $base ** $class) . ' ' . $si_prefix[$class],
                 '@queue' => $queue
               ]);
           }
           else {
             \Drupal::logger('hydroponics')
               ->info('@free remaining free space on your Drupal temporary filesystem before starting queue @queue and your space limit is @limit.', [
-                '@free' => sprintf('%1.2f', $bytes / pow($base, $class)) . ' ' . $si_prefix[$class],
-                '@limit' => sprintf('%1.2f', $freespace_limit / pow($base, $class)) . ' ' . $si_prefix[$class],
+                '@free' => sprintf('%1.2f', $bytes / $base ** $class) . ' ' . $si_prefix[$class],
+                '@limit' => sprintf('%1.2f', $freespace_limit / $base ** $class) . ' ' . $si_prefix[$class],
                 '@queue' => $queue
               ]);
           }

@@ -64,7 +64,7 @@ class keyNameProviderEntityForm extends EntityForm {
     ];
 
     $ajax = [
-      'callback' => [get_class($this), 'ajaxCallback'],
+      'callback' => [static::class, 'ajaxCallback'],
       'wrapper' => 'keynameproviderentity-ajax-container',
     ];
     /* @var \Drupal\strawberryfield\Plugin\StrawberryfieldKeyNameProviderManager $keyprovider_plugin_definitions */
@@ -136,18 +136,14 @@ class keyNameProviderEntityForm extends EntityForm {
     $strawberry_keynameprovider = $this->entity;
     $status = $strawberry_keynameprovider->save();
 
-    switch ($status) {
-      case SAVED_NEW:
-        $this->messenger->addStatus($this->t('Created the %label Strawberry Key Name Provider.', [
+    match ($status) {
+        SAVED_NEW => $this->messenger->addStatus($this->t('Created the %label Strawberry Key Name Provider.', [
           '%label' => $strawberry_keynameprovider->label(),
-        ]));
-        break;
-
-      default:
-        $this->messenger->addStatus($this->t('Saved the %label Strawberry Key Name Provider.', [
+        ])),
+        default => $this->messenger->addStatus($this->t('Saved the %label Strawberry Key Name Provider.', [
           '%label' => $strawberry_keynameprovider->label(),
-        ]));
-    }
+        ])),
+    };
     $form_state->setRedirectUrl($strawberry_keynameprovider->toUrl('collection'));
   }
 

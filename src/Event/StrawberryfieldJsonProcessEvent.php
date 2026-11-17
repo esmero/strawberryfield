@@ -19,23 +19,6 @@ class StrawberryfieldJsonProcessEvent extends Event {
   protected $originalJson;
 
   /**
-   * a processed JSON
-   *
-   * This is where all changes happen and event subscribers are encourage to
-   * deal with changing, adding, filtering it.
-   *
-   * @var array
-   */
-  private $processedJson;
-
-  /**
-   * The event type.
-   *
-   * @var \Drupal\strawberryfield\StrawberryfieldEventType
-   */
-  private $eventType;
-
-  /**
    * If processed JSON was modified since the Event was dispatched.
    *
    * @var boolean
@@ -46,17 +29,24 @@ class StrawberryfieldJsonProcessEvent extends Event {
   /**
    * Construct a new Json processing event.
    *
-   * @param string $event_type
+   * @param string $eventType
    *   The event type.
    * @param array $originalJson
    *   The original JSON
    * @param array $processedJson
    *   The processed JSON since these are arrays and not Objects by reference.
    */
-  public function __construct($event_type, array $originalJson, array $processedJson) {
-    $this->eventType = $event_type;
+  public function __construct(/**
+   * The event type.
+   */
+  private $eventType, array $originalJson, /**
+   * a processed JSON
+   *
+   * This is where all changes happen and event subscribers are encourage to
+   * deal with changing, adding, filtering it.
+   */
+  private array $processedJson) {
     $this->originalJson = $originalJson;
-    $this->processedJson = $processedJson;
   }
 
   /**

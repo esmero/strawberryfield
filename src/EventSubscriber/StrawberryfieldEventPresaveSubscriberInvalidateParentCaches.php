@@ -102,7 +102,7 @@ class StrawberryfieldEventPresaveSubscriberInvalidateParentCaches extends Strawb
     if (count($tags)) {
       $this->cacheTagsInvalidator->invalidateTags($tags);
     }
-    $current_class = get_called_class();
+    $current_class = static::class;
     $event->setProcessedBy($current_class, TRUE);
   }
 }

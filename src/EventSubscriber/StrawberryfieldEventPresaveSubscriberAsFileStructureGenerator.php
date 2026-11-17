@@ -146,8 +146,8 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
             break;
           }
           $fullvalues_flat = $itemfield->provideFlatten();
-          $fids_from_as = isset($fullvalues_flat['dr:fid']) ? $fullvalues_flat['dr:fid'] : [];
-          $for_from_as = isset($fullvalues_flat['dr:for']) ? $fullvalues_flat['dr:for'] : [];
+          $fids_from_as = $fullvalues_flat['dr:fid'] ?? [];
+          $for_from_as = $fullvalues_flat['dr:for'] ?? [];
           $fids_from_as = is_array(
             $fids_from_as
           ) ? $fids_from_as : [$fids_from_as];
@@ -168,7 +168,7 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
               // Here each $jsonkey_with_filenumids is a json key that holds file ids
               // Also $fullvalues[$jsonkeys_with_filenumids] will be there because
               // ::cleanUpEntityMappingStructure. Still, double check please?
-              $fullvalues[$jsonkey_with_filenumids] = isset($fullvalues[$jsonkey_with_filenumids]) ? $fullvalues[$jsonkey_with_filenumids] : [];
+              $fullvalues[$jsonkey_with_filenumids] ??= [];
 
               // make even single files an array
               $fids = (is_array($fullvalues[$jsonkey_with_filenumids])) ? $fullvalues[$jsonkey_with_filenumids] : [$fullvalues[$jsonkey_with_filenumids]];
@@ -176,7 +176,7 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
 
               $fids = array_filter(
                 $fids,
-                [$this, 'isEntityId']
+                $this->isEntityId(...)
               );
 
               // NOTE. If no files are passed no processing will be done
@@ -258,7 +258,7 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
         }
       }
     }
-    $current_class = get_called_class();
+    $current_class = static::class;
     $event->setProcessedBy($current_class, TRUE);
   }
 
@@ -311,7 +311,7 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
 
       $entityMapping = array_filter(
         $fullvalues['ap:entitymapping'],
-        [$this,'prefixedEntity'],
+        $this->prefixedEntity(...),
         ARRAY_FILTER_USE_KEY
       );
       // We can not have an array of arrays.
@@ -319,7 +319,7 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
         if (is_array($jsonkeys_with_fileids)) {
           $jsonkeys_with_fileids_clean = array_filter(
             $jsonkeys_with_fileids,
-            [$this, 'isNotArray']
+            $this->isNotArray(...)
           );
         }
 
@@ -328,9 +328,7 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
           $jsonkeys_with_fileids_clean = array_filter($jsonkeys_with_fileids_clean);
           foreach ($jsonkeys_with_fileids_clean as $json_key) {
             // If not present simply create
-            if (!isset($fullvalues[$json_key])) {
-              $fullvalues[$json_key] = [];
-            }
+            $fullvalues[$json_key] ??= [];
           }
         }
         // We are not checking here if the entity part is an actual entity
@@ -381,6 +379,6 @@ class StrawberryfieldEventPresaveSubscriberAsFileStructureGenerator extends Stra
    * @return bool
    */
   private function prefixedEntity($key) {
-    return (strpos($key, 'entity:', 0) !== FALSE);
+    return (str_contains($key, 'entity:'));
   }
 }

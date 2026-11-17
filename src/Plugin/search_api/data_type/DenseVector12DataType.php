@@ -2,20 +2,21 @@
 
 namespace Drupal\strawberryfield\Plugin\search_api\data_type;
 
+use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\search_api\Attribute\SearchApiDataType;
 use Drupal\search_api\DataType\DataTypePluginBase;
+use Drupal\search_api_solr\Plugin\search_api\data_type\SearchApiDataTypePrefixInterface;
 
 /**
  * Provides a Vector data type for 12 length (3 colors) search api fields.
- *
- * @SearchApiDataType(
- *   id = "densevector_12=",
- *   label = @Translation("Dense Vector of 12 length"),
- *   description = @Translation("Contains Dense Vectors, float values."),
- *   fallback_type = "decimal",
- *   prefix = "knn12"
- * )
  */
-class DenseVector12DataType extends DataTypePluginBase {
+#[SearchApiDataType(
+  id: 'densevector_12',
+  label: new TranslatableMarkup('Dense Vector of 12 length'),
+  description: new TranslatableMarkup('Contains Dense Vectors, float values.'),
+  fallback_type: 'decimal'
+)]
+class DenseVector12DataType extends DataTypePluginBase implements SearchApiDataTypePrefixInterface {
 
   /**
    * {@inheritdoc}
@@ -25,6 +26,13 @@ class DenseVector12DataType extends DataTypePluginBase {
       $value = (float)$value;
     }
     return $value;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function getPrefix(): string {
+    return 'knn12';
   }
 
 }

@@ -44,7 +44,7 @@ class StrawberryFieldConstraintValidator extends ConstraintValidator implements 
     /**
      * {@inheritdoc}
      */
-    public function validate($value, Constraint $constraint) {
+    public function validate(mixed $value, Constraint $constraint): void {
         // Empty should be handled by the field settings.
         if (empty($value->value)) {
             return;

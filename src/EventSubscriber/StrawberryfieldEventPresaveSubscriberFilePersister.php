@@ -109,7 +109,7 @@ class StrawberryfieldEventPresaveSubscriberFilePersister extends Strawberryfield
     if ($newlysavedcount > 0 && $this->account->hasPermission('display strawberry messages')) {
       $this->messenger->addStatus($this->stringTranslation->formatPlural($newlysavedcount, 'Very good. New file persisted to permanent Storage.', 'Great! @count new files persisted to permanent Storage.'));
     }
-    $current_class = get_called_class();
+    $current_class = static::class;
     $event->setProcessedBy($current_class, TRUE);
   }
 }

@@ -51,11 +51,6 @@ class StrawberryfieldHydroponicsService {
   protected $moduleHandler;
 
   /**
-   * @var \Drupal\Core\Queue\QueueWorkerManagerInterface
-   */
-  private $queueManager;
-
-  /**
    * The queue factory.
    *
    * @var \Drupal\Core\Queue\QueueFactory
@@ -76,7 +71,7 @@ class StrawberryfieldHydroponicsService {
    * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entity_type_manager
    * @param \Drupal\Core\Config\ConfigFactoryInterface $config_factory
    * @param \Drupal\Core\Extension\ModuleHandlerInterface $module_handler
-   * @param \Drupal\Core\Queue\QueueWorkerManagerInterface $queue_manager
+   * @param \Drupal\Core\Queue\QueueWorkerManagerInterface $queueManager
    * @param \Drupal\Core\Queue\QueueFactory $queue_factory
    * @param \Psr\Log\LoggerInterface $hydroponics_logger
    */
@@ -84,14 +79,13 @@ class StrawberryfieldHydroponicsService {
     EntityTypeManagerInterface $entity_type_manager,
     ConfigFactoryInterface $config_factory,
     ModuleHandlerInterface $module_handler,
-    QueueWorkerManagerInterface $queue_manager,
+    private QueueWorkerManagerInterface $queueManager,
     QueueFactory $queue_factory,
     LoggerInterface $hydroponics_logger
   ) {
     $this->entityTypeManager = $entity_type_manager;
     $this->configFactory = $config_factory;
     $this->moduleHandler = $module_handler;
-    $this->queueManager = $queue_manager;
     $this->queueFactory = $queue_factory;
     $this->logger = $hydroponics_logger;
   }
@@ -134,7 +128,7 @@ class StrawberryfieldHydroponicsService {
           $queue_worker->processItem($item->data);
           $queue->deleteItem($item);
         }
-        catch (RequeueException $e) {
+        catch (RequeueException) {
           // The worker requested the task be immediately requeued.
           $queue->releaseItem($item);
         }

@@ -14,58 +14,41 @@ class StrawberryfieldFileEvent extends Event {
 
 
   /**
-   * The Path with StreamWrapper to a File.
-   *
-   * @var string
-   */
-  private string $uri;
-
-
-  /**
-   * The Time this event was Fired
-   *
-   * @var integer
-   */
-  private int $timestamp;
-
-
-  /**
-   * The Drupal Module machine name that triggered this event.
-   *
-   * @var string
-   */
-  private $module;
-
-  /**
-   * The event type.
-   *
-   * @var \Drupal\strawberryfield\StrawberryfieldEventType
-   */
-  private $eventType;
-
-
-  /**
-   * Which Subscribers processed this Event.
-   *
-   * @var array
-   *
-   */
-  private $processedby = [];
-
-  /**
    * Construct a new entity event.
    *
-   * @param string $event_type
+   * @param string $eventType
    *   The event type.
    * @param \Drupal\Core\Entity\EntityInterface $entity
    *   The entity which caused the event.
+   * @param string $uri
+   * @param int $timestamp
+   * @param string $module
    */
-  public function __construct($event_type, $module, $uri, $timestamp,  array $processedby = []) {
-    $this->eventType = $event_type;
-    $this->uri = $uri;
-    $this->timestamp = $timestamp;
-    $this->module = $module;
-    $this->processedby = $processedby;
+  public function __construct(
+      /**
+       * The event type.
+       */
+      private $eventType,
+      /**
+       * The Drupal Module machine name that triggered this event.
+       */
+      private $module,
+      /**
+       * The Path with StreamWrapper to a File.
+       */
+      private readonly string $uri,
+      /**
+       * The Time this event was Fired
+       */
+      private readonly int $timestamp,
+      /**
+       * Which Subscribers processed this Event.
+       *
+       *
+       */
+      private array $processedby = []
+  )
+  {
   }
 
   /**

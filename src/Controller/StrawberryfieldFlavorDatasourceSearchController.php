@@ -123,7 +123,7 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
 
       $response = new CacheableJsonResponse(
         json_encode($snippets),
-        200,
+        \Symfony\Component\HttpFoundation\Response::HTTP_OK,
         ['content-type' => 'application/json'],
         TRUE
       );
@@ -153,7 +153,7 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
 
       $response = new CacheableResponse(
         $output,
-        200,
+        \Symfony\Component\HttpFoundation\Response::HTTP_OK,
         ['content-type' => 'application/xml']
       );
     }
@@ -591,7 +591,7 @@ class StrawberryfieldFlavorDatasourceSearchController extends ControllerBase {
       );
       return new JsonResponse(['count' => $count]);
     }
-    catch (\Exception $exception) {
+    catch (\Exception) {
       // We do not want to throw nor record exceptions for public facing Endpoints
       return new JsonResponse(['count' => $count]);
     }

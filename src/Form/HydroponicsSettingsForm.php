@@ -73,11 +73,6 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
   protected $hydroponicsService;
 
   /**
-   * @var \Drupal\Core\Entity\EntityTypeManagerInterface
-   */
-  protected EntityTypeManagerInterface $entityTypeManager;
-
-  /**
    * OverviewForm constructor.
    *
    * @param \Drupal\Core\Config\ConfigFactoryInterface $config_factory
@@ -88,10 +83,10 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
    * @param \Drupal\Core\Queue\QueueWorkerManagerInterface $queueWorkerManager
    * @param \Drupal\Core\Messenger\Messenger $messenger
    * @param \Drupal\strawberryfield\StrawberryfieldHydroponicsService $hydroponics_service
-   * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entitytype_manager
+   * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entityTypeManager
    * @param \Drupal\Core\Config\TypedConfigManagerInterface $typed_config_manager
    */
-  public function __construct(ConfigFactoryInterface $config_factory, QueueFactory $queue_factory, AccountInterface $current_user, StateInterface $state, ModuleHandler $module_handler, QueueWorkerManagerInterface $queueWorkerManager, Messenger $messenger, StrawberryfieldHydroponicsService $hydroponics_service, EntityTypeManagerInterface $entitytype_manager, TypedConfigManagerInterface $typed_config_manager) {
+  public function __construct(ConfigFactoryInterface $config_factory, QueueFactory $queue_factory, AccountInterface $current_user, StateInterface $state, ModuleHandler $module_handler, QueueWorkerManagerInterface $queueWorkerManager, Messenger $messenger, StrawberryfieldHydroponicsService $hydroponics_service, protected EntityTypeManagerInterface $entityTypeManager, TypedConfigManagerInterface $typed_config_manager) {
     parent::__construct($config_factory, $typed_config_manager);
     $this->queueFactory = $queue_factory;
     $this->currentUser = $current_user;
@@ -101,7 +96,6 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
     $this->messenger = $messenger;
     $this->queues = $this->queueWorkerManager->getDefinitions();
     $this->hydroponicsService = $hydroponics_service;
-    $this->entityTypeManager = $entitytype_manager;
   }
 
   /**
@@ -146,20 +140,20 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
   public function buildForm(array $form, FormStateInterface $form_state) {
     $config = $this->config('strawberryfield.hydroponics_settings');
 
-    $active =  $config->get('active') ? $config->get('active') : FALSE;
-    $time_to_expire =  $config->get('time_to_expire') !== null ? $config->get('time_to_expire') : 720;
-    $freespace_limit = $config->get('freespace_limit') !== null ? $config->get('freespace_limit') : 21474836480;
+    $active =  $config->get('active') ?: FALSE;
+    $time_to_expire =  $config->get('time_to_expire') ?? 720;
+    $freespace_limit = $config->get('freespace_limit') ?? 21474836480;
 
-    $si_prefix = array( 'B', 'KB', 'MB', 'GB', 'TB', 'EB', 'ZB', 'YB' );
+    $si_prefix = [ 'B', 'KB', 'MB', 'GB', 'TB', 'EB', 'ZB', 'YB' ];
 
     $base = 1024;
 
     $class =  min((int)log($freespace_limit , $base) , count($si_prefix) - 1);
 
-    $freespace_limit_human = $freespace_limit != 0 ? sprintf('%1.2f' , $freespace_limit / pow($base,$class)) . ' ' . $si_prefix[$class] : 0;
+    $freespace_limit_human = $freespace_limit != 0 ? sprintf('%1.2f' , $freespace_limit / $base ** $class) . ' ' . $si_prefix[$class] : 0;
 
-    $drush_path = $config->get('drush_path') ?  $config->get('drush_path') : NULL;
-    $home_path = $config->get('home_path') ?  $config->get('home_path') : NULL;
+    $drush_path = $config->get('drush_path') ?: NULL;
+    $home_path = $config->get('home_path') ?: NULL;
     $enabled_queues =  !empty($config->get('queues')) ? array_flip($config->get('queues')) : [];
     $enabled_search_api_indexes = !empty($config->get('search_api_indexes')) ? array_values($config->get('search_api_indexes')) : [];
     $search_api_indexes_count =  !empty($config->get('search_api_indexes_count')) ? $config->get('search_api_indexes_count') : 0;
@@ -185,12 +179,12 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
     $current_status = $this->hydroponicsService->checkRunning();
     /* Give users a view of Free space in temporary */
     $bytes = disk_free_space(\Drupal::service('file_system')->getTempDirectory());
-    $si_prefix = array( 'B', 'KB', 'MB', 'GB', 'TB', 'EB', 'ZB', 'YB' );
+    $si_prefix = [ 'B', 'KB', 'MB', 'GB', 'TB', 'EB', 'ZB', 'YB' ];
     $base = 1024;
     $class = min((int)log($bytes , $base) , count($si_prefix) - 1);
 
     $status = $this->t('@status.<br>You have @free remaining free space on your Drupal temporary filesystem.', [
-      '@free' => sprintf('%1.2f' , $bytes / pow($base,$class)) . ' ' . $si_prefix[$class],
+      '@free' => sprintf('%1.2f' , $bytes / $base ** $class) . ' ' . $si_prefix[$class],
       '@status'=> $current_status['message']
       ]);
 
@@ -247,7 +241,7 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
       '#title' => 'When Freespace for <em>temporary://</em> is less or equal than this value, suspend Hydroponics Service for all queues except for <em>Archipelago Temporary File Composter Queue Worker</em>.',
       '#description' => 'A value of 0 will ignore this safety measure. For real limites enter a value like "200 MB" (megabytes) or "20 GB" (Gigabytes). It is recommended that you set a real SAFE threashold to avoid having your server crash when running out of space. ',
       '#type' => 'textfield',
-      '#element_validate' => [[get_class($this), 'validateMaxFilesize']],
+      '#element_validate' => [[static::class, 'validateMaxFilesize']],
       '#required' => TRUE,
       '#default_value' => $freespace_limit_human,
     ];
@@ -335,7 +329,7 @@ class HydroponicsSettingsForm extends ConfigFormBase implements ContainerInjecti
     ];
 
 
-    $queues = (isset($this->queues)) ? $this->queues : [];
+    $queues = $this->queues ?? [];
     foreach ($queues as $name => $queue_definition) {
       /** @var QueueInterface $queue */
       $queue = $this->queueFactory->get($name);

@@ -13,9 +13,7 @@ use Drupal\Core\File\FileSystemInterface;
 use Drupal\Core\StreamWrapper\StreamWrapperInterface;
 use Drupal\Core\Url;
 use Drupal\Core\Config\ConfigFactoryInterface;
-use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Core\StreamWrapper\StreamWrapperManagerInterface;
-use Drupal\Core\Archiver\ArchiverManager;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\file\FileInterface;
 use Drupal\Core\Messenger\MessengerTrait;
@@ -616,7 +614,7 @@ class StrawberryfieldFileMetadataService {
                   if (is_string($value) && (strlen($value) > 1)) {
                     $pair = array_filter(explode(':', $value));
                     if (count($pair)) {
-                      $identify[$pair[0]] = isset($pair[1]) ? $pair[1] : NULL;
+                      $identify[$pair[0]] = $pair[1] ?? NULL;
                     }
                   }
                 }
@@ -668,7 +666,7 @@ class StrawberryfieldFileMetadataService {
           $temp['general']['internet_media_type'] =  $temp['flv:mediainfo']['general']['internet_media_type'] ?? NULL;
           $metadata['flv:mediainfo'] = $temp;
         }
-      } catch (UnknownTrackTypeException $e) {
+      } catch (UnknownTrackTypeException) {
         $this->loggerFactory->get('strawberryfield')->warning(
           'Could not process MediaInfo on @templocation for @fileurl',
           [
@@ -849,7 +847,7 @@ class StrawberryfieldFileMetadataService {
           $templocation = $this->fileSystem->realpath(
             $templocation
           );
-        } catch (FileException $exception) {
+        } catch (FileException) {
           // Means the file is not longer there
           // This happens if a file was added and shortly after that removed and replace
           // by a new one.

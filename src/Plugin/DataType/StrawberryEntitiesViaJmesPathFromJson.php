@@ -69,7 +69,7 @@ class StrawberryEntitiesViaJmesPathFromJson extends StrawberryValuesViaJmesPathF
       $jmespaths_split = preg_split($pattern, $jmespaths);
       $jmespath_array = [];
       if ($jmespaths_split && is_array($jmespaths_split) && count($jmespaths_split) > 0 ) {
-        $jmespath_array = array_map('trim', $jmespaths_split);
+        $jmespath_array = array_map(trim(...), $jmespaths_split);
       }
       else {
         // Regular expression for splitting failed. Return silently.
@@ -152,7 +152,7 @@ class StrawberryEntitiesViaJmesPathFromJson extends StrawberryValuesViaJmesPathF
       throw new \InvalidArgumentException('Unable to get a value with a non-numeric delta in a list.');
     }
     $this->ensureComputedValue();
-    return isset($this->list[$index]) ? $this->list[$index] : NULL;
+    return $this->list[$index] ?? NULL;
   }
   /**
    * {@inheritdoc}

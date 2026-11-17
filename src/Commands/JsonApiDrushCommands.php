@@ -36,216 +36,216 @@ class JsonApiDrushCommands extends DrushCommands {
   /**
    * JSON SCHEMA Draft 7.0 for a JSON API NODE via POST
    */
-  const acceptedjsonschemapost = <<<'JSON'
-{
-  "$id": "http://archipelago.nyc/jsonschemas/jsonapinodepost.json",
-  "$schema": "http://json-schema.org/schema#",
-  "type": "object",
-  "definitions": {
-     "relationshipToOne": {
-      "description": "References to other resource objects in a to-one (\"relationship\"). Relationships can be specified by including a member in a resource's links object.",
-      "anyOf": [
-        {
-          "$ref": "#/definitions/empty"
-        },
-        {
+  const acceptedjsonschemapost = <<<'JSON_WRAP'
+  {
+    "$id": "http://archipelago.nyc/jsonschemas/jsonapinodepost.json",
+    "$schema": "http://json-schema.org/schema#",
+    "type": "object",
+    "definitions": {
+       "relationshipToOne": {
+        "description": "References to other resource objects in a to-one (\"relationship\"). Relationships can be specified by including a member in a resource's links object.",
+        "anyOf": [
+          {
+            "$ref": "#/definitions/empty"
+          },
+          {
+            "$ref": "#/definitions/linkage"
+          }
+        ]
+      },
+      "relationshipToMany": {
+        "description": "An array of objects each containing \"type\" and \"id\" members for to-many relationships.",
+        "type": "array",
+        "items": {
           "$ref": "#/definitions/linkage"
-        }
-      ]
-    },
-    "relationshipToMany": {
-      "description": "An array of objects each containing \"type\" and \"id\" members for to-many relationships.",
-      "type": "array",
-      "items": {
-        "$ref": "#/definitions/linkage"
+        },
+        "uniqueItems": true
       },
-      "uniqueItems": true
-    },
-    "empty": {
-      "description": "Describes an empty to-one relationship.",
-      "type": "null"
-    },
-    "linkage": {
-      "description": "The \"type\" and \"id\" to non-empty members.",
-      "type": "object",
-      "required": [
-        "type",
-        "id"
-      ],
-      "properties": {
-        "type": {
-          "type": "string"
-        },
-        "id": {
-          "type": "string"
-        },
-        "meta": {
-          "$ref": "#/definitions/meta"
-        }
+      "empty": {
+        "description": "Describes an empty to-one relationship.",
+        "type": "null"
       },
-      "additionalProperties": false
-    },
-     "meta": {
-      "description": "Non-standard meta-information that can not be represented as an attribute or relationship.",
-      "type": "object",
-      "additionalProperties": true
-    },
-    "resource": {
-      "description": "\"Resource objects\" appear in a JSON:API document to represent resources.",
-      "type": "object",
-      "required": [
-        "type",
-        "id"
-      ],
-      "properties": {
-        "type": {
-          "type": "string"
+      "linkage": {
+        "description": "The \"type\" and \"id\" to non-empty members.",
+        "type": "object",
+        "required": [
+          "type",
+          "id"
+        ],
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "meta": {
+            "$ref": "#/definitions/meta"
+          }
         },
-        "id": {
-          "type": "string"
-        },
-        "attributes": {
-          "$ref": "#/definitions/attributes"
-        },
-        "relationships": {
-          "$ref": "#/definitions/relationships"
-        },
-        "links": {
-          "$ref": "#/definitions/links"
-        },
-        "meta": {
-          "$ref": "#/definitions/meta"
-        }
+        "additionalProperties": false
       },
-      "additionalProperties": false
-    },
-    "relationshipLinks": {
-      "description": "A resource object **MAY** contain references to other resource objects (\"relationships\"). Relationships may be to-one or to-many. Relationships can be specified by including a member in a resource's links object.",
-      "type": "object",
-      "properties": {
-        "self": {
-          "description": "A `self` member, whose value is a URL for the relationship itself (a \"relationship URL\"). This URL allows the client to directly manipulate the relationship. For example, it would allow a client to remove an `author` from an `article` without deleting the people resource itself.",
+       "meta": {
+        "description": "Non-standard meta-information that can not be represented as an attribute or relationship.",
+        "type": "object",
+        "additionalProperties": true
+      },
+      "resource": {
+        "description": "\"Resource objects\" appear in a JSON:API document to represent resources.",
+        "type": "object",
+        "required": [
+          "type",
+          "id"
+        ],
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "attributes": {
+            "$ref": "#/definitions/attributes"
+          },
+          "relationships": {
+            "$ref": "#/definitions/relationships"
+          },
+          "links": {
+            "$ref": "#/definitions/links"
+          },
+          "meta": {
+            "$ref": "#/definitions/meta"
+          }
+        },
+        "additionalProperties": false
+      },
+      "relationshipLinks": {
+        "description": "A resource object **MAY** contain references to other resource objects (\"relationships\"). Relationships may be to-one or to-many. Relationships can be specified by including a member in a resource's links object.",
+        "type": "object",
+        "properties": {
+          "self": {
+            "description": "A `self` member, whose value is a URL for the relationship itself (a \"relationship URL\"). This URL allows the client to directly manipulate the relationship. For example, it would allow a client to remove an `author` from an `article` without deleting the people resource itself.",
+            "$ref": "#/definitions/link"
+          },
+          "related": {
+            "$ref": "#/definitions/link"
+          }
+        },
+        "additionalProperties": true
+      },
+      "links": {
+        "type": "object",
+        "additionalProperties": {
           "$ref": "#/definitions/link"
-        },
-        "related": {
-          "$ref": "#/definitions/link"
         }
       },
-      "additionalProperties": true
-    },
-    "links": {
-      "type": "object",
-      "additionalProperties": {
-        "$ref": "#/definitions/link"
-      }
-    },
-    "link": {
-      "description": "A link **MUST** be represented as either: a string containing the link's URL or a link object.",
-      "oneOf": [
-        {
-          "description": "A string containing the link's URL.",
-          "type": "string",
-          "format": "uri-reference"
-        },
-        {
-          "type": "object",
-          "required": [
-            "href"
-          ],
-          "properties": {
-            "href": {
-              "description": "A string containing the link's URL.",
-              "type": "string",
-              "format": "uri-reference"
-            },
-            "meta": {
-              "$ref": "#/definitions/meta"
+      "link": {
+        "description": "A link **MUST** be represented as either: a string containing the link's URL or a link object.",
+        "oneOf": [
+          {
+            "description": "A string containing the link's URL.",
+            "type": "string",
+            "format": "uri-reference"
+          },
+          {
+            "type": "object",
+            "required": [
+              "href"
+            ],
+            "properties": {
+              "href": {
+                "description": "A string containing the link's URL.",
+                "type": "string",
+                "format": "uri-reference"
+              },
+              "meta": {
+                "$ref": "#/definitions/meta"
+              }
             }
           }
-        }
-      ]
-    },
-    "attributes": {
-      "description": "Members of the attributes object (\"attributes\") represent information about the resource object in which it's defined.",
-      "type": "object",
-      "patternProperties": {
-        "^(?!relationships$|links$|id$|type$)\\w[-\\w_]*$": {
-          "description": "Attributes may contain any valid JSON value."
-        }
+        ]
       },
-      "additionalProperties": false
-    },
-    "relationships": {
-      "description": "Members of the relationships object (\"relationships\") represent references from the resource object in which it's defined to other resource objects.",
-      "type": "object",
-      "patternProperties": {
-        "^(?!id$|type$)\\w[-\\w_]*$": {
-          "properties": {
-            "links": {
-              "$ref": "#/definitions/relationshipLinks"
-            },
-            "data": {
-              "description": "Member, whose value represents \"resource linkage\".",
-              "oneOf": [
-                {
-                  "$ref": "#/definitions/relationshipToOne"
-                },
-                {
-                  "$ref": "#/definitions/relationshipToMany"
-                }
-              ]
-            },
-            "meta": {
-              "$ref": "#/definitions/meta"
-            }
-          },
-          "anyOf": [
-            {
-              "required": [
-                "data"
-              ]
-            },
-            {
-              "required": [
-                "meta"
-              ]
-            },
-            {
-              "required": [
-                "links"
-              ]
-            }
-          ],
-          "additionalProperties": false
-        }
-      },
-      "additionalProperties": false
-    }
-  },
-  "properties": {
-    "data": {
-      "description": "The document's \"primary data\" is a representation of the resource or collection of resources targeted by a request.",
-      "oneOf": [
-        {
-          "$ref": "#/definitions/resource"
+      "attributes": {
+        "description": "Members of the attributes object (\"attributes\") represent information about the resource object in which it's defined.",
+        "type": "object",
+        "patternProperties": {
+          "^(?!relationships$|links$|id$|type$)\\w[-\\w_]*$": {
+            "description": "Attributes may contain any valid JSON value."
+          }
         },
-        {
-          "description": "An array of resource objects, an array of resource identifier objects, or an empty array ([]), for requests that target resource collections.",
-          "type": "array",
-          "items": {
+        "additionalProperties": false
+      },
+      "relationships": {
+        "description": "Members of the relationships object (\"relationships\") represent references from the resource object in which it's defined to other resource objects.",
+        "type": "object",
+        "patternProperties": {
+          "^(?!id$|type$)\\w[-\\w_]*$": {
+            "properties": {
+              "links": {
+                "$ref": "#/definitions/relationshipLinks"
+              },
+              "data": {
+                "description": "Member, whose value represents \"resource linkage\".",
+                "oneOf": [
+                  {
+                    "$ref": "#/definitions/relationshipToOne"
+                  },
+                  {
+                    "$ref": "#/definitions/relationshipToMany"
+                  }
+                ]
+              },
+              "meta": {
+                "$ref": "#/definitions/meta"
+              }
+            },
+            "anyOf": [
+              {
+                "required": [
+                  "data"
+                ]
+              },
+              {
+                "required": [
+                  "meta"
+                ]
+              },
+              {
+                "required": [
+                  "links"
+                ]
+              }
+            ],
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "properties": {
+      "data": {
+        "description": "The document's \"primary data\" is a representation of the resource or collection of resources targeted by a request.",
+        "oneOf": [
+          {
             "$ref": "#/definitions/resource"
           },
-          "uniqueItems": true
-        },
-        {
-          "description": "null if the request is one that might correspond to a single resource, but doesn't currently.",
-          "type": "null"
-        }
-      ]
+          {
+            "description": "An array of resource objects, an array of resource identifier objects, or an empty array ([]), for requests that target resource collections.",
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/resource"
+            },
+            "uniqueItems": true
+          },
+          {
+            "description": "null if the request is one that might correspond to a single resource, but doesn't currently.",
+            "type": "null"
+          }
+        ]
+      }
     }
   }
-}
-JSON;
+  JSON_WRAP;
 
   /**
    * Wraps a JSON API node post call back with added files.
@@ -381,7 +381,7 @@ JSON;
         try {
           // @see https://github.com/swaggest/php-json-schema
           $schema->in((Object) $data);
-        } catch (JsonSchemaException $exception) {
+        } catch (JsonSchemaException) {
           throw new \Exception(
             dt(
               'The provided JSON is not a valid JSON API payload. Suspending the ingest'
@@ -521,7 +521,7 @@ JSON;
 
       // Now ingest the actual OBJECT
       $data_body = [];
-      $ado_title = isset($data['label']) ? $data['label'] : 'Unnamed Digital Object';
+      $ado_title = $data['label'] ?? 'Unnamed Digital Object';
       $data_body['data'] = [
         'id' => $options['uuid'],
         'type' => 'node--' . $bundle,

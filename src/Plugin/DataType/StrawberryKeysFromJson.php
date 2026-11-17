@@ -82,9 +82,7 @@ class StrawberryKeysFromJson extends ItemList {
         $jsonArray, '', $exclude
       );
       if ($filter_empties) {
-        $flattened = array_filter($flattened, function($value) {
-          return ($value !== null && $value !== '' && $value !== []);
-        });
+        $flattened = array_filter($flattened, fn($value) => $value !== null && $value !== '' && $value !== []);
       }
       $this->processed = array_keys($flattened);
       $this->computed = TRUE;
@@ -130,7 +128,7 @@ class StrawberryKeysFromJson extends ItemList {
     }
     $this->ensureComputedValue();
 
-    return isset($this->list[$index]) ? $this->list[$index] : NULL;
+    return $this->list[$index] ?? NULL;
   }
 
   /**

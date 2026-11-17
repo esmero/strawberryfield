@@ -202,7 +202,7 @@ class StrawberryfieldJsonHelper {
    */
   public static function arrayToFlatPropertypaths(array $sourcearray = [], $propertypath = '', $excludepaths = [])
   {
-    $flat = array();
+    $flat = [];
 
     // Blacklist paths. Strip the last dot in case this was called recursively.
     if (!empty($excludepaths) && in_array(rtrim($propertypath,'.'), $excludepaths)) {
@@ -239,7 +239,7 @@ class StrawberryfieldJsonHelper {
    */
   public static function arrayToFlatJsonPropertypaths(array $sourcearray = [], $propertypath = '', $excludepaths = [])
   {
-    $flat = array();
+    $flat = [];
 
     // Blacklist paths. Strip the last dot in case this was called recursively.
     if (!empty($excludepaths) && in_array(rtrim($propertypath,'.'), $excludepaths)) {
@@ -300,9 +300,7 @@ class StrawberryfieldJsonHelper {
         static::arrayToFlatCommonkeys($value, $flat, $jsonld);
         // Don't accumulate int keys. Makes no sense.
         if (is_string($key)) {
-          if (!isset($flat[$key])) {
-            $flat[$key] = [];
-          }
+          $flat[$key] ??= [];
           // Means we can't keep flattening
           if (is_array($value)) {
             $flat[$key] = $flat[$key] + $value;
@@ -332,7 +330,7 @@ class StrawberryfieldJsonHelper {
    *  TRUE if is associative
    */
   public static function arrayIsMultiSimple(array $sourcearray =  []) {
-      return !empty(array_filter(array_keys($sourcearray), 'is_string'));
+      return !empty(array_filter(array_keys($sourcearray), is_string(...)));
   }
 
   /**
@@ -365,11 +363,9 @@ class StrawberryfieldJsonHelper {
    * @return bool
    *  TRUE if is associative
    */
-  public static function arrayIsMultiIterative(array $sourcearray =  []) {
-    foreach ($sourcearray as $item) {
-      if (is_array($item)) return true;
-    }
-    return false;
+  public static function arrayIsMultiIterative(array $sourcearray =  [])
+  {
+      return array_any($sourcearray, fn($item) => is_array($item));
   }
 
   /**
@@ -461,16 +457,11 @@ class StrawberryfieldJsonHelper {
     if (empty($filter_expression)) {
       return NULL;
     }
-    switch ($op) {
-      case "pipe":
-        $filter_expression_string = implode('|', $filter_expression);
-        break;
-      case "or":
-        $filter_expression_string = "[?" . implode('||', $filter_expression) . "]";
-        break;
-      default:
-        $filter_expression_string = "[?" . implode('&&', $filter_expression) . "]";
-    }
+    $filter_expression_string = match ($op) {
+        "pipe" => implode('|', $filter_expression),
+        "or" => "[?" . implode('||', $filter_expression) . "]",
+        default => "[?" . implode('&&', $filter_expression) . "]",
+    };
     return $filter_expression_string;
   }
 

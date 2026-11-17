@@ -124,7 +124,7 @@ class StrawberryfieldEventSaveSubscriberDepositDO extends StrawberryfieldEventSa
    */
   public function onEntitySave(StrawberryfieldCrudEvent $event) {
     /* @var $entity \Drupal\Core\Entity\ContentEntityInterface */
-    $current_class = get_called_class();
+    $current_class = static::class;
     $entity = $event->getEntity();
     if ($entity->isDefaultRevision()) {
        $prefix = 'current';

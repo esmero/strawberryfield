@@ -41,7 +41,7 @@ class StrawberryFieldEntityComputedSemanticTypeItemList extends FieldItemList {
             $sbf_type = [];
             if (isset($flatvalues['type'])) {
               $sbf_type = (array) $flatvalues['type'];
-              $sbf_type = array_filter($sbf_type, 'is_string');
+              $sbf_type = array_filter($sbf_type, is_string(...));
             }
 
 

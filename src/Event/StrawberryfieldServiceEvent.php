@@ -13,46 +13,36 @@ use Symfony\Contracts\EventDispatcher\Event;
 class StrawberryfieldServiceEvent extends Event {
 
   /**
-   * The Entity.
-   *
-   * @var \Drupal\Core\Entity\EntityInterface
-   */
-  private $entity;
-
-  /**
-   * The SBF field with that contains the service.
-   *
-   * @var \Drupal\Core\Field\FieldItemInterface;
-   */
-  private $field;
-
-  /**
-   * The Service definition.
-   *
-   * @array;
-   */
-  private $service;
-
-  /**
-   * The event type.
-   *
-   * @var \Drupal\strawberryfield\StrawberryfieldEventType
-   */
-  private $eventType;
-
-  /**
    * Construct a new entity event.
    *
-   * @param string $event_type
+   * @param string $eventType
    *   The event type.
    * @param \Drupal\Core\Entity\EntityInterface $entity
    *   The entity which caused the event.
    */
-  public function __construct($event_type, EntityInterface $entity, FieldItemListInterface $field, array $service) {
-    $this->entity = $entity;
-    $this->eventType = $event_type;
-    $this->field = $field;
-    $this->service = $service;
+  public function __construct(
+      /**
+       * The event type.
+       */
+      private $eventType,
+      /**
+       * The Entity.
+       */
+      private readonly EntityInterface $entity,
+      /**
+       * The SBF field with that contains the service.
+       *
+       * @var \Drupal\Core\Field\FieldItemInterface;
+       */
+      private readonly FieldItemListInterface $field,
+      /**
+       * The Service definition.
+       *
+       * @array;
+       */
+      private readonly array $service
+  )
+  {
   }
 
   /**

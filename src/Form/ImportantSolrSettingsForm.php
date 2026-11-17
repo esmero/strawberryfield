@@ -402,7 +402,7 @@ class ImportantSolrSettingsForm extends ConfigFormBase {
   /**
    * Submission handler for condition changes in
    */
-  function field_submit(array &$form, FormStateInterface $form_state) {
+  public function field_submit(array &$form, FormStateInterface $form_state) {
     // We want to unset values here.
     // That way, e.g in case people select an index, then a field
     // And then a new index, solr_field_select gets always a chance to be

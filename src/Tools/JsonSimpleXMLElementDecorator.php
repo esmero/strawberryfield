@@ -25,19 +25,12 @@ class JsonSimpleXMLElementDecorator implements \JsonSerializable {
     'depth' => self::DEF_DEPTH
   ];
 
-  /**
-   * @var SimpleXMLElement
-   */
-  private $subject;
-
   public function __construct(
-    SimpleXMLElement $element,
+    private readonly SimpleXMLElement $subject,
     $useAttributes = TRUE,
     $useValue = TRUE,
     $depth = self::DEF_DEPTH
   ) {
-
-    $this->subject = $element;
 
     if (!is_null($useAttributes)) {
       $this->useAttributes($useAttributes);
@@ -76,7 +69,7 @@ class JsonSimpleXMLElementDecorator implements \JsonSerializable {
     if ($this->options['@attributes']) {
       if ($attributes = $subject->attributes()) {
         $array['@attributes'] = array_map(
-          'strval',
+          strval(...),
           iterator_to_array($attributes)
         );
       }

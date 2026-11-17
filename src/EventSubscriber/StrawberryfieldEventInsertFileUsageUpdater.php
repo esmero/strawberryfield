@@ -103,7 +103,7 @@ class StrawberryfieldEventInsertFileUsageUpdater extends StrawberryfieldEventIns
     if (($updatedfiles > 0) &&  ($this->account->hasPermission('display strawberry messages'))) {
       $this->messenger->addStatus($this->stringTranslation->formatPlural($updatedfiles, 'One file usage tracked for this digital Object.', '@count files usage tracked for this digital Object.'));
     }
-    $current_class = get_called_class();
+    $current_class = static::class;
     $event->setProcessedBy($current_class, TRUE);
   }
 }

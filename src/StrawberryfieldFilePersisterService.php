@@ -24,7 +24,6 @@ use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Component\Transliteration\TransliterationInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\StreamWrapper\StreamWrapperManagerInterface;
-use Drupal\Core\Archiver\ArchiverManager;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\file\FileInterface;
 use Drupal\Core\Messenger\MessengerTrait;
@@ -82,13 +81,6 @@ class StrawberryfieldFilePersisterService {
    * @var \Drupal\Core\StreamWrapper\StreamWrapperManagerInterface
    */
   protected $streamWrapperManager;
-
-  /**
-   * The archiver manager.
-   *
-   * @var \Drupal\Core\Archiver\ArchiverManager
-   */
-  protected $archiverManager;
 
   /**
    * The Storage Destination Scheme.
@@ -181,7 +173,6 @@ class StrawberryfieldFilePersisterService {
    * @param \Drupal\file\FileUsage\FileUsageInterface                   $file_usage
    * @param \Drupal\Core\Entity\EntityTypeManagerInterface              $entity_type_manager
    * @param \Drupal\Core\StreamWrapper\StreamWrapperManagerInterface    $stream_wrapper_manager
-   * @param \Drupal\Core\Archiver\ArchiverManager                       $archiver_manager
    * @param \Drupal\Core\Config\ConfigFactoryInterface                  $config_factory
    * @param \Drupal\Core\Session\AccountInterface                       $current_user
    * @param \Drupal\Core\Language\LanguageManagerInterface              $language_manager
@@ -197,7 +188,6 @@ class StrawberryfieldFilePersisterService {
     FileUsageInterface $file_usage,
     EntityTypeManagerInterface $entity_type_manager,
     StreamWrapperManagerInterface $stream_wrapper_manager,
-    ArchiverManager $archiver_manager,
     ConfigFactoryInterface $config_factory,
     AccountInterface $current_user,
     LanguageManagerInterface $language_manager,
@@ -212,7 +202,6 @@ class StrawberryfieldFilePersisterService {
     $this->fileUsage = $file_usage;
     $this->entityTypeManager = $entity_type_manager;
     $this->streamWrapperManager = $stream_wrapper_manager;
-    $this->archiverManager = $archiver_manager;
     $this->strawberryfieldFileMetadataService = $strawberryfield_file_metadata_service;
     //@TODO evaluate creating a ServiceFactory instead of reading this on construct.
     $this->config = $config_factory->get(
@@ -517,14 +506,14 @@ class StrawberryfieldFilePersisterService {
       $files = $this->entityTypeManager->getStorage('file')->loadMultiple(
         $file_id_list
       );
-    } catch (InvalidPluginDefinitionException $e) {
+    } catch (InvalidPluginDefinitionException) {
       $this->messenger()->addError(
         $this->t(
           'Sorry, we had real issues loading your files. Invalid Plugin File Definition.'
         )
       );
       return [];
-    } catch (PluginNotFoundException $e) {
+    } catch (PluginNotFoundException) {
       $this->messenger()->addError(
         $this->t(
           'Sorry, we had real issues loading your files. File Plugin not Found'
@@ -696,7 +685,7 @@ class StrawberryfieldFilePersisterService {
     $force = $sortmode == 'manual' ? FALSE : $force;
 
     if ($sortmode == 'natural') {
-      uasort($fileinfo, [$this, 'sortByFileName']);
+      uasort($fileinfo, $this->sortByFileName(...));
     }
     else {
       // Use the ingest order of the files, namely the order in which
@@ -879,14 +868,14 @@ class StrawberryfieldFilePersisterService {
                     // basically if the File was already in the perfect spot why attempt it again?
                     if ($destination_uri != $current_uri) {
                       $event_type = StrawberryfieldEventType::TEMP_FILE_CREATION;
-                      $current_timestamp = (new DrupalDateTime())->getTimestamp();
+                      $current_timestamp = new DrupalDateTime()->getTimestamp();
                       $event = new StrawberryfieldFileEvent($event_type, 'strawberryfield', $current_uri, $current_timestamp);
                       // This will allow any temp file on ADO save to be managed
                       // IN a queue by \Drupal\strawberryfield\EventSubscriber\StrawberryfieldEventCompostBinSubscriber
                       $this->eventDispatcher->dispatch($event, $event_type);
                     }
                   }
-                  catch (EntityStorageException $e) {
+                  catch (EntityStorageException) {
                     $this->messenger()->addError(
                       t(
                         'Something went wrong when saving file @filename:, please check your logs.',
@@ -951,14 +940,14 @@ class StrawberryfieldFilePersisterService {
       $files = $this->entityTypeManager->getStorage('file')->loadMultiple(
         $file_id_list
       );
-    } catch (InvalidPluginDefinitionException $e) {
+    } catch (InvalidPluginDefinitionException) {
       $this->messenger()->addError(
         $this->t(
           'Sorry, we had real issues loading your files during cleanup/removal. Invalid Plugin File Definition.'
         )
       );
       return $originaljson;
-    } catch (PluginNotFoundException $e) {
+    } catch (PluginNotFoundException) {
       $this->messenger()->addError(
         $this->t(
           'Sorry, we had real issues loading your files during cleanup/removal. File Plugin not Found.'
@@ -1260,7 +1249,7 @@ class StrawberryfieldFilePersisterService {
         }
       }
     }
-    catch (\Throwable $exception) {
+    catch (\Throwable) {
       $success = FALSE;
     }
     return $success;
@@ -1306,7 +1295,7 @@ class StrawberryfieldFilePersisterService {
    * @return bool
    *    TRUE if exists. IF checksum passed and exists and does not match, FALSE.
    */
-  public function fileS3Exists(string $uri, string $checksum = NULL) {
+  public function fileS3Exists(string $uri, ?string $checksum = NULL) {
 
     $exists = FALSE;
     // Soft dependency, if S3FS module is not enabled we return silently.
@@ -1317,7 +1306,7 @@ class StrawberryfieldFilePersisterService {
     if (!$wrapper) {
       return FALSE;
     }
-    if (get_class($wrapper) === 'Drupal\s3fs\StreamWrapper\S3fsStream') {
+    if ($wrapper::class === \Drupal\s3fs\StreamWrapper\S3fsStream::class) {
       $parts = explode('://', $uri);
       if (count($parts) == 2) {
         $protocol = $parts[0];
@@ -1337,13 +1326,13 @@ class StrawberryfieldFilePersisterService {
       try {
         $client = $s3fs->getAmazonS3Client($config);
         $args = ['Bucket' => $config['bucket']];
-        if ($protocol == 'private' && !empty($config['private_folder']) && strlen($config['private_folder'] ?? '' > 0)) {
+        if ($protocol == 'private' && !empty($config['private_folder']) && strlen($config['private_folder'] ?? '') > 0) {
           $key = $config['private_folder'] . '/' . $key;
         }
-        elseif ($protocol == 'public' && !empty($config['public_folder']) && strlen($config['public_folder'] ?? '' > 0)) {
+        elseif ($protocol == 'public' && !empty($config['public_folder']) && strlen($config['public_folder'] ?? '') > 0) {
           $key = $config['public_folder'] . '/' . $key;
         }
-        if (!empty($config['root_folder'])  && strlen($config['root_folder']  ?? '' > 0)) {
+        if (!empty($config['root_folder'])  && strlen($config['root_folder']  ?? '') > 0) {
           $key = $config['root_folder'] . '/' . $key;
         }
         // Longer than the max Key for an S3 Object Path
@@ -1403,7 +1392,7 @@ class StrawberryfieldFilePersisterService {
     if (count($parts) == 2) {
       $source_protocol = $parts[0];
       $source_key = $parts[1];
-      if (get_class($source_wrapper) === 'Drupal\s3fs\StreamWrapper\S3fsStream') {
+      if ($source_wrapper::class === \Drupal\s3fs\StreamWrapper\S3fsStream::class) {
         $source_local = FALSE;
       }
     } else {
@@ -1415,7 +1404,7 @@ class StrawberryfieldFilePersisterService {
     if (count($parts) == 2) {
       $destination_protocol = $parts[0];
       $destination_key = $parts[1];
-      if (get_class($destination_wrapper) === 'Drupal\s3fs\StreamWrapper\S3fsStream') {
+      if ($destination_wrapper::class === \Drupal\s3fs\StreamWrapper\S3fsStream::class) {
         $destination_local = FALSE;
       }
     } else {
@@ -1429,13 +1418,13 @@ class StrawberryfieldFilePersisterService {
       foreach ($s3fsConfig->get() as $prop => $value) {
         $config[$prop] = $value;
       }
-      if ($destination_protocol == 'private' && !empty($config['private_folder']) && strlen($config['private_folder'] ?? '' > 0)) {
+      if ($destination_protocol == 'private' && !empty($config['private_folder']) && strlen($config['private_folder'] ?? '') > 0) {
         $destination_key = $config['private_folder'] . '/' . $destination_key;
       }
-      elseif ($destination_protocol == 'public' && !empty($config['public_folder']) && strlen($config['public_folder'] ?? '' > 0)) {
+      elseif ($destination_protocol == 'public' && !empty($config['public_folder']) && strlen($config['public_folder'] ?? '') > 0) {
         $destination_key = $config['public_folder'] . '/' . $destination_key;
       }
-      if (!empty($config['root_folder']) && strlen($config['root_folder']  ?? '' > 0)) {
+      if (!empty($config['root_folder']) && strlen($config['root_folder']  ?? '') > 0) {
         $destination_key = $config['root_folder'] . '/' . $destination_key;
       }
       // Longer than the max Key for an S3 Object Path
@@ -1451,13 +1440,13 @@ class StrawberryfieldFilePersisterService {
         ];
         $bucket =  $config['bucket'];
         if (!$source_local) {
-          if ($source_protocol == 'private' && !empty($config['private_folder']) && strlen($config['private_folder'] ?? '' > 0)) {
+          if ($source_protocol == 'private' && !empty($config['private_folder']) && strlen($config['private_folder'] ?? '') > 0) {
             $source_key  = $config['private_folder'] . '/' . $source_key;
           }
-          elseif ($source_protocol == 'public' && !empty($config['public_folder']) && strlen($config['public_folder'] ?? '' > 0)) {
+          elseif ($source_protocol == 'public' && !empty($config['public_folder']) && strlen($config['public_folder'] ?? '') > 0) {
             $source_key = $config['public_folder'] . '/' . $source_key;
           }
-          if (!empty($config['root_folder']) && strlen($config['root_folder']  ?? '' > 0)) {
+          if (!empty($config['root_folder']) && strlen($config['root_folder']  ?? '') > 0) {
             $source_key = $config['root_folder'] . '/' . $source_key;
           }
 
@@ -1468,10 +1457,7 @@ class StrawberryfieldFilePersisterService {
             $this->loggerFactory->get('strawberryfield')->info('File was successfully Copied to S3 at @destination_uri via Multipart', ['@destination_uri' => $destination_uri]);
             return $destination_uri;
           }
-          catch (MultipartUploadException $e) {
-            $this->loggerFactory->get('sbf')->error($e->getMessage());
-          }
-          catch (\Exception $e) {
+          catch (MultipartUploadException|\Exception $e) {
             $this->loggerFactory->get('sbf')->error($e->getMessage());
           }
         }
@@ -1497,7 +1483,7 @@ class StrawberryfieldFilePersisterService {
                     'state' => $e->getState(),
                   ]);
                 }
-                catch (\Exception $e) {
+                catch (\Exception) {
                   $this->loggerFactory->get('strawberryfield')->error('File failed uploading to S3 at @destination_uri from @source_uri via Multipart even if we retried', [
                     '%destination_uri' => $destination_uri,
                     '%source_uri' => $source_uri
@@ -1518,7 +1504,7 @@ class StrawberryfieldFilePersisterService {
           }
         }
       }
-      catch (\Exception $exception) {
+      catch (\Exception) {
         $this->loggerFactory->get('strawberryfield')->error('File upload %source_uri failed because we could not connect to S3.', [
           '%source_uri' => $source_uri
         ]);

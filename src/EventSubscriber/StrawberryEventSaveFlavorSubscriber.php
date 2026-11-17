@@ -83,7 +83,7 @@ class StrawberryEventSaveFlavorSubscriber extends StrawberryfieldEventSaveSubscr
     // Connects... so not yet ok?
     $this->trackFlavorsNeedUpdate($entity, $tracked_deleted);
 
-    $current_class = get_called_class();
+    $current_class = static::class;
     $event->setProcessedBy($current_class, TRUE);
   }
 
@@ -222,16 +222,11 @@ class StrawberryEventSaveFlavorSubscriber extends StrawberryfieldEventSaveSubscr
       $tracking_manager = \Drupal::getContainer()
         ->get('search_api.entity_datasource.tracking_manager');
       foreach ($entity->field_sbf_nodetonode->referencedEntities() as $key => $referencedEntity) {
-        if (!isset($indexes[$referencedEntity->getType()])) {
-          $indexes[$referencedEntity->getType()]
-            = $tracking_manager->getIndexesForEntity($referencedEntity);
-        }
+        $indexes[$referencedEntity->getType()] ??= $tracking_manager->getIndexesForEntity($referencedEntity);
         $updated_item_ids = [];
         $entity_id = $referencedEntity->id();
         $langcode = [$referencedEntity->language()->getId()];
-        $combine_id = function ($langcode) use ($entity_id) {
-          return $entity_id . ':' . $langcode;
-        };
+        $combine_id = (fn($langcode) => $entity_id . ':' . $langcode);
         $updated_item_ids = array_map($combine_id, array_values($langcode));
         if (isset($indexes[$referencedEntity->getType()])) {
           foreach ($indexes[$referencedEntity->getType()] as $index) {
